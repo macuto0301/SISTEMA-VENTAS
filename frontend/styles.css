@@ -915,6 +915,16 @@ body.modo-cajero .venta-resumen-rapido {
     overflow: hidden;
 }
 
+.venta-totalizar-acciones {
+    display: flex;
+    justify-content: flex-start;
+    margin-top: 16px;
+}
+
+.venta-totalizar-acciones .btn-success {
+    width: fit-content;
+}
+
 .atajos-panel {
     margin-bottom: 22px;
     padding: 18px 20px;
@@ -2909,6 +2919,10 @@ body.modo-cajero .venta-resumen-rapido {
 
     .venta-resumen-rapido {
         position: static;
+    }
+
+    .venta-totalizar-acciones .btn-success {
+        width: 100%;
     }
 
     .panel-header-surface,

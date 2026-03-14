@@ -2090,6 +2090,7 @@ function aceptarExcedenteComoSaldoFavor() {
     ventaEnProgreso.excedenteReconocido = 0;
 
     cerrarModalExcedenteTotalizacion();
+    cerrarModalTotalizacion();
     terminarProcesoVenta(ventaEnProgreso, '');
 }
 
@@ -3242,6 +3243,9 @@ async function terminarProcesoVenta(venta, mensajeVuelto) {
 
         if (res.ok) {
             const ventaGuardada = await res.json();
+            cerrarModalExcedenteTotalizacion();
+            cerrarModalTotalizacion();
+            document.getElementById('modalGestionVuelto').style.display = 'none';
             mostrarNotificacion('✅ Venta guardada en servidor');
             await cargarProductos(); // Sincronizar stock real desde backend
             await cargarDatosVentas();
