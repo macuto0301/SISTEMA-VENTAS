@@ -5,9 +5,22 @@
 const AppState = {
     // Productos
     productos: [],
+    productosVista: [],
+    productosQuery: {
+        search: '',
+        filters: {}
+    },
     
     // Ventas
     ventas: [],
+
+    // Clientes
+    clientes: [],
+    clientesCxcBusqueda: [],
+
+    // Cuentas por cobrar
+    cuentasPorCobrar: [],
+    estadoCuentaClienteActual: null,
     
     // Carrito
     carrito: [],
@@ -20,6 +33,16 @@ const AppState = {
     
     // Compras
     compras: [],
+
+    // Paginacion remota
+    paginacion: {
+        productos: { page: 1, page_size: 20, total: 0, total_pages: 0, has_next: false, has_prev: false },
+        ventas: { page: 1, page_size: 10, total: 0, total_pages: 0, has_next: false, has_prev: false },
+        clientes: { page: 1, page_size: 10, total: 0, total_pages: 0, has_next: false, has_prev: false },
+        cuentasPorCobrar: { page: 1, page_size: 10, total: 0, total_pages: 0, has_next: false, has_prev: false },
+        proveedores: { page: 1, page_size: 10, total: 0, total_pages: 0, has_next: false, has_prev: false },
+        compras: { page: 1, page_size: 10, total: 0, total_pages: 0, has_next: false, has_prev: false }
+    },
     
     // Configuración
     tasaDolar: 36.5,
@@ -27,6 +50,7 @@ const AppState = {
     porcentajeGananciaDefecto: 30,
     porcentajeDescuentoDolares: 0,
     metodoRedondeoBs: 'none',
+    precioVentaLibre: false,
     
     // Datos de la empresa
     nombreEmpresa: '',
@@ -111,12 +135,15 @@ const AppState = {
 // Referencias directas para compatibilidad
 var productos = AppState.productos;
 var ventas = AppState.ventas;
+var clientes = AppState.clientes;
+var cuentasPorCobrar = AppState.cuentasPorCobrar;
 var tasaDolar = AppState.tasaDolar;
 var tasaVuelto = AppState.tasaVuelto;
 var tasaVuelto = AppState.tasaVuelto;
 var porcentajeDescuentoDolares = AppState.porcentajeDescuentoDolares;
 var porcentajeGananciaDefecto = AppState.porcentajeGananciaDefecto;
 var metodoRedondeoBs = AppState.metodoRedondeoBs;
+var precioVentaLibre = AppState.precioVentaLibre;
 var carrito = AppState.carrito;
 var pagos = AppState.pagos;
 var proveedores = AppState.proveedores;

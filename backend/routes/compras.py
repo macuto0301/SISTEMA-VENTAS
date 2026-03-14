@@ -1,17 +1,65 @@
 from flask import Blueprint, jsonify, request
 from datetime import datetime
+from sqlalchemy import or_
 from auth_utils import require_roles
 from database import db
-from models import Compra, DetalleCompra, HistorialPrecio, Producto
+from models import Compra, DetalleCompra, HistorialPrecio, Producto, Proveedor
+from pagination import build_paginated_response, get_pagination_params, has_pagination_args
 
 compras_bp = Blueprint('compras', __name__)
 
 @compras_bp.route('/', methods=['GET'])
 def get_compras():
     try:
-        compras = Compra.query.order_by(Compra.created_at.desc()).all()
-        return jsonify([{
+        query = Compra.query.outerjoin(Proveedor, Compra.proveedor_id == Proveedor.id)
+        page = 1
+        page_size = 20
+        paginacion = None
+
+        busqueda = (request.args.get('q') or '').strip()
+        factura = (request.args.get('factura') or '').strip()
+        fecha = (request.args.get('fecha') or '').strip()
+        fecha_libro = (request.args.get('fecha_libro') or '').strip()
+        proveedor = (request.args.get('proveedor') or '').strip()
+        estado = (request.args.get('estado') or '').strip()
+        fecha_inicio = (request.args.get('fecha_inicio') or '').strip()
+        fecha_fin = (request.args.get('fecha_fin') or '').strip()
+
+        if busqueda:
+            termino = f'%{busqueda}%'
+            query = query.filter(or_(
+                db.cast(Compra.numero_compra, db.String).ilike(termino),
+                Compra.nro_factura.ilike(termino),
+                Proveedor.nombre.ilike(termino),
+                Compra.estado.ilike(termino),
+            ))
+
+        if factura:
+            query = query.filter(Compra.nro_factura.ilike(f'%{factura}%'))
+        if fecha:
+            query = query.filter(db.cast(Compra.fecha, db.String).ilike(f'%{fecha}%'))
+        if fecha_libro:
+            query = query.filter(db.cast(Compra.fecha_libro, db.String).ilike(f'%{fecha_libro}%'))
+        if proveedor:
+            query = query.filter(Proveedor.nombre.ilike(f'%{proveedor}%'))
+        if estado:
+            query = query.filter(Compra.estado == estado)
+        if fecha_inicio:
+            query = query.filter(Compra.fecha >= datetime.strptime(fecha_inicio, '%Y-%m-%d').date())
+        if fecha_fin:
+            query = query.filter(Compra.fecha <= datetime.strptime(fecha_fin, '%Y-%m-%d').date())
+
+        query = query.order_by(Compra.created_at.desc())
+        if has_pagination_args():
+            page, page_size = get_pagination_params()
+            paginacion = query.paginate(page=page, per_page=page_size, error_out=False)
+            compras = paginacion.items
+        else:
+            compras = query.all()
+
+        items = [{
             'id': c.id,
+            'numero_compra': c.numero_compra or c.id,
             'nro_factura': c.nro_factura,
             'fecha': c.fecha.strftime('%Y-%m-%d') if c.fecha else '',
             'fecha_libro': c.fecha_libro.strftime('%Y-%m-%d') if c.fecha_libro else '',
@@ -20,7 +68,13 @@ def get_compras():
             'total_dolares': c.total_dolares,
             'total_bs': c.total_bs if hasattr(c, 'total_bs') else 0,
             'estado': c.estado
-        } for c in compras])
+        } for c in compras]
+
+        if has_pagination_args():
+            total = paginacion.total if paginacion and paginacion.total is not None else len(items)
+            return jsonify(build_paginated_response(items, total, page, page_size))
+
+        return jsonify(items)
     except Exception as e:
         import traceback
         print("Error en get_compras:", traceback.format_exc())
@@ -51,6 +105,7 @@ def crear_compra():
         )
         db.session.add(nueva)
         db.session.flush()
+        nueva.numero_compra = nueva.id
 
         for item in data.get('detalles', []):
             detalle = DetalleCompra(
@@ -74,12 +129,17 @@ def crear_compra():
                         producto_id=producto.id,
                         precio_anterior=precio_anterior,
                         precio_nuevo=item['precio_unitario'],
+                        tipo_precio='costo',
                         motivo='compra'
                     )
                     db.session.add(historial)
 
         db.session.commit()
-        return jsonify({'mensaje': 'Compra registrada', 'id': nueva.id}), 201
+        return jsonify({
+            'mensaje': 'Compra registrada',
+            'id': nueva.id,
+            'numero_compra': nueva.numero_compra,
+        }), 201
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 400
@@ -89,6 +149,7 @@ def get_compra(id):
     compra = Compra.query.get_or_404(id)
     return jsonify({
         'id': compra.id,
+        'numero_compra': compra.numero_compra or compra.id,
         'nro_factura': compra.nro_factura,
         'fecha': compra.fecha.strftime('%Y-%m-%d') if compra.fecha else '',
         'fecha_libro': compra.fecha_libro.strftime('%Y-%m-%d') if compra.fecha_libro else '',

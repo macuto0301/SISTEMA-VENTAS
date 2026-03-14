@@ -1,14 +1,52 @@
 from flask import Blueprint, jsonify, request
+from sqlalchemy import or_
 from auth_utils import require_roles
 from database import db
 from models import Proveedor, Compra, DetalleCompra, HistorialPrecio, Producto
+from pagination import build_paginated_response, get_pagination_params, has_pagination_args
 
 proveedores_bp = Blueprint('proveedores', __name__)
 
 @proveedores_bp.route('/', methods=['GET'])
 def get_proveedores():
-    proveedores = Proveedor.query.filter_by(activo=True).order_by(Proveedor.nombre).all()
-    return jsonify([{
+    query = Proveedor.query.filter_by(activo=True).order_by(Proveedor.nombre)
+    page = 1
+    page_size = 20
+    paginacion = None
+
+    busqueda = (request.args.get('q') or '').strip()
+    nombre = (request.args.get('nombre') or '').strip()
+    rif = (request.args.get('rif') or '').strip()
+    telefono = (request.args.get('telefono') or '').strip()
+    email = (request.args.get('email') or '').strip()
+
+    if busqueda:
+        termino = f'%{busqueda}%'
+        query = query.filter(or_(
+            Proveedor.nombre.ilike(termino),
+            Proveedor.rif.ilike(termino),
+            Proveedor.telefono.ilike(termino),
+            Proveedor.email.ilike(termino),
+            Proveedor.direccion.ilike(termino),
+        ))
+
+    if nombre:
+        query = query.filter(Proveedor.nombre.ilike(f'%{nombre}%'))
+    if rif:
+        query = query.filter(Proveedor.rif.ilike(f'%{rif}%'))
+    if telefono:
+        query = query.filter(Proveedor.telefono.ilike(f'%{telefono}%'))
+    if email:
+        query = query.filter(Proveedor.email.ilike(f'%{email}%'))
+
+    if has_pagination_args():
+        page, page_size = get_pagination_params()
+        paginacion = query.paginate(page=page, per_page=page_size, error_out=False)
+        proveedores = paginacion.items
+    else:
+        proveedores = query.all()
+
+    items = [{
         'id': p.id,
         'nombre': p.nombre,
         'rif': p.rif,
@@ -16,7 +54,13 @@ def get_proveedores():
         'email': p.email,
         'direccion': p.direccion,
         'activo': p.activo
-    } for p in proveedores])
+    } for p in proveedores]
+
+    if has_pagination_args():
+        total = paginacion.total if paginacion else len(items)
+        return jsonify(build_paginated_response(items, total, page, page_size))
+
+    return jsonify(items)
 
 @proveedores_bp.route('/', methods=['POST'])
 @require_roles('admin')

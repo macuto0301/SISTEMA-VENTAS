@@ -3,6 +3,42 @@
 // ============================================
 
 const InformesService = {
+    construirParametrosBackend({ soloHoy = false, aplicarFecha = false, page = 1, pageSize = null, search = '', filters = {} } = {}) {
+        const rolFiltro = this.obtenerValorFiltro('filtroRolInforme');
+        const usuarioFiltro = this.obtenerValorFiltro('filtroUsuarioInforme');
+        const inicioInput = this.obtenerValorFiltro('fechaInicioInforme');
+        const finInput = this.obtenerValorFiltro('fechaFinInforme');
+
+        let fechaInicio = '';
+        let fechaFin = '';
+
+        if (soloHoy) {
+            const hoy = new Date();
+            const yyyy = hoy.getFullYear();
+            const mm = String(hoy.getMonth() + 1).padStart(2, '0');
+            const dd = String(hoy.getDate()).padStart(2, '0');
+            fechaInicio = `${yyyy}-${mm}-${dd}`;
+            fechaFin = `${yyyy}-${mm}-${dd}`;
+        } else if (aplicarFecha || (inicioInput && finInput)) {
+            fechaInicio = inicioInput;
+            fechaFin = finInput;
+        }
+
+        return {
+            page,
+            pageSize,
+            search,
+            filters: {
+                fecha: filters.fecha || '',
+                usuario: filters.usuario || usuarioFiltro || '',
+                rol: rolFiltro || '',
+                cliente: filters.cliente || '',
+                fecha_inicio: fechaInicio,
+                fecha_fin: fechaFin
+            }
+        };
+    },
+
     obtenerValorFiltro(id) {
         const elemento = document.getElementById(id);
         return elemento ? elemento.value : '';
@@ -25,44 +61,8 @@ const InformesService = {
         return new Date(anio, mes, dia, hora, min);
     },
 
-    obtenerVentasFiltradas({ soloHoy = false, aplicarFecha = false } = {}) {
-        const rolFiltro = this.obtenerValorFiltro('filtroRolInforme');
-        const usuarioFiltro = this.obtenerValorFiltro('filtroUsuarioInforme');
-        const inicioInput = this.obtenerValorFiltro('fechaInicioInforme');
-        const finInput = this.obtenerValorFiltro('fechaFinInforme');
-
-        let fechaInicio = null;
-        let fechaFin = null;
-
-        if (soloHoy) {
-            const hoy = new Date();
-            fechaInicio = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate(), 0, 0, 0);
-            fechaFin = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate(), 23, 59, 59);
-        } else if (aplicarFecha) {
-            if (!inicioInput || !finInput) {
-                alert('Seleccione fechas de Inicio y Fin');
-                return null;
-            }
-
-            fechaInicio = new Date(inicioInput + 'T00:00:00');
-            fechaFin = new Date(finInput + 'T23:59:59');
-
-            if (fechaInicio > fechaFin) {
-                alert('La fecha final no puede ser menor a la inicial');
-                return null;
-            }
-        }
-
-        return AppState.ventas.filter(venta => {
-            if (rolFiltro && (venta.usuario_rol || '') !== rolFiltro) return false;
-            if (usuarioFiltro && (venta.usuario_username || '') !== usuarioFiltro) return false;
-            if (!fechaInicio || !fechaFin) return true;
-
-            const fechaVenta = this.parsearFechaVenta(venta.fecha);
-            if (!fechaVenta) return false;
-
-            return fechaVenta >= fechaInicio && fechaVenta <= fechaFin;
-        });
+    obtenerVentasFiltradas() {
+        return AppState.ventas || [];
     },
 
     actualizarOpcionesUsuarios() {
@@ -97,29 +97,51 @@ const InformesService = {
         return etiquetas.length > 0 ? `${baseTitulo} - ${etiquetas.join(' | ')}` : baseTitulo;
     },
 
-    cargarVentasDelDia() {
+    async cargarVentasDelDia() {
         this.actualizarOpcionesUsuarios();
-        const ventasDelDia = this.obtenerVentasFiltradas({ soloHoy: true }) || [];
-        this.mostrar(ventasDelDia, this.construirTitulo('Ventas de Hoy'));
+        await cargarDatosVentas(this.construirParametrosBackend({
+            soloHoy: true,
+            page: 1,
+            pageSize: AppState.paginacion.ventas?.page_size || 10
+        }));
+        this.mostrar(this.obtenerVentasFiltradas(), this.construirTitulo('Ventas de Hoy'));
     },
 
-    cargarTodasLasVentas() {
+    async cargarTodasLasVentas() {
         this.actualizarOpcionesUsuarios();
-        const ventasFiltradas = this.obtenerVentasFiltradas() || [];
-        this.mostrar(ventasFiltradas, this.construirTitulo('Todas las Ventas'));
+        await cargarDatosVentas(this.construirParametrosBackend({
+            page: AppState.paginacion.ventas?.page || 1,
+            pageSize: AppState.paginacion.ventas?.page_size || 10
+        }));
+        this.mostrar(this.obtenerVentasFiltradas(), this.construirTitulo('Todas las Ventas'));
     },
 
-    filtrarPorFecha() {
-        const filtradas = this.obtenerVentasFiltradas({ aplicarFecha: true });
-        if (!filtradas) return;
+    async filtrarPorFecha() {
+        const inicioInput = this.obtenerValorFiltro('fechaInicioInforme');
+        const finInput = this.obtenerValorFiltro('fechaFinInforme');
+        if (!inicioInput || !finInput) {
+            alert('Seleccione fechas de Inicio y Fin');
+            return;
+        }
 
-        const fechaInicio = new Date(this.obtenerValorFiltro('fechaInicioInforme') + 'T00:00:00');
-        const fechaFin = new Date(this.obtenerValorFiltro('fechaFinInforme') + 'T23:59:59');
+        const fechaInicio = new Date(inicioInput + 'T00:00:00');
+        const fechaFin = new Date(finInput + 'T23:59:59');
+        if (fechaInicio > fechaFin) {
+            alert('La fecha final no puede ser menor a la inicial');
+            return;
+        }
+
+        await cargarDatosVentas(this.construirParametrosBackend({
+            aplicarFecha: true,
+            page: 1,
+            pageSize: AppState.paginacion.ventas?.page_size || 10
+        }));
+
         const label = `Del ${fechaInicio.toLocaleDateString('es-ES')} al ${fechaFin.toLocaleDateString('es-ES')}`;
-        this.mostrar(filtradas, this.construirTitulo(label));
+        this.mostrar(this.obtenerVentasFiltradas(), this.construirTitulo(label));
     },
 
-    limpiarFiltros() {
+    async limpiarFiltros() {
         document.getElementById('fechaInicioInforme').value = '';
         document.getElementById('fechaFinInforme').value = '';
 
@@ -129,98 +151,186 @@ const InformesService = {
         if (selectRol) selectRol.value = '';
         if (selectUsuario) selectUsuario.value = '';
 
-        this.cargarTodasLasVentas();
+        await this.cargarTodasLasVentas();
     },
 
     mostrar(ventasFiltradas, titulo) {
         const resumenDiv = document.getElementById('resumenVentas');
-        const tablaDiv = document.getElementById('tablaInformes');
 
-        if (!ventasFiltradas || ventasFiltradas.length === 0) {
-            if (resumenDiv) resumenDiv.innerHTML = '<div class="mensaje-vacio">No hay ventas registradas</div>';
-            if (tablaDiv) tablaDiv.innerHTML = '';
-            return;
-        }
+        const ventasLista = Array.isArray(ventasFiltradas) ? ventasFiltradas : [];
 
-        const totalDolares = ventasFiltradas.reduce((sum, v) => sum + (v.total_dolares || 0), 0);
-        const totalBs = ventasFiltradas.reduce((sum, v) => sum + (v.total_bolivares || 0), 0);
-        const totalVentas = ventasFiltradas.length;
+        const totalDolares = ventasLista.reduce((sum, v) => sum + (v.total_dolares || 0), 0);
+        const totalBs = ventasLista.reduce((sum, v) => sum + (v.total_bolivares || 0), 0);
+        const totalVentas = ventasLista.length;
         const promedioDolares = totalVentas > 0 ? totalDolares / totalVentas : 0;
         const promedioBs = totalVentas > 0 ? totalBs / totalVentas : 0;
 
         if (resumenDiv) {
             resumenDiv.innerHTML = `
                 <h3>${titulo}</h3>
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">
-                    <div class="stat-card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 10px;">
-                        <div style="font-size: 0.9em; opacity: 0.9;">Total Ventas</div>
-                        <div style="font-size: 2em; font-weight: bold;">${totalVentas}</div>
+                <div class="resumen-ventas-grid">
+                    <div class="tarjeta-resumen tarjeta-resumen--ventas">
+                        <h3>Total Ventas</h3>
+                        <div class="valor">${totalVentas}</div>
                     </div>
-                    <div class="stat-card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; padding: 20px; border-radius: 10px;">
-                        <div style="font-size: 0.9em; opacity: 0.9;">Total en Dólares</div>
-                        <div style="font-size: 2em; font-weight: bold;">$${totalDolares.toFixed(2)}</div>
+                    <div class="tarjeta-resumen tarjeta-resumen--dolares">
+                        <h3>Total en Dolares</h3>
+                        <div class="valor">$${totalDolares.toFixed(2)}</div>
                     </div>
-                    <div class="stat-card" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white; padding: 20px; border-radius: 10px;">
-                        <div style="font-size: 0.9em; opacity: 0.9;">Total en Bolívares</div>
-                        <div style="font-size: 2em; font-weight: bold;">Bs ${totalBs.toFixed(2)}</div>
+                    <div class="tarjeta-resumen tarjeta-resumen--bolivares">
+                        <h3>Total en Bolivares</h3>
+                        <div class="valor">Bs ${totalBs.toFixed(2)}</div>
                     </div>
-                    <div class="stat-card" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); color: white; padding: 20px; border-radius: 10px;">
-                        <div style="font-size: 0.9em; opacity: 0.9;">Promedio por Venta</div>
-                        <div style="font-size: 1.5em; font-weight: bold;">$${promedioDolares.toFixed(2)}</div>
-                        <div style="font-size: 0.8em; opacity: 0.9;">Bs ${promedioBs.toFixed(2)}</div>
+                    <div class="tarjeta-resumen tarjeta-resumen--promedio">
+                        <h3>Promedio por Venta</h3>
+                        <div class="valor">$${promedioDolares.toFixed(2)}</div>
+                        <small>Bs ${promedioBs.toFixed(2)}</small>
                     </div>
                 </div>
             `;
         }
 
-        const ventasInvertidas = [...ventasFiltradas].reverse();
+        const ventasInvertidas = [...ventasLista].reverse().map((venta, idx) => ({
+            ...venta,
+            __rowId: venta.id || `${venta.fecha || 'sin-fecha'}-${idx}`,
+            __numeroVenta: venta.numero_venta || venta.id || (ventasLista.length - idx)
+        }));
 
-        if (tablaDiv) {
-            tablaDiv.innerHTML = `
-                <table style="width: 100%; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
-                    <thead style="background: #667eea; color: white;">
-                        <tr>
-                            <th style="padding: 15px; text-align: left;">#</th>
-                            <th style="padding: 15px; text-align: left;">Fecha</th>
-                            <th style="padding: 15px; text-align: left;">Usuario</th>
-                            <th style="padding: 15px; text-align: left;">Cliente</th>
-                            <th style="padding: 15px; text-align: left;">Productos</th>
-                            <th style="padding: 15px; text-align: right;">Total $</th>
-                            <th style="padding: 15px; text-align: right;">Total Bs</th>
-                            <th style="padding: 15px; text-align: center;">Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${ventasInvertidas.map((venta, idx) => {
-                            const numeroVenta = ventasFiltradas.length - idx;
-                            return `
-                                <tr style="border-bottom: 1px solid #eee;">
-                                    <td style="padding: 12px; font-weight: bold;">${numeroVenta}</td>
-                                    <td style="padding: 12px;">${venta.fecha || 'S/F'}</td>
-                                    <td style="padding: 12px;">
-                                        ${venta.usuario_username || 'Sin usuario'}
-                                        <br><small style="color: #64748b;">${venta.usuario_rol || 'Sin rol'}</small>
-                                    </td>
-                                    <td style="padding: 12px;">${venta.cliente || 'Consumidor Final'}</td>
-                                    <td style="padding: 12px;">
-                                        ${typeof renderProductosVentaInforme === 'function' ? renderProductosVentaInforme(venta) : ((venta.productos || []).map(p => `${p.cantidad}x ${p.nombre}`).join('<br>') || 'Sin productos')}
-                                        ${typeof obtenerResumenDevolucionVenta === 'function' ? obtenerResumenDevolucionVenta(venta) : ''}
-                                    </td>
-                                    <td style="padding: 12px; text-align: right; font-weight: bold; color: #28a745;">
-                                        $${(venta.total_dolares || 0).toFixed(2)}
-                                    </td>
-                                    <td style="padding: 12px; text-align: right; font-weight: bold; color: #007bff;">
-                                        Bs ${(venta.total_bolivares || 0).toFixed(2)}
-                                    </td>
-                                    <td style="padding: 12px; text-align: center;">
-                                        ${typeof renderAccionesVentaInforme === 'function' ? renderAccionesVentaInforme(venta, numeroVenta) : ''}
-                                    </td>
-                                </tr>
-                            `;
-                        }).join('')}
-                    </tbody>
-                </table>
-            `;
+        if (window.SVTable) {
+            window.SVTable.mount({
+                id: 'tabla-informes-principal',
+                container: 'tablaInformes',
+                title: titulo,
+                ariaLabel: 'Tabla de informes de ventas',
+                rows: ventasInvertidas,
+                rowId: row => row.__rowId,
+                exportFileName: 'informe-ventas',
+                searchPlaceholder: 'Buscar ventas, clientes, usuarios o productos',
+                emptyState: 'No hay ventas registradas para los filtros actuales',
+                pageSize: 10,
+                remotePagination: {
+                    enabled: true,
+                    page: AppState.paginacion.ventas?.page || 1,
+                    pageSize: AppState.paginacion.ventas?.page_size || 10,
+                    total: AppState.paginacion.ventas?.total || ventasLista.length,
+                    totalPages: AppState.paginacion.ventas?.total_pages || 1,
+                    onPageChange: async ({ page, pageSize }) => {
+                        if (typeof cargarDatosVentas === 'function') {
+                            await cargarDatosVentas(this.construirParametrosBackend({ page, pageSize }));
+                            this.mostrar(AppState.ventas, titulo);
+                        }
+                    },
+                    onPageSizeChange: async ({ page, pageSize }) => {
+                        if (typeof cargarDatosVentas === 'function') {
+                            await cargarDatosVentas(this.construirParametrosBackend({ page, pageSize }));
+                            this.mostrar(AppState.ventas, titulo);
+                        }
+                    },
+                    onQueryChange: async ({ page, pageSize, search, filters }) => {
+                        if (typeof cargarDatosVentas === 'function') {
+                            await cargarDatosVentas(this.construirParametrosBackend({ page, pageSize, search, filters }));
+                            this.mostrar(AppState.ventas, titulo);
+                        }
+                    }
+                },
+                columns: [
+                    {
+                        id: 'numero',
+                        label: '#',
+                        key: '__numeroVenta',
+                        align: 'center',
+                        searchValue: row => row.__numeroVenta,
+                        filterable: true
+                    },
+                    {
+                        id: 'fecha',
+                        label: 'Fecha',
+                        key: 'fecha',
+                        filterable: true,
+                        sortValue: row => InformesService.parsearFechaVenta(row.fecha)?.getTime() || 0
+                    },
+                    {
+                        id: 'usuario',
+                        label: 'Usuario',
+                        key: 'usuario_username',
+                        filterable: true,
+                        render: row => `
+                            <div class="sv-table-stack">
+                                <strong>${row.usuario_username || 'Sin usuario'}</strong>
+                                <small>${row.usuario_rol || 'Sin rol'}</small>
+                            </div>
+                        `,
+                        allowHtml: true,
+                        searchValue: row => `${row.usuario_username || ''} ${row.usuario_rol || ''}`
+                    },
+                    {
+                        id: 'cliente',
+                        label: 'Cliente',
+                        key: 'cliente',
+                        filterable: true,
+                        render: row => row.cliente || 'Consumidor Final'
+                    },
+                    {
+                        id: 'productos',
+                        label: 'Productos',
+                        key: 'productos',
+                        sortable: false,
+                        filterable: false,
+                        render: row => `
+                            <div class="sv-table-stack sv-table-stack--dense">
+                                ${typeof renderProductosVentaInforme === 'function'
+                                    ? renderProductosVentaInforme(row)
+                                    : ((row.productos || []).map(p => `${p.cantidad}x ${p.nombre}`).join('<br>') || 'Sin productos')}
+                                ${typeof obtenerResumenDevolucionVenta === 'function' ? obtenerResumenDevolucionVenta(row) : ''}
+                            </div>
+                        `,
+                        allowHtml: true,
+                        exportValue: row => (row.productos || []).map(p => `${p.cantidad}x ${p.nombre}`).join(' | ')
+                    },
+                    {
+                        id: 'totalUsd',
+                        label: 'Total $',
+                        key: 'total_dolares',
+                        type: 'money',
+                        currency: '$',
+                        align: 'right',
+                        filterable: true
+                    },
+                    {
+                        id: 'totalBs',
+                        label: 'Total Bs',
+                        key: 'total_bolivares',
+                        type: 'money',
+                        currency: 'Bs',
+                        align: 'right',
+                        filterable: true
+                    },
+                    {
+                        id: 'acciones',
+                        label: 'Acciones',
+                        type: 'actions',
+                        sortable: false,
+                        searchable: false,
+                        hideable: false,
+                        align: 'center',
+                        render: row => typeof renderAccionesVentaInforme === 'function' ? renderAccionesVentaInforme(row, row.__numeroVenta) : '',
+                        allowHtml: true,
+                        exportable: false
+                    }
+                ],
+                bulkActions: [
+                    {
+                        id: 'export-selected-csv',
+                        label: 'Exportar seleccion CSV',
+                        handler: () => window.SVTable.exportSelected('tabla-informes-principal', 'csv')
+                    },
+                    {
+                        id: 'clear-selection',
+                        label: 'Limpiar seleccion',
+                        handler: () => window.SVTable.clearSelection('tabla-informes-principal')
+                    }
+                ]
+            });
         }
     }
 };

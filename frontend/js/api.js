@@ -5,6 +5,17 @@
 const API = {
     baseUrl: "http://localhost:5000/api",
 
+    buildQuery(params = {}) {
+        const searchParams = new URLSearchParams();
+        Object.entries(params).forEach(([key, value]) => {
+            if (value !== undefined && value !== null && value !== '') {
+                searchParams.append(key, value);
+            }
+        });
+        const query = searchParams.toString();
+        return query ? `?${query}` : '';
+    },
+
     getAuthHeaders() {
         try {
             const sesion = JSON.parse(localStorage.getItem('sesion_ventas') || 'null');
@@ -20,11 +31,27 @@ const API = {
     async request(endpoint, options = {}) {
         const url = `${this.baseUrl}${endpoint}`;
         try {
+            const headers = { ...this.getAuthHeaders(), ...options.headers };
+            if (options.body instanceof FormData) {
+                delete headers['Content-Type'];
+            } else if (!headers['Content-Type']) {
+                headers['Content-Type'] = 'application/json';
+            }
+
             const res = await fetch(url, {
-                headers: { 'Content-Type': 'application/json', ...this.getAuthHeaders(), ...options.headers },
+                headers,
                 ...options
             });
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            if (!res.ok) {
+                let mensaje = `HTTP ${res.status}`;
+                try {
+                    const data = await res.json();
+                    mensaje = data?.error || data?.message || mensaje;
+                } catch (parseError) {
+                    // noop
+                }
+                throw new Error(mensaje);
+            }
             return await res.json();
         } catch (e) {
             console.warn(`API Error: ${endpoint}`, e);
@@ -40,8 +67,24 @@ const API = {
         return this.request(endpoint, { method: 'POST', body: JSON.stringify(data) });
     },
 
+    async postForm(endpoint, formData) {
+        return this.request(endpoint, {
+            method: 'POST',
+            headers: {},
+            body: formData
+        });
+    },
+
     async put(endpoint, data) {
         return this.request(endpoint, { method: 'PUT', body: JSON.stringify(data) });
+    },
+
+    async putForm(endpoint, formData) {
+        return this.request(endpoint, {
+            method: 'PUT',
+            headers: {},
+            body: formData
+        });
     },
 
     async delete(endpoint) {
@@ -50,6 +93,59 @@ const API = {
 };
 
 const ApiService = {
+    buildListParams(options = {}) {
+        const params = {
+            page: options.page || 1,
+            page_size: options.pageSize || 10
+        };
+
+        if (options.search) {
+            params.q = options.search;
+        }
+
+        Object.entries(options.filters || {}).forEach(([key, value]) => {
+            if (value !== undefined && value !== null && value !== '') {
+                params[key] = value;
+            }
+        });
+
+        Object.entries(options.extraParams || {}).forEach(([key, value]) => {
+            if (value !== undefined && value !== null && value !== '') {
+                params[key] = value;
+            }
+        });
+
+        return params;
+    },
+
+    normalizarRespuestaListado(data, fallbackPage = 1, fallbackPageSize = 10) {
+        if (Array.isArray(data)) {
+            return {
+                items: data,
+                pagination: {
+                    page: fallbackPage,
+                    page_size: fallbackPageSize,
+                    total: data.length,
+                    total_pages: data.length > 0 ? 1 : 0,
+                    has_next: false,
+                    has_prev: false
+                }
+            };
+        }
+
+        return {
+            items: Array.isArray(data?.items) ? data.items : [],
+            pagination: {
+                page: data?.pagination?.page || fallbackPage,
+                page_size: data?.pagination?.page_size || fallbackPageSize,
+                total: data?.pagination?.total || 0,
+                total_pages: data?.pagination?.total_pages || 0,
+                has_next: Boolean(data?.pagination?.has_next),
+                has_prev: Boolean(data?.pagination?.has_prev)
+            }
+        };
+    },
+
     async cargarConfiguracion() {
         try {
             const data = await API.get('/config/');
@@ -60,6 +156,7 @@ const ApiService = {
                     porcentajeGananciaDefecto: data.porcentajeGananciaDefecto || 30,
                     porcentajeDescuentoDolares: data.porcentajeDescuentoDolares || 0,
                     metodoRedondeoBs: data.metodoRedondeoBs || 'none',
+                    precioVentaLibre: Boolean(data.precioVentaLibre),
                     nombreEmpresa: data.nombreEmpresa || '',
                     rifEmpresa: data.rifEmpresa || '',
                     direccionEmpresa: data.direccionEmpresa || ''
@@ -81,14 +178,17 @@ const ApiService = {
         }
     },
 
-    async cargarProductos() {
+    async cargarProductos(options = {}) {
         try {
-            const data = await API.get('/productos/');
-            return data;
+            const page = options.page || 1;
+            const pageSize = options.pageSize || 20;
+            const query = API.buildQuery(this.buildListParams({ ...options, page, pageSize }));
+            const data = await API.get(`/productos/${query}`);
+            return this.normalizarRespuestaListado(data, page, pageSize);
         } catch (e) {
             console.error('Error cargando productos:', e);
             alert('Error de conexión con el servidor.');
-            return [];
+            return this.normalizarRespuestaListado([], options.page || 1, options.pageSize || 20);
         }
     },
 
@@ -128,13 +228,17 @@ const ApiService = {
         }
     },
 
-    async cargarVentas() {
+    async cargarVentas(options = {}) {
         try {
-            return await API.get('/ventas/');
+            const page = options.page || 1;
+            const pageSize = options.pageSize || 10;
+            const query = API.buildQuery(this.buildListParams({ ...options, page, pageSize }));
+            const data = await API.get(`/ventas/${query}`);
+            return this.normalizarRespuestaListado(data, page, pageSize);
         } catch (e) {
             console.error('Error cargando ventas:', e);
             alert('Error de conexión con el servidor.');
-            return [];
+            return this.normalizarRespuestaListado([], options.page || 1, options.pageSize || 10);
         }
     },
 
@@ -174,6 +278,56 @@ const ApiService = {
         }
     },
 
+    async cargarClientes(options = {}) {
+        try {
+            const page = options.page || 1;
+            const pageSize = options.pageSize || 10;
+            const query = API.buildQuery(this.buildListParams({ ...options, page, pageSize }));
+            const data = await API.get(`/clientes/${query}`);
+            return this.normalizarRespuestaListado(data, page, pageSize);
+        } catch (e) {
+            console.error('Error cargando clientes:', e);
+            alert('Error de conexion con el servidor.');
+            return this.normalizarRespuestaListado([], options.page || 1, options.pageSize || 10);
+        }
+    },
+
+    async crearCliente(cliente) {
+        if (cliente instanceof FormData) {
+            return API.postForm('/clientes/', cliente);
+        }
+        return API.post('/clientes/', cliente);
+    },
+
+    async actualizarCliente(id, cliente) {
+        if (cliente instanceof FormData) {
+            return API.putForm(`/clientes/${id}`, cliente);
+        }
+        return API.put(`/clientes/${id}`, cliente);
+    },
+
+    async obtenerEstadoCuentaCliente(clienteId) {
+        return API.get(`/clientes/${clienteId}/estado-cuenta`);
+    },
+
+    async cargarCuentasPorCobrar(options = {}) {
+        try {
+            const page = options.page || 1;
+            const pageSize = options.pageSize || 10;
+            const query = API.buildQuery(this.buildListParams({ ...options, page, pageSize }));
+            const data = await API.get(`/cuentas-por-cobrar/${query}`);
+            return this.normalizarRespuestaListado(data, page, pageSize);
+        } catch (e) {
+            console.error('Error cargando cuentas por cobrar:', e);
+            alert('Error de conexion con el servidor.');
+            return this.normalizarRespuestaListado([], options.page || 1, options.pageSize || 10);
+        }
+    },
+
+    async registrarAbonoCuenta(cuentaId, payload) {
+        return API.post(`/cuentas-por-cobrar/${cuentaId}/abonos`, payload);
+    },
+
     async tasaBCV() {
         try {
             const res = await fetch('https://pydolarvenezuela-api.vercel.app/api/v1/dollar?moneda=bcv');
@@ -185,13 +339,17 @@ const ApiService = {
     },
 
     // Proveedores
-    async cargarProveedores() {
+    async cargarProveedores(options = {}) {
         try {
-            return await API.get('/proveedores/');
+            const page = options.page || 1;
+            const pageSize = options.pageSize || 10;
+            const query = API.buildQuery(this.buildListParams({ ...options, page, pageSize }));
+            const data = await API.get(`/proveedores/${query}`);
+            return this.normalizarRespuestaListado(data, page, pageSize);
         } catch (e) {
             console.error('Error cargando proveedores:', e);
             alert('Error de conexión con el servidor. Verifique que el backend esté corriendo.');
-            return [];
+            return this.normalizarRespuestaListado([], options.page || 1, options.pageSize || 10);
         }
     },
 
@@ -238,15 +396,18 @@ const ApiService = {
     },
 
     // Compras
-    async cargarCompras() {
+    async cargarCompras(options = {}) {
         try {
-            const data = await API.get('/compras/');
+            const page = options.page || 1;
+            const pageSize = options.pageSize || 10;
+            const query = API.buildQuery(this.buildListParams({ ...options, page, pageSize }));
+            const data = await API.get(`/compras/${query}`);
             console.log('Compras desde API:', data);
-            return data;
+            return this.normalizarRespuestaListado(data, page, pageSize);
         } catch (e) {
             console.error('Error cargando compras:', e);
             alert('Error de conexión con el servidor. Verifique que el backend esté corriendo.');
-            return [];
+            return this.normalizarRespuestaListado([], options.page || 1, options.pageSize || 10);
         }
     },
 

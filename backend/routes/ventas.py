@@ -1,13 +1,19 @@
 from datetime import datetime
 
 from flask import Blueprint, jsonify, request
+from sqlalchemy import or_
 from auth_utils import get_current_user, require_roles
+from cuenta_corriente_utils import obtener_saldos_a_favor_disponibles
 
 from database import db
+from pagination import build_paginated_response, get_pagination_params, has_pagination_args
 from models import (
+    Cliente,
+    CuentaPorCobrar,
     DetalleDevolucionVenta,
     DetalleVenta,
     DevolucionVenta,
+    MovimientoCuentaCliente,
     PagoVenta,
     Producto,
     Venta,
@@ -28,12 +34,14 @@ def serializar_detalle_venta(detalle: DetalleVenta, cantidad_devuelta: int = 0) 
         'cantidad_disponible_devolucion': cantidad_disponible,
         'precio_unitario_dolares': detalle.precio_unitario,
         'subtotal_dolares': detalle.subtotal,
+        'lista_precio': detalle.lista_precio or 1,
     }
 
 
 def serializar_devolucion(devolucion: DevolucionVenta) -> dict:
     detalles = DetalleDevolucionVenta.query.filter_by(devolucion_id=devolucion.id).all()
     reintegros = devolucion.reintegros_entregados or []
+    venta = Venta.query.get(devolucion.venta_id)
     if not reintegros and devolucion.monto_reintegrado:
         reintegros = [{
             'metodo': devolucion.metodo_reintegro,
@@ -45,6 +53,7 @@ def serializar_devolucion(devolucion: DevolucionVenta) -> dict:
     return {
         'id': devolucion.id,
         'venta_id': devolucion.venta_id,
+        'venta_numero_venta': venta.numero_venta if venta and venta.numero_venta else devolucion.venta_id,
         'fecha': devolucion.fecha.strftime('%d/%m/%Y %H:%M'),
         'cliente': devolucion.cliente,
         'motivo': devolucion.motivo or '',
@@ -63,6 +72,7 @@ def serializar_devolucion(devolucion: DevolucionVenta) -> dict:
             'cantidad': d.cantidad,
             'precio_unitario_dolares': d.precio_unitario,
             'subtotal_dolares': d.subtotal,
+            'lista_precio': getattr(d, 'lista_precio', 1) or 1,
         } for d in detalles],
     }
 
@@ -81,30 +91,88 @@ def obtener_cantidades_devueltas(venta_id: int) -> dict[int, int]:
     return {detalle_venta_id: int(total or 0) for detalle_venta_id, total in detalles_devueltos if detalle_venta_id}
 
 
+def crear_movimiento_cliente(
+    cliente_id: int,
+    tipo_movimiento: str,
+    monto_usd: float,
+    venta_id: int | None = None,
+    cuenta_por_cobrar_id: int | None = None,
+    moneda_origen: str = 'USD',
+    monto_origen: float = 0.0,
+    tasa_usada: float = 0.0,
+    medio: str | None = None,
+    descripcion: str | None = None,
+    usuario_username: str | None = None,
+    movimiento_referencia_id: int | None = None,
+    saldo_disponible_usd: float | None = None,
+) -> None:
+    movimiento = MovimientoCuentaCliente(
+        cliente_id=cliente_id,
+        venta_id=venta_id,
+        cuenta_por_cobrar_id=cuenta_por_cobrar_id,
+        movimiento_referencia_id=movimiento_referencia_id,
+        tipo_movimiento=tipo_movimiento,
+        monto_usd=round(monto_usd or 0.0, 2),
+        saldo_disponible_usd=round(saldo_disponible_usd if saldo_disponible_usd is not None else (monto_usd if tipo_movimiento == 'saldo_a_favor' else 0.0), 2),
+        moneda_origen=moneda_origen,
+        monto_origen=round(monto_origen or 0.0, 2),
+        tasa_usada=tasa_usada or 0.0,
+        medio=medio,
+        descripcion=descripcion,
+        usuario_username=usuario_username,
+    )
+    db.session.add(movimiento)
+
+
 @ventas_bp.route('/', methods=['POST'])
 @require_roles('admin', 'cajero')
 def registrar_venta():
-    data = request.get_json()
+    data = request.get_json() or {}
     current_user = get_current_user()
 
     if not current_user:
         return jsonify({'error': 'Sesion no valida'}), 401
 
     try:
+        cliente_id = data.get('cliente_id')
+        cliente_nombre = (data.get('cliente') or 'Cliente General').strip() or 'Cliente General'
+        cliente = Cliente.query.get(cliente_id) if cliente_id else None
+        pagos = data.get('pagos', [])
+        saldo_a_favor_aplicado_usd = round(float(data.get('saldo_a_favor_aplicado_usd') or 0), 2)
+        saldo_a_favor_generado_usd = round(float(data.get('saldo_a_favor_generado_usd') or 0), 2)
+        total_reconocido_pagos = round(sum(float(p.get('valor_reconocido') or 0) for p in pagos), 2)
+        total_dolares = round(float(data['total_dolares']), 2)
+        saldo_pendiente_usd = round(float(data.get('saldo_pendiente_usd') or max(0.0, total_dolares - total_reconocido_pagos - saldo_a_favor_aplicado_usd)), 2)
+        tipo_venta = 'credito' if saldo_pendiente_usd > 0.01 else 'contado'
+
+        if (saldo_pendiente_usd > 0.01 or saldo_a_favor_generado_usd > 0.01 or saldo_a_favor_aplicado_usd > 0.01) and not cliente:
+            return jsonify({'error': 'Debe seleccionar un cliente para ventas con saldo pendiente o saldo a favor'}), 400
+
+        if saldo_a_favor_aplicado_usd > 0.01:
+            if not cliente:
+                return jsonify({'error': 'No se encontro el cliente para aplicar saldo a favor'}), 400
+            if saldo_a_favor_aplicado_usd > round(cliente.saldo_a_favor_usd or 0.0, 2) + 0.001:
+                return jsonify({'error': 'El cliente no tiene suficiente saldo a favor'}), 400
+
         nueva_venta = Venta(
-            cliente=data.get('cliente', 'Cliente General'),
+            cliente_id=cliente.id if cliente else None,
+            cliente=cliente.nombre if cliente else cliente_nombre,
             usuario_username=current_user.username,
             usuario_rol=current_user.rol,
-            total_dolares=data['total_dolares'],
+            tipo_venta=tipo_venta,
+            total_dolares=total_dolares,
             total_bolivares=data['total_bolivares'],
             descuento_total=data.get('descuento_dolares', 0),
             porcentaje_bono=data.get('porcentaje_descuento_usd', 0),
             total_pagado_dolares=data.get('total_pagado_real_dolares', 0),
             total_pagado_bs=data.get('total_pagado_real_bs', 0),
+            saldo_pendiente_usd=saldo_pendiente_usd,
+            saldo_a_favor_generado_usd=saldo_a_favor_generado_usd,
             vuelto_entregado=data.get('vueltos_entregados', []),
         )
         db.session.add(nueva_venta)
         db.session.flush()
+        nueva_venta.numero_venta = nueva_venta.id
 
         for item in data['productos']:
             prod = None
@@ -128,10 +196,11 @@ def registrar_venta():
                 cantidad=item['cantidad'],
                 precio_unitario=item['precio_unitario_dolares'],
                 subtotal=item['subtotal_dolares'],
+                lista_precio=int(item.get('lista_precio') or 1),
             )
             db.session.add(detalle)
 
-        for p in data['pagos']:
+        for p in pagos:
             pago = PagoVenta(
                 venta_id=nueva_venta.id,
                 medio=p['medio'],
@@ -142,8 +211,94 @@ def registrar_venta():
             )
             db.session.add(pago)
 
+        cuenta_por_cobrar = None
+        if saldo_a_favor_aplicado_usd > 0.01 and cliente:
+            cliente.saldo_a_favor_usd = round((cliente.saldo_a_favor_usd or 0.0) - saldo_a_favor_aplicado_usd, 2)
+            restante_por_aplicar = saldo_a_favor_aplicado_usd
+            fuentes_saldo = obtener_saldos_a_favor_disponibles(cliente.id)
+
+            for fuente in fuentes_saldo:
+                if restante_por_aplicar <= 0.001:
+                    break
+                disponible = round(fuente.saldo_disponible_usd or 0.0, 2)
+                if disponible <= 0.001:
+                    continue
+                monto_desde_fuente = round(min(disponible, restante_por_aplicar), 2)
+                fuente.saldo_disponible_usd = round(disponible - monto_desde_fuente, 2)
+                numero_venta_origen = fuente.venta.numero_venta if fuente.venta and fuente.venta.numero_venta else fuente.venta_id
+                crear_movimiento_cliente(
+                    cliente_id=cliente.id,
+                    venta_id=nueva_venta.id,
+                    tipo_movimiento='aplicacion_saldo_favor_venta',
+                    monto_usd=monto_desde_fuente,
+                    moneda_origen='USD',
+                    monto_origen=monto_desde_fuente,
+                    tasa_usada=1.0,
+                    medio='Saldo a favor',
+                    descripcion=f'Saldo a favor aplicado a la venta #{nueva_venta.numero_venta} usando saldo originado en la venta #{numero_venta_origen}',
+                    usuario_username=current_user.username,
+                    movimiento_referencia_id=fuente.id,
+                    saldo_disponible_usd=0.0,
+                )
+                restante_por_aplicar = round(restante_por_aplicar - monto_desde_fuente, 2)
+
+            if restante_por_aplicar > 0.001:
+                db.session.rollback()
+                return jsonify({'error': 'No se pudo rastrear completamente el saldo a favor disponible del cliente'}), 400
+
+        if saldo_pendiente_usd > 0.01 and cliente:
+            cuenta_por_cobrar = CuentaPorCobrar(
+                cliente_id=cliente.id,
+                venta_id=nueva_venta.id,
+                numero_venta=nueva_venta.numero_venta,
+                monto_original_usd=saldo_pendiente_usd,
+                monto_abonado_usd=0.0,
+                saldo_pendiente_usd=saldo_pendiente_usd,
+                estado='pendiente',
+                observacion=(data.get('observacion_credito') or '').strip() or None,
+            )
+            db.session.add(cuenta_por_cobrar)
+            db.session.flush()
+            crear_movimiento_cliente(
+                cliente_id=cliente.id,
+                venta_id=nueva_venta.id,
+                cuenta_por_cobrar_id=cuenta_por_cobrar.id,
+                tipo_movimiento='cargo_venta_credito',
+                monto_usd=saldo_pendiente_usd,
+                moneda_origen='USD',
+                monto_origen=saldo_pendiente_usd,
+                tasa_usada=1.0,
+                medio='Credito',
+                descripcion=f'Saldo pendiente generado por la venta #{nueva_venta.numero_venta}',
+                usuario_username=current_user.username,
+            )
+
+        if saldo_a_favor_generado_usd > 0.01 and cliente:
+            cliente.saldo_a_favor_usd = round((cliente.saldo_a_favor_usd or 0.0) + saldo_a_favor_generado_usd, 2)
+            crear_movimiento_cliente(
+                cliente_id=cliente.id,
+                venta_id=nueva_venta.id,
+                cuenta_por_cobrar_id=cuenta_por_cobrar.id if cuenta_por_cobrar else None,
+                tipo_movimiento='saldo_a_favor',
+                monto_usd=saldo_a_favor_generado_usd,
+                moneda_origen='USD',
+                monto_origen=saldo_a_favor_generado_usd,
+                tasa_usada=1.0,
+                medio='Excedente sin vuelto',
+                descripcion=f'Saldo a favor generado por excedente en la venta #{nueva_venta.numero_venta}',
+                usuario_username=current_user.username,
+            )
+
         db.session.commit()
-        return jsonify({'mensaje': 'Venta registrada con éxito', 'id': nueva_venta.id}), 201
+        return jsonify({
+            'mensaje': 'Venta registrada con éxito',
+            'id': nueva_venta.id,
+            'numero_venta': nueva_venta.numero_venta,
+            'tipo_venta': nueva_venta.tipo_venta,
+            'saldo_pendiente_usd': nueva_venta.saldo_pendiente_usd,
+            'saldo_a_favor_generado_usd': nueva_venta.saldo_a_favor_generado_usd,
+            'cuenta_por_cobrar_id': cuenta_por_cobrar.id if cuenta_por_cobrar else None,
+        }), 201
 
     except Exception as e:
         db.session.rollback()
@@ -281,6 +436,7 @@ def registrar_devolucion(venta_id: int):
                 cantidad=cantidad,
                 precio_unitario=detalle_venta.precio_unitario,
                 subtotal=subtotal,
+                lista_precio=detalle_venta.lista_precio or 1,
             )
             db.session.add(detalle_devolucion)
 
@@ -302,7 +458,54 @@ def registrar_devolucion(venta_id: int):
 
 @ventas_bp.route('/', methods=['GET'])
 def get_ventas():
-    lista_ventas = Venta.query.order_by(Venta.fecha.desc()).all()
+    query = Venta.query
+    page = 1
+    page_size = 20
+    paginacion = None
+
+    busqueda = (request.args.get('q') or '').strip()
+    fecha = (request.args.get('fecha') or '').strip()
+    usuario = (request.args.get('usuario') or '').strip()
+    rol = (request.args.get('rol') or '').strip()
+    cliente = (request.args.get('cliente') or '').strip()
+    fecha_inicio = (request.args.get('fecha_inicio') or '').strip()
+    fecha_fin = (request.args.get('fecha_fin') or '').strip()
+
+    if busqueda:
+        termino = f'%{busqueda}%'
+        ventas_con_producto = db.session.query(DetalleVenta.venta_id).filter(
+            DetalleVenta.producto_nombre.ilike(termino)
+        )
+        query = query.filter(or_(
+            Venta.cliente.ilike(termino),
+            Venta.usuario_username.ilike(termino),
+            Venta.usuario_rol.ilike(termino),
+            db.cast(Venta.fecha, db.String).ilike(termino),
+            db.cast(Venta.numero_venta, db.String).ilike(termino),
+            Venta.id.in_(ventas_con_producto),
+        ))
+
+    if fecha:
+        query = query.filter(db.cast(Venta.fecha, db.String).ilike(f'%{fecha}%'))
+    if usuario:
+        query = query.filter(Venta.usuario_username.ilike(f'%{usuario}%'))
+    if rol:
+        query = query.filter(Venta.usuario_rol == rol)
+    if cliente:
+        query = query.filter(Venta.cliente.ilike(f'%{cliente}%'))
+    if fecha_inicio:
+        query = query.filter(Venta.fecha >= datetime.strptime(fecha_inicio, '%Y-%m-%d'))
+    if fecha_fin:
+        query = query.filter(Venta.fecha < datetime.strptime(fecha_fin, '%Y-%m-%d').replace(hour=23, minute=59, second=59))
+
+    query = query.order_by(Venta.fecha.desc())
+    if has_pagination_args():
+        page, page_size = get_pagination_params()
+        paginacion = query.paginate(page=page, per_page=page_size, error_out=False)
+        lista_ventas = paginacion.items
+    else:
+        lista_ventas = query.all()
+
     res = []
     for v in lista_ventas:
         cantidades_devueltas = obtener_cantidades_devueltas(v.id)
@@ -327,13 +530,18 @@ def get_ventas():
 
         res.append({
             'id': v.id,
+            'numero_venta': v.numero_venta or v.id,
             'fecha': v.fecha.strftime('%d/%m/%Y %H:%M'),
+            'cliente_id': v.cliente_id,
             'cliente': v.cliente,
             'usuario_username': v.usuario_username,
             'usuario_rol': v.usuario_rol,
+            'tipo_venta': v.tipo_venta or 'contado',
             'total_dolares': v.total_dolares,
             'total_bolivares': v.total_bolivares,
             'descuento_dolares': v.descuento_total,
+            'saldo_pendiente_usd': round(v.saldo_pendiente_usd or 0.0, 2),
+            'saldo_a_favor_generado_usd': round(v.saldo_a_favor_generado_usd or 0.0, 2),
             'productos': productos_list,
             'pagos': pagos_list,
             'vueltos_entregados': v.vuelto_entregado or [],
@@ -342,4 +550,9 @@ def get_ventas():
             'total_devuelto_bolivares': round(sum(d.total_reintegrado_bolivares for d in devoluciones), 2),
             'cantidad_items_devueltos': sum(det.get('cantidad', 0) for d in devoluciones_list for det in d['detalles']),
         })
+
+    if has_pagination_args():
+        total = paginacion.total if paginacion else len(res)
+        return jsonify(build_paginated_response(res, total, page, page_size))
+
     return jsonify(res)

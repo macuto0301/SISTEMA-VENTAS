@@ -4,55 +4,136 @@
 
 window.window.indiceSeleccionado = -1;
 
+function mapearFiltrosProveedores(filters = {}) {
+    return {
+        nombre: filters.nombre || '',
+        rif: filters.rif || '',
+        telefono: filters.telefono || '',
+        email: filters.email || ''
+    };
+}
+
+function mapearFiltrosCompras(filters = {}) {
+    return {
+        factura: filters.factura || '',
+        fecha: filters.fecha || '',
+        fecha_libro: filters.libro || '',
+        proveedor: filters.proveedor || '',
+        estado: filters.estado || ''
+    };
+}
+
 const ProveedoresModule = {
     async init() {
         await this.cargarProveedores();
     },
 
-    async cargarProveedores() {
-        AppState.proveedores = await ApiService.cargarProveedores();
+    async cargarProveedores(options = {}) {
+        const container = document.getElementById('listaProveedores');
+        if (container) {
+            container.innerHTML = '<div class="sv-table-loading-card">Cargando proveedores...</div>';
+        }
+
+        const paginacionActual = AppState.paginacion.proveedores || { page: 1, page_size: 10 };
+        const page = options.page || paginacionActual.page || 1;
+        const pageSize = options.pageSize || paginacionActual.page_size || 10;
+        const response = await ApiService.cargarProveedores({
+            page,
+            pageSize,
+            search: options.search || '',
+            filters: mapearFiltrosProveedores(options.filters)
+        });
+
+        AppState.proveedores = response.items;
+        AppState.paginacion.proveedores = response.pagination;
         proveedores = AppState.proveedores;
         this.mostrarProveedores();
     },
 
     mostrarProveedores(lista = null) {
-        const container = document.getElementById('listaProveedores');
-        if (!container) return;
-        
         const proveedoresMostrar = lista || AppState.proveedores;
-        
-        if (proveedoresMostrar.length === 0) {
-            container.innerHTML = '<div class="mensaje-vacio">No hay proveedores registrados</div>';
+
+        if (!window.SVTable) {
             return;
         }
 
-        container.innerHTML = `
-            <table style="width: 100%; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
-                <thead style="background: #667eea; color: white;">
-                    <tr>
-                        <th style="padding: 12px; text-align: left;">Nombre</th>
-                        <th style="padding: 12px; text-align: left;">RIF</th>
-                        <th style="padding: 12px; text-align: left;">Teléfono</th>
-                        <th style="padding: 12px; text-align: left;">Email</th>
-                        <th style="padding: 12px; text-align: center;">Acciones</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${proveedoresMostrar.map(p => `
-                        <tr style="border-bottom: 1px solid #eee;">
-                            <td style="padding: 12px;">${p.nombre}</td>
-                            <td style="padding: 12px;">${p.rif}</td>
-                            <td style="padding: 12px;">${p.telefono || '-'}</td>
-                            <td style="padding: 12px;">${p.email || '-'}</td>
-                            <td style="padding: 12px; text-align: center;">
-                                <button onclick="editarProveedor(${p.id})" class="btn-small" style="background: #ffc107; color: black;">✏️</button>
-                                <button onclick="eliminarProveedor(${p.id})" class="btn-small" style="background: #dc3545; color: white;">🗑️</button>
-                            </td>
-                        </tr>
-                    `).join('')}
-                </tbody>
-            </table>
-        `;
+        window.SVTable.mount({
+            id: 'tabla-proveedores',
+            container: 'listaProveedores',
+            title: 'Proveedores',
+            ariaLabel: 'Tabla de proveedores',
+            rows: proveedoresMostrar,
+            rowId: row => row.id,
+            exportFileName: 'proveedores',
+            searchPlaceholder: 'Buscar por nombre, RIF, telefono o email',
+            emptyState: 'No hay proveedores registrados',
+            pageSize: 10,
+            remotePagination: {
+                enabled: true,
+                page: AppState.paginacion.proveedores?.page || 1,
+                pageSize: AppState.paginacion.proveedores?.page_size || 10,
+                total: AppState.paginacion.proveedores?.total || proveedoresMostrar.length,
+                totalPages: AppState.paginacion.proveedores?.total_pages || 1,
+                onPageChange: ({ page, pageSize, search, filters }) => this.cargarProveedores({ page, pageSize, search, filters }),
+                onPageSizeChange: ({ page, pageSize, search, filters }) => this.cargarProveedores({ page, pageSize, search, filters }),
+                onQueryChange: ({ page, pageSize, search, filters }) => this.cargarProveedores({ page, pageSize, search, filters })
+            },
+            columns: [
+                {
+                    id: 'nombre',
+                    label: 'Nombre',
+                    key: 'nombre',
+                    filterable: true
+                },
+                {
+                    id: 'rif',
+                    label: 'RIF',
+                    key: 'rif',
+                    filterable: true
+                },
+                {
+                    id: 'telefono',
+                    label: 'Telefono',
+                    key: 'telefono',
+                    filterable: true,
+                    render: row => row.telefono || '-'
+                },
+                {
+                    id: 'email',
+                    label: 'Email',
+                    key: 'email',
+                    filterable: true,
+                    render: row => row.email || '-'
+                },
+                {
+                    id: 'acciones',
+                    label: 'Acciones',
+                    type: 'actions',
+                    sortable: false,
+                    searchable: false,
+                    hideable: false,
+                    align: 'center',
+                    render: row => `
+                        <button onclick="editarProveedor(${row.id})" class="btn-small" style="background: #ffc107; color: black;" title="Editar proveedor">✏️</button>
+                        <button onclick="eliminarProveedor(${row.id})" class="btn-small" style="background: #dc3545; color: white;" title="Eliminar proveedor">🗑️</button>
+                    `,
+                    allowHtml: true,
+                    exportable: false
+                }
+            ],
+            bulkActions: [
+                {
+                    id: 'export-selected-csv',
+                    label: 'Exportar seleccion CSV',
+                    handler: () => window.SVTable.exportSelected('tabla-proveedores', 'csv')
+                },
+                {
+                    id: 'clear-selection',
+                    label: 'Limpiar seleccion',
+                    handler: () => window.SVTable.clearSelection('tabla-proveedores')
+                }
+            ]
+        });
     }
 };
 
@@ -156,12 +237,33 @@ const ComprasModule = {
         }
     },
 
-    async cargarCompras() {
+    async cargarCompras(options = {}) {
         console.log('Cargando compras...');
-        AppState.compras = await ApiService.cargarCompras();
+        const container = document.getElementById('listaCompras');
+        if (container) {
+            container.innerHTML = '<div class="sv-table-loading-card">Cargando compras...</div>';
+        }
+
+        const paginacionActual = AppState.paginacion.compras || { page: 1, page_size: 10 };
+        const page = options.page || paginacionActual.page || 1;
+        const pageSize = options.pageSize || paginacionActual.page_size || 10;
+        const response = await ApiService.cargarCompras({
+            page,
+            pageSize,
+            search: options.search || '',
+            filters: {
+                ...mapearFiltrosCompras(options.filters),
+                fecha_inicio: document.getElementById('fechaInicioCompraFiltro')?.value || '',
+                fecha_fin: document.getElementById('fechaFinCompraFiltro')?.value || '',
+                estado: document.getElementById('estadoCompraFiltro')?.value || mapearFiltrosCompras(options.filters).estado || ''
+            }
+        });
+
+        AppState.compras = response.items;
+        AppState.paginacion.compras = response.pagination;
         console.log('Compras cargadas:', AppState.compras);
         compras = AppState.compras;
-        this.aplicarFiltrosActivos();
+        this.mostrarCompras(AppState.compras);
     },
 
     obtenerFechaCompra(compra) {
@@ -203,82 +305,158 @@ const ComprasModule = {
         });
     },
 
-    aplicarFiltrosActivos() {
-        this.mostrarCompras(this.obtenerComprasFiltradas());
+    async aplicarFiltrosActivos() {
+        await this.cargarCompras({ page: 1, pageSize: AppState.paginacion.compras?.page_size || 10 });
     },
 
     mostrarCompras(lista = null) {
         const container = document.getElementById('listaCompras');
-        if (!container) return;
+        const resumenContainer = document.getElementById('resumenCompras');
+        if (!container || !resumenContainer) return;
         
         const comprasMostrar = lista || AppState.compras;
-        
-        if (comprasMostrar.length === 0) {
-            container.innerHTML = '<div class="mensaje-vacio">No hay compras registradas</div>';
-            return;
-        }
 
         const pendientes = comprasMostrar.filter(c => c.estado === 'pendiente').length;
         const pagadas = comprasMostrar.filter(c => c.estado === 'pagada').length;
         const totalDolares = comprasMostrar.reduce((sum, c) => sum + (c.total_dolares || 0), 0);
         const totalBs = comprasMostrar.reduce((sum, c) => sum + (c.total_bs || 0), 0);
 
-        container.innerHTML = `
-            <div style="display: flex; gap: 20px; margin-bottom: 20px;">
-                <div style="background: white; padding: 15px; border-radius: 8px; flex: 1; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
-                    <div style="font-size: 2em; font-weight: bold; color: #667eea;">${comprasMostrar.length}</div>
-                    <div style="color: #666;">Total</div>
+        resumenContainer.innerHTML = `
+            <div class="resumen-ventas-grid resumen-ventas-grid--compact">
+                <div class="tarjeta-resumen tarjeta-resumen--ventas">
+                    <h3>Total</h3>
+                    <div class="valor">${comprasMostrar.length}</div>
                 </div>
-                <div style="background: white; padding: 15px; border-radius: 8px; flex: 1; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
-                    <div style="font-size: 2em; font-weight: bold; color: #ffc107;">${pendientes}</div>
-                    <div style="color: #666;">Pendientes</div>
+                <div class="tarjeta-resumen tarjeta-resumen--pendientes">
+                    <h3>Pendientes</h3>
+                    <div class="valor">${pendientes}</div>
                 </div>
-                <div style="background: white; padding: 15px; border-radius: 8px; flex: 1; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
-                    <div style="font-size: 2em; font-weight: bold; color: #28a745;">${pagadas}</div>
-                    <div style="color: #666;">Pagadas</div>
+                <div class="tarjeta-resumen tarjeta-resumen--pagadas">
+                    <h3>Pagadas</h3>
+                    <div class="valor">${pagadas}</div>
                 </div>
-                <div style="background: white; padding: 15px; border-radius: 8px; flex: 1; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
-                    <div style="font-size: 1.6em; font-weight: bold; color: #17a2b8;">$${totalDolares.toFixed(2)}</div>
-                    <div style="color: #666;">Total $</div>
-                    <small style="color: #666;">Bs ${totalBs.toFixed(2)}</small>
+                <div class="tarjeta-resumen tarjeta-resumen--bolivares">
+                    <h3>Total acumulado</h3>
+                    <div class="valor">$${totalDolares.toFixed(2)}</div>
+                    <small>Bs ${totalBs.toFixed(2)}</small>
                 </div>
             </div>
-            <table style="width: 100%; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
-                <thead style="background: #667eea; color: white;">
-                    <tr>
-                        <th style="padding: 12px; text-align: left;">#</th>
-                        <th style="padding: 12px; text-align: left;">Factura</th>
-                        <th style="padding: 12px; text-align: left;">Fecha</th>
-                        <th style="padding: 12px; text-align: left;">Libro</th>
-                        <th style="padding: 12px; text-align: left;">Proveedor</th>
-                        <th style="padding: 12px; text-align: right;">Total $</th>
-                        <th style="padding: 12px; text-align: center;">Estado</th>
-                        <th style="padding: 12px; text-align: center;">Acciones</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${comprasMostrar.map((c, idx) => `
-                        <tr style="border-bottom: 1px solid #eee;">
-                            <td style="padding: 12px; font-weight: bold;">${idx + 1}</td>
-                            <td style="padding: 12px;">${c.nro_factura || '-'}</td>
-                            <td style="padding: 12px;">${c.fecha || '-'}</td>
-                            <td style="padding: 12px;">${c.fecha_libro || '-'}</td>
-                            <td style="padding: 12px;">${c.proveedor_nombre || 'Sin proveedor'}</td>
-                            <td style="padding: 12px; text-align: right; font-weight: bold;">$${c.total_dolares.toFixed(2)}</td>
-                            <td style="padding: 12px; text-align: center;">
-                                <span style="padding: 4px 8px; border-radius: 4px; font-size: 0.85em; background: ${c.estado === 'pagada' ? '#d4edda' : c.estado === 'cancelada' ? '#f8d7da' : '#fff3cd'}; color: ${c.estado === 'pagada' ? '#155724' : c.estado === 'cancelada' ? '#721c24' : '#856404'};">
-                                    ${c.estado.toUpperCase()}
-                                </span>
-                            </td>
-                            <td style="padding: 12px; text-align: center;">
-                                <button onclick="verDetalleCompra(${c.id})" class="btn-small" style="background: #17a2b8; color: white;">👁️ Ver</button>
-                                ${c.estado === 'pendiente' ? `<button onclick="marcarCompraPagada(${c.id})" class="btn-small" style="background: #28a745; color: white;">💰 Pagar</button>` : ''}
-                            </td>
-                        </tr>
-                    `).join('')}
-                </tbody>
-            </table>
         `;
+
+        container.innerHTML = '<div id="tablaComprasModelo"></div>';
+
+        if (!window.SVTable) return;
+
+        const comprasConIndice = comprasMostrar.map((compra, idx) => ({
+            ...compra,
+            __indice: compra.numero_compra || compra.id || (idx + 1)
+        }));
+
+        window.SVTable.mount({
+            id: 'tabla-compras',
+            container: 'tablaComprasModelo',
+            title: 'Compras',
+            ariaLabel: 'Tabla de compras',
+            rows: comprasConIndice,
+            rowId: row => row.id,
+            exportFileName: 'compras',
+            searchPlaceholder: 'Buscar compras por factura, proveedor o estado',
+            emptyState: 'No hay compras registradas',
+            pageSize: 10,
+            remotePagination: {
+                enabled: true,
+                page: AppState.paginacion.compras?.page || 1,
+                pageSize: AppState.paginacion.compras?.page_size || 10,
+                total: AppState.paginacion.compras?.total || comprasMostrar.length,
+                totalPages: AppState.paginacion.compras?.total_pages || 1,
+                onPageChange: ({ page, pageSize, search, filters }) => this.cargarCompras({ page, pageSize, search, filters }),
+                onPageSizeChange: ({ page, pageSize, search, filters }) => this.cargarCompras({ page, pageSize, search, filters }),
+                onQueryChange: ({ page, pageSize, search, filters }) => this.cargarCompras({ page, pageSize, search, filters })
+            },
+            columns: [
+                {
+                    id: 'indice',
+                    label: '#',
+                    key: '__indice',
+                    align: 'center',
+                    filterable: true
+                },
+                {
+                    id: 'factura',
+                    label: 'Factura',
+                    key: 'nro_factura',
+                    filterable: true,
+                    render: row => row.nro_factura || '-'
+                },
+                {
+                    id: 'fecha',
+                    label: 'Fecha',
+                    key: 'fecha',
+                    filterable: true
+                },
+                {
+                    id: 'libro',
+                    label: 'Libro',
+                    key: 'fecha_libro',
+                    filterable: true,
+                    render: row => row.fecha_libro || '-'
+                },
+                {
+                    id: 'proveedor',
+                    label: 'Proveedor',
+                    key: 'proveedor_nombre',
+                    filterable: true,
+                    render: row => row.proveedor_nombre || 'Sin proveedor'
+                },
+                {
+                    id: 'totalUsd',
+                    label: 'Total $',
+                    key: 'total_dolares',
+                    type: 'money',
+                    currency: '$',
+                    align: 'right',
+                    filterable: true
+                },
+                {
+                    id: 'estado',
+                    label: 'Estado',
+                    key: 'estado',
+                    type: 'badge',
+                    align: 'center',
+                    filterable: true,
+                    filterType: 'select',
+                    badgeTone: row => row.estado === 'pagada' ? 'success' : row.estado === 'cancelada' ? 'danger' : 'warning',
+                    render: row => row.estado
+                },
+                {
+                    id: 'acciones',
+                    label: 'Acciones',
+                    type: 'actions',
+                    sortable: false,
+                    searchable: false,
+                    hideable: false,
+                    align: 'center',
+                    render: row => `
+                        <button onclick="verDetalleCompra(${row.id})" class="btn-small" style="background: #17a2b8; color: white;" title="Ver detalle">👁️ Ver</button>
+                        ${row.estado === 'pendiente' ? `<button onclick="marcarCompraPagada(${row.id})" class="btn-small" style="background: #28a745; color: white;" title="Marcar como pagada">💰 Pagar</button>` : ''}
+                    `,
+                    allowHtml: true,
+                    exportable: false
+                }
+            ],
+            bulkActions: [
+                {
+                    id: 'export-selected-csv',
+                    label: 'Exportar seleccion CSV',
+                    handler: () => window.SVTable.exportSelected('tabla-compras', 'csv')
+                },
+                {
+                    id: 'clear-selection',
+                    label: 'Limpiar seleccion',
+                    handler: () => window.SVTable.clearSelection('tabla-compras')
+                }
+            ]
+        });
     }
 };
 
@@ -333,7 +511,7 @@ function cerrarModalCompra() {
     document.getElementById('modalCompra').style.display = 'none';
 }
 
-function filtrarProductosCompra(e) {
+async function filtrarProductosCompra(e) {
     const texto = e.target.value.toLowerCase().trim();
     const sugerencias = document.getElementById('sugerenciasCompra');
     
@@ -348,11 +526,13 @@ function filtrarProductosCompra(e) {
         if (sugerencias) sugerencias.style.display = 'none';
         return;
     }
-    
-    const resultados = productos.filter(p =>
-        p.nombre.toLowerCase().includes(busqueda) ||
-        p.codigo.toLowerCase().includes(busqueda)
-    );
+
+    const resultados = typeof buscarProductosRemotos === 'function'
+        ? (await buscarProductosRemotos(busqueda, {}, 20)).map(item => item.producto)
+        : productos.filter(p =>
+            p.nombre.toLowerCase().includes(busqueda) ||
+            p.codigo.toLowerCase().includes(busqueda)
+        );
     
     if (resultados.length > 0 && sugerencias) {
         const esRapido = !!matchRapido;
@@ -529,12 +709,14 @@ async function guardarCompra() {
     try {
         const resultado = await ApiService.guardarCompra(compra);
         console.log('Resultado compra:', resultado);
+
+        const numeroCompra = resultado?.numero_compra || resultado?.id;
         
-        AppState.productos = await ApiService.cargarProductos();
-        productos = AppState.productos;
-        mostrarProductos();
+        if (typeof cargarProductos === 'function') {
+            await cargarProductos({ page: 1 });
+        }
         
-        mostrarNotificacion('✅ Compra registrada');
+        mostrarNotificacion(`✅ Compra #${numeroCompra} registrada`);
         cerrarModalCompra();
         await ComprasModule.cargarCompras();
     } catch (e) {
@@ -562,6 +744,7 @@ async function verDetalleCompra(id) {
         
         document.getElementById('detalleCompraInfo').innerHTML = `
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                <div><strong>Nro. Compra:</strong> ${compra.numero_compra || compra.id}</div>
                 <div><strong>Nro. Factura:</strong> ${compra.nro_factura || '-'}</div>
                 <div><strong>Proveedor:</strong> ${compra.proveedor_nombre}</div>
                 <div><strong>Fecha Factura:</strong> ${compra.fecha || '-'}</div>
@@ -606,7 +789,7 @@ async function marcarCompraPagada(id) {
     }
 }
 
-function filtrarCompras() {
+async function filtrarCompras() {
     const inicioInput = document.getElementById('fechaInicioCompraFiltro')?.value;
     const finInput = document.getElementById('fechaFinCompraFiltro')?.value;
 
@@ -620,10 +803,10 @@ function filtrarCompras() {
         }
     }
 
-    ComprasModule.aplicarFiltrosActivos();
+    await ComprasModule.aplicarFiltrosActivos();
 }
 
-function limpiarFiltrosCompras() {
+async function limpiarFiltrosCompras() {
     const fechaInicio = document.getElementById('fechaInicioCompraFiltro');
     const fechaFin = document.getElementById('fechaFinCompraFiltro');
     const estado = document.getElementById('estadoCompraFiltro');
@@ -632,10 +815,10 @@ function limpiarFiltrosCompras() {
     if (fechaFin) fechaFin.value = '';
     if (estado) estado.value = '';
 
-    ComprasModule.mostrarCompras(AppState.compras);
+    await ComprasModule.cargarCompras({ page: 1, pageSize: AppState.paginacion.compras?.page_size || 10 });
 }
 
-function cargarComprasDelDia() {
+async function cargarComprasDelDia() {
     const hoy = obtenerFechaActualLocal();
 
     const fechaInicio = document.getElementById('fechaInicioCompraFiltro');
@@ -644,11 +827,11 @@ function cargarComprasDelDia() {
     if (fechaInicio) fechaInicio.value = hoy;
     if (fechaFin) fechaFin.value = hoy;
 
-    ComprasModule.aplicarFiltrosActivos();
+    await ComprasModule.aplicarFiltrosActivos();
 }
 
-function cargarTodasLasCompras() {
-    limpiarFiltrosCompras();
+async function cargarTodasLasCompras() {
+    await limpiarFiltrosCompras();
 }
 
 function obtenerFechaActualLocal() {
@@ -667,7 +850,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const inputBusqueda = document.getElementById('buscarProductoCompra');
     if (inputBusqueda) {
         inputBusqueda.addEventListener('input', filtrarProductosCompra);
-        inputBusqueda.addEventListener('keydown', function(e) {
+        inputBusqueda.addEventListener('keydown', async function(e) {
             const sugerencias = document.getElementById('sugerenciasCompra');
             const items = sugerencias?.querySelectorAll('.sugerencia-item') || [];
             
@@ -705,10 +888,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     const cantidad = parseInt(matchRapido[1]);
                     const buscar = matchRapido[2].toLowerCase();
                     
-                    const resultados = productos.filter(p =>
-                        p.nombre.toLowerCase().includes(buscar) ||
-                        p.codigo.toLowerCase().includes(buscar)
-                    );
+                    const resultados = typeof buscarProductosRemotos === 'function'
+                        ? (await buscarProductosRemotos(buscar, {}, 20)).map(item => item.producto)
+                        : productos.filter(p =>
+                            p.nombre.toLowerCase().includes(buscar) ||
+                            p.codigo.toLowerCase().includes(buscar)
+                        );
                     
                     if (resultados.length > 0) {
                         agregarProductoRapido(resultados[0], cantidad);
