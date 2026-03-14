@@ -1,5 +1,6 @@
 from flask import Blueprint, jsonify, request
 from datetime import datetime
+from auth_utils import require_roles
 from database import db
 from models import Compra, DetalleCompra, HistorialPrecio, Producto
 
@@ -26,6 +27,7 @@ def get_compras():
         return jsonify({'error': str(e)}), 500
 
 @compras_bp.route('/', methods=['POST'])
+@require_roles('admin')
 def crear_compra():
     data = request.get_json()
     try:
@@ -107,6 +109,7 @@ def get_compra(id):
     })
 
 @compras_bp.route('/<int:id>/estado', methods=['PUT'])
+@require_roles('admin')
 def actualizar_estado_compra(id):
     compra = Compra.query.get_or_404(id)
     data = request.get_json()
@@ -119,6 +122,7 @@ def actualizar_estado_compra(id):
         return jsonify({'error': str(e)}), 400
 
 @compras_bp.route('/<int:id>', methods=['DELETE'])
+@require_roles('admin')
 def eliminar_compra(id):
     compra = Compra.query.get_or_404(id)
     try:

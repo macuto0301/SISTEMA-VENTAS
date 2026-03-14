@@ -1,4 +1,5 @@
 from flask import Blueprint, jsonify, request
+from auth_utils import require_roles
 from models import Producto, HistorialPrecio
 from database import db
 
@@ -21,6 +22,7 @@ def get_productos():
     } for p in productos])
 
 @productos_bp.route('/', methods=['POST'])
+@require_roles('admin')
 def crear_producto():
     data = request.get_json()
     try:
@@ -31,7 +33,7 @@ def crear_producto():
             precio_costo=data.get('precio_costo', 0),
             porcentaje_ganancia=data.get('porcentaje_ganancia', 30),
             precio_dolares=data['precio_dolares'],
-            cantidad=data.get('cantidad', 0),
+            cantidad=0,
             categoria=data.get('categoria'),
             metodo_redondeo=data.get('metodo_redondeo', 'none')
         )
@@ -43,6 +45,7 @@ def crear_producto():
         return jsonify({'error': str(e)}), 400
 
 @productos_bp.route('/<int:id>', methods=['PUT'])
+@require_roles('admin')
 def editar_producto(id):
     data = request.get_json()
     prod = Producto.query.get_or_404(id)
@@ -53,7 +56,6 @@ def editar_producto(id):
         prod.precio_costo = data.get('precio_costo', prod.precio_costo)
         prod.porcentaje_ganancia = data.get('porcentaje_ganancia', prod.porcentaje_ganancia)
         prod.precio_dolares = data.get('precio_dolares', prod.precio_dolares)
-        prod.cantidad = data.get('cantidad', prod.cantidad)
         prod.categoria = data.get('categoria', prod.categoria)
         prod.metodo_redondeo = data.get('metodo_redondeo', prod.metodo_redondeo)
         
@@ -64,6 +66,7 @@ def editar_producto(id):
         return jsonify({'error': str(e)}), 400
 
 @productos_bp.route('/<int:id>', methods=['DELETE'])
+@require_roles('admin')
 def eliminar_producto(id):
     prod = Producto.query.get_or_404(id)
     try:

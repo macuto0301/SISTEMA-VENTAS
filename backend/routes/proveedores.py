@@ -1,4 +1,5 @@
 from flask import Blueprint, jsonify, request
+from auth_utils import require_roles
 from database import db
 from models import Proveedor, Compra, DetalleCompra, HistorialPrecio, Producto
 
@@ -18,6 +19,7 @@ def get_proveedores():
     } for p in proveedores])
 
 @proveedores_bp.route('/', methods=['POST'])
+@require_roles('admin')
 def crear_proveedor():
     data = request.get_json()
     try:
@@ -49,6 +51,7 @@ def get_proveedor(id):
     })
 
 @proveedores_bp.route('/<int:id>', methods=['PUT'])
+@require_roles('admin')
 def actualizar_proveedor(id):
     proveedor = Proveedor.query.get_or_404(id)
     data = request.get_json()
@@ -67,6 +70,7 @@ def actualizar_proveedor(id):
         return jsonify({'error': str(e)}), 400
 
 @proveedores_bp.route('/<int:id>', methods=['DELETE'])
+@require_roles('admin')
 def eliminar_proveedor(id):
     proveedor = Proveedor.query.get_or_404(id)
     proveedor.activo = False

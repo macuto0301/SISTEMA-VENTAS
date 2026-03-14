@@ -86,6 +86,11 @@ function actualizarInfoTasaHeader() {
 }
 
 function abrirModalConfiguracion() {
+    if (usuarioLogueado?.rol === 'cajero') {
+        mostrarNotificacion('🔒 Solo el administrador puede cambiar la configuracion');
+        return;
+    }
+
     document.getElementById('configTasaDolar').value = tasaDolar;
     document.getElementById('configTasaVueltoGeneral').value = tasaVuelto;
     document.getElementById('configPorcentajeDescuentoModal').value = porcentajeDescuentoDolares;
@@ -115,13 +120,51 @@ function cerrarModalVuelto() {
 }
 
 // FUNCIONES DE AUTENTICACION
+function obtenerTabsPermitidos() {
+    return usuarioLogueado?.rol === 'cajero' ? ['ventas'] : ['productos', 'ventas', 'proveedores', 'compras', 'informes'];
+}
+
+function aplicarPermisosUsuario() {
+    const nombreUsuario = document.getElementById('nombreUsuarioDisplay');
+    const rolUsuario = document.getElementById('rolUsuarioDisplay');
+    const btnConfiguracion = document.getElementById('btnConfiguracion');
+    const tabsPermitidos = obtenerTabsPermitidos();
+
+    if (nombreUsuario && usuarioLogueado?.username) {
+        nombreUsuario.textContent = usuarioLogueado.username;
+    }
+
+    if (rolUsuario) {
+        rolUsuario.textContent = usuarioLogueado?.rol ? `(${usuarioLogueado.rol})` : '';
+    }
+
+    document.querySelectorAll('.tab-btn[data-tab]').forEach(btn => {
+        btn.style.display = tabsPermitidos.includes(btn.dataset.tab) ? 'inline-flex' : 'none';
+    });
+
+    if (btnConfiguracion) {
+        btnConfiguracion.style.display = usuarioLogueado?.rol === 'cajero' ? 'none' : 'inline-flex';
+    }
+}
+
+function asegurarVistaInicialPorRol() {
+    if (usuarioLogueado?.rol === 'cajero') {
+        cambiarTab('ventas');
+        return;
+    }
+
+    cambiarTab('productos');
+}
+
 function verificarSesion() {
     const sesion = localStorage.getItem('sesion_ventas');
     if (sesion) {
         usuarioLogueado = JSON.parse(sesion);
+        AppState.usuarioLogueado = usuarioLogueado;
         document.getElementById('panelLogin').style.display = 'none';
         document.getElementById('panelPrincipal').style.display = 'block';
-        document.getElementById('nombreUsuarioDisplay').textContent = usuarioLogueado.username;
+        aplicarPermisosUsuario();
+        asegurarVistaInicialPorRol();
     } else {
         document.getElementById('panelLogin').style.display = 'flex';
         document.getElementById('panelPrincipal').style.display = 'none';
@@ -148,6 +191,7 @@ async function manejarLogin(e) {
 
         if (res.ok && data.success) {
             usuarioLogueado = data.user;
+            AppState.usuarioLogueado = usuarioLogueado;
             localStorage.setItem('sesion_ventas', JSON.stringify(usuarioLogueado));
             verificarSesion();
             mostrarNotificacion('✅ Bienvenid@ al sistema');
@@ -166,6 +210,7 @@ function cerrarSesion() {
     if (confirm('¿Desea cerrar la sesión?')) {
         localStorage.removeItem('sesion_ventas');
         usuarioLogueado = null;
+        AppState.usuarioLogueado = null;
         window.location.reload();
     }
 }
@@ -225,15 +270,12 @@ async function guardarConfiguracion() {
 function actualizarEmpresaDisplay() {
     const nombre = AppState.nombreEmpresa || 'Mi Empresa';
     const rif = AppState.rifEmpresa || '';
-    const direccion = AppState.direccionEmpresa || '';
     
     const nombreEl = document.getElementById('nombreEmpresaDisplay');
     const rifEl = document.getElementById('rifEmpresaDisplay');
-    const dirEl = document.getElementById('direccionEmpresaDisplay');
     
     if (nombreEl) nombreEl.textContent = nombre;
     if (rifEl) rifEl.textContent = rif ? `RIF: ${rif}` : '';
-    if (dirEl) dirEl.textContent = direccion;
 }
 
 
@@ -320,7 +362,6 @@ async function guardarProducto(e) {
     const precioCosto = parseFloat(document.getElementById('productoPrecioCosto').value) || 0;
     const porcentajeGanancia = parseFloat(document.getElementById('productoPorcentajeGanancia').value) || 0;
     const precioDolares = parseFloat(document.getElementById('productoPrecioDolares').value);
-    const cantidad = parseInt(document.getElementById('productoCantidad').value);
     const categoria = document.getElementById('productoCategoria').value;
     const metodoRedondeo = document.getElementById('productoMetodoRedondeo').value;
 
@@ -329,7 +370,7 @@ async function guardarProducto(e) {
         precio_costo: precioCosto,
         porcentaje_ganancia: porcentajeGanancia,
         precio_dolares: precioDolares,
-        cantidad, categoria,
+        cantidad: 0, categoria,
         metodo_redondeo: metodoRedondeo
     };
 
@@ -339,7 +380,7 @@ async function guardarProducto(e) {
 
         const res = await fetch(url, {
             method,
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', ...API.getAuthHeaders() },
             body: JSON.stringify(producto)
         });
 
@@ -364,7 +405,10 @@ async function eliminarProducto(index) {
         }
 
         try {
-            const res = await fetch(`${API_URL}/productos/${prod.id}`, { method: 'DELETE' });
+            const res = await fetch(`${API_URL}/productos/${prod.id}`, {
+                method: 'DELETE',
+                headers: API.getAuthHeaders()
+            });
             if (!res.ok) {
                 mostrarNotificacion('⚠️ No se pudo eliminar el producto');
                 return;
@@ -382,6 +426,9 @@ async function eliminarProducto(index) {
 async function cargarDatosVentas() {
     AppState.ventas = await ApiService.cargarVentas();
     ventas = AppState.ventas;
+    if (typeof InformesService !== 'undefined' && typeof InformesService.actualizarOpcionesUsuarios === 'function') {
+        InformesService.actualizarOpcionesUsuarios();
+    }
 }
 
 
@@ -472,6 +519,7 @@ function mostrarFormularioProducto() {
     document.getElementById('productoId').value = '-1';
     document.getElementById('productoPorcentajeGanancia').value = porcentajeGananciaDefecto;
     document.getElementById('productoMetodoRedondeo').value = 'none'; // Default sin redondeo
+    document.getElementById('productoCantidad').value = 0;
     document.getElementById('productoCodigo').disabled = false; // Habilitar para nuevos productos
     document.getElementById('modalProducto').style.display = 'block';
 }
@@ -568,6 +616,7 @@ function agregarAlCarrito(productoIndex) {
     } else {
         carrito.push({
             productoIndex: productoIndex,
+            producto_id: producto.id,
             nombre: producto.nombre,
             precio_dolares: producto.precio_dolares,
             cantidad: 1,
@@ -1086,6 +1135,7 @@ function procesarVenta() {
         fecha: new Date().toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }),
         cliente: document.getElementById('cliente').value || 'Cliente General',
         productos: carrito.map(item => ({
+            producto_id: item.producto_id,
             nombre: item.nombre,
             cantidad: item.cantidad,
             precio_unitario_dolares: item.precio_dolares,
@@ -1353,7 +1403,7 @@ async function terminarProcesoVenta(venta, mensajeVuelto) {
         };
         const res = await fetch(`${API_URL}/ventas/`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', ...API.getAuthHeaders() },
             body: JSON.stringify(payload)
         });
 
@@ -1696,6 +1746,11 @@ document.head.appendChild(style);
 // ============================================
 
 function cambiarTab(tabName) {
+    if (usuarioLogueado && !obtenerTabsPermitidos().includes(tabName)) {
+        mostrarNotificacion('🔒 Este usuario solo puede usar el POS de ventas');
+        return;
+    }
+
     // Ocultar todos los paneles
     const panels = document.querySelectorAll('.tab-panel');
     panels.forEach(panel => {
@@ -1758,9 +1813,7 @@ function cambiarTab(tabName) {
     }
 
     // Activar el botón correspondiente
-    const activeButton = Array.from(buttons).find(btn =>
-        btn.textContent.toLowerCase().includes(tabName)
-    );
+    const activeButton = Array.from(buttons).find(btn => btn.dataset.tab === tabName);
     if (activeButton) {
         activeButton.classList.add('active');
     }
@@ -1806,157 +1859,74 @@ function obtenerTimestampFecha(venta) {
     return 0;
 }
 
+function obtenerVentaPorId(ventaId) {
+    return ventas.find(v => v.id === ventaId);
+}
+
+function escaparAtributoHtml(valor) {
+    return String(valor || '')
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+}
+
+function obtenerResumenDevolucionVenta(venta) {
+    const devoluciones = venta.devoluciones || [];
+    if (devoluciones.length === 0) return '';
+
+    return `
+        <div style="margin-top: 6px; padding: 6px 8px; background: #fff4e8; border: 1px solid #ffd8a8; border-radius: 6px; color: #9a3412; font-size: 0.82em;">
+            ↩️ ${devoluciones.length} devolución(es) | Reintegrado: $${(venta.total_devuelto_dolares || 0).toFixed(2)}
+        </div>
+    `;
+}
+
+function renderProductosVentaInforme(venta) {
+    return (venta.productos || []).map(p => {
+        const devuelto = p.cantidad_devuelta || 0;
+        const disponible = p.cantidad_disponible_devolucion || 0;
+        return `
+            <div style="margin-bottom: 6px;">
+                <div>${p.cantidad}x ${p.nombre}</div>
+                ${devuelto > 0 ? `<small style="color: #b45309;">Devuelto: ${devuelto} | Disponible para devolución: ${disponible}</small>` : ''}
+            </div>
+        `;
+    }).join('') || 'Sin productos';
+}
+
+function renderAccionesVentaInforme(venta, numeroVenta) {
+    const tieneDisponible = (venta.productos || []).some(p => (p.cantidad_disponible_devolucion || 0) > 0);
+    return `
+        <div style="display: flex; gap: 5px; justify-content: center; flex-wrap: wrap;">
+            <button onclick='verDetallesPago(${JSON.stringify(venta)}, ${numeroVenta})' class="btn-small" style="padding: 5px 10px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 0.85em;">
+                💳 Ver Pagos
+            </button>
+            <button onclick='verReciboCompleto(${JSON.stringify(venta)}, ${numeroVenta})' class="btn-small" style="padding: 5px 10px; background: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 0.85em;">
+                🧾 Ver Recibo
+            </button>
+            <button onclick="abrirModalDevolucion(${venta.id})" class="btn-small" ${tieneDisponible ? '' : 'disabled'} style="padding: 5px 10px; background: ${tieneDisponible ? '#f59e0b' : '#cbd5e1'}; color: white; border: none; border-radius: 5px; cursor: ${tieneDisponible ? 'pointer' : 'not-allowed'}; font-size: 0.85em;">
+                ↩️ Devolución
+            </button>
+        </div>
+    `;
+}
+
 function limpiarFiltrosFecha() {
-    document.getElementById('fechaInicioInforme').value = '';
-    document.getElementById('fechaFinInforme').value = '';
-    cargarTodasLasVentas();
+    InformesService.limpiarFiltros();
 }
 
 function cargarTodasLasVentas() {
-    mostrarInformes(ventas, 'Todas las Ventas');
+    InformesService.cargarTodasLasVentas();
 }
 
 function filtrarInformesPorFecha() {
-    const inicioInput = document.getElementById('fechaInicioInforme').value;
-    const finInput = document.getElementById('fechaFinInforme').value;
-
-    if (!inicioInput || !finInput) {
-        alert("⚠️ Seleccione fechas de Inicio y Fin");
-        return;
-    }
-
-    const fechaInicio = new Date(inicioInput + 'T00:00:00');
-    const fechaFin = new Date(finInput + 'T23:59:59');
-
-    if (fechaInicio > fechaFin) {
-        alert("⚠️ La fecha final no puede ser menor a la inicial");
-        return;
-    }
-
-    const filtradas = ventas.filter(v => {
-        if (!v.fecha) return false;
-        
-        const partes = v.fecha.split(/[\/\s:]/);
-        if (partes.length < 3) return false;
-        
-        let dia = parseInt(partes[0], 10);
-        let mes = parseInt(partes[1], 10) - 1;
-        let anio = parseInt(partes[2], 10);
-        if (anio < 100) anio += 2000;
-        
-        const hora = partes.length > 3 ? parseInt(partes[3], 10) : 0;
-        const min = partes.length > 4 ? parseInt(partes[4], 10) : 0;
-        
-        const fechaVenta = new Date(anio, mes, dia, hora, min);
-        
-        return fechaVenta >= fechaInicio && fechaVenta <= fechaFin;
-    });
-
-    const label = `Del ${fechaInicio.toLocaleDateString('es-ES')} al ${fechaFin.toLocaleDateString('es-ES')}`;
-    mostrarInformes(filtradas, label);
+    InformesService.filtrarPorFecha();
 }
 
 function mostrarInformes(ventasFiltradas, titulo) {
-    const resumenDiv = document.getElementById('resumenVentas');
-    const tablaDiv = document.getElementById('tablaInformes');
-
-    if (ventasFiltradas.length === 0) {
-        resumenDiv.innerHTML = '<div class="mensaje-vacio">No hay ventas registradas</div>';
-        tablaDiv.innerHTML = '';
-        return;
-    }
-
-    // Calcular totales
-    const totalDolares = ventasFiltradas.reduce((sum, v) => sum + (v.total_dolares || 0), 0);
-    const totalBs = ventasFiltradas.reduce((sum, v) => sum + (v.total_bolivares || 0), 0);
-    const totalVentas = ventasFiltradas.length;
-    const promedioDolares = totalDolares / totalVentas;
-    const promedioBs = totalBs / totalVentas;
-
-    // Mostrar resumen
-    resumenDiv.innerHTML = `
-        <h3>${titulo}</h3>
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">
-            <div class="stat-card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 10px;">
-                <div style="font-size: 0.9em; opacity: 0.9;">Total Ventas</div>
-                <div style="font-size: 2em; font-weight: bold;">${totalVentas}</div>
-            </div>
-            <div class="stat-card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; padding: 20px; border-radius: 10px;">
-                <div style="font-size: 0.9em; opacity: 0.9;">Total en Dólares</div>
-                <div style="font-size: 2em; font-weight: bold;">$${totalDolares.toFixed(2)}</div>
-            </div>
-            <div class="stat-card" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white; padding: 20px; border-radius: 10px;">
-                <div style="font-size: 0.9em; opacity: 0.9;">Total en Bolívares</div>
-                <div style="font-size: 2em; font-weight: bold;">Bs ${totalBs.toFixed(2)}</div>
-            </div>
-            <div class="stat-card" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); color: white; padding: 20px; border-radius: 10px;">
-                <div style="font-size: 0.9em; opacity: 0.9;">Promedio por Venta</div>
-                <div style="font-size: 1.5em; font-weight: bold;">$${promedioDolares.toFixed(2)}</div>
-                <div style="font-size: 0.8em; opacity: 0.9;">Bs ${promedioBs.toFixed(2)}</div>
-            </div>
-        </div>
-    `;
-
-    // Mostrar tabla de ventas (Invertida: de más reciente a más antigua)
-    const ventasInvertidas = [...ventasFiltradas].reverse();
-
-    tablaDiv.innerHTML = `
-        <table style="width: 100%; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
-            <thead style="background: #667eea; color: white;">
-                <tr>
-                    <th style="padding: 15px; text-align: left;">#</th>
-                    <th style="padding: 15px; text-align: left;">Fecha</th>
-                    <th style="padding: 15px; text-align: left;">Cliente</th>
-                    <th style="padding: 15px; text-align: left;">Productos</th>
-                    <th style="padding: 15px; text-align: right;">Total $</th>
-                    <th style="padding: 15px; text-align: right;">Total Bs</th>
-                    <th style="padding: 15px; text-align: center;">Acciones</th>
-                </tr>
-            </thead>
-            <tbody>
-                ${ventasInvertidas.map((venta, idx) => {
-        const numeroVenta = ventasFiltradas.length - idx;
-        return `
-                    <tr style="border-bottom: 1px solid #eee;">
-                        <td style="padding: 12px; font-weight: bold;">${numeroVenta}</td>
-                        <td style="padding: 12px;">${venta.fecha || (venta.id && venta.id > 1000000000 ? new Date(venta.id).toLocaleDateString('es-ES') : 'S/F')}</td>
-                        <td style="padding: 12px;">${venta.cliente || 'Consumidor Final'}</td>
-                        <td style="padding: 12px;">
-                            ${(venta.productos || []).map(p => `${p.cantidad}x ${p.nombre}`).join('<br>') || 'Sin productos'}
-                        </td>
-                        <td style="padding: 12px; text-align: right; font-weight: bold; color: #28a745;">
-                            $${venta.total_dolares.toFixed(2)}
-                        </td>
-                        <td style="padding: 12px; text-align: right; font-weight: bold; color: #007bff;">
-                            Bs ${venta.total_bolivares.toFixed(2)}
-                        </td>
-                        <td style="padding: 12px; text-align: center;">
-                            <div style="display: flex; gap: 5px; justify-content: center; flex-wrap: wrap;">
-                                <button onclick='verDetallesPago(${JSON.stringify(venta)}, ${numeroVenta})' class="btn-small" style="padding: 5px 10px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 0.85em;">
-                                    💳 Ver Pagos
-                                </button>
-                                <button onclick='verReciboCompleto(${JSON.stringify(venta)}, ${numeroVenta})' class="btn-small" style="padding: 5px 10px; background: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 0.85em;">
-                                    🧾 Ver Recibo
-                                </button>
-                            </div>
-                        </td>
-                    </tr>
-                `}).join('')}
-            </tbody>
-            <tfoot style="background: #f8f9fa; font-weight: bold;">
-                <tr>
-                    <td colspan="4" style="padding: 15px; text-align: right;">TOTALES:</td>
-                    <td style="padding: 15px; text-align: right; color: #28a745; font-size: 1.2em;">
-                        $${totalDolares.toFixed(2)}
-                    </td>
-                    <td style="padding: 15px; text-align: right; color: #007bff; font-size: 1.2em;">
-                        Bs ${totalBs.toFixed(2)}
-                    </td>
-                    <td></td>
-                </tr>
-            </tfoot>
-        </table>
-    `;
+    InformesService.mostrar(ventasFiltradas, titulo);
 }
 
 function verDetallesPago(venta, numeroVenta) {
@@ -2030,6 +2000,346 @@ function cerrarDetallePago() {
     if (modal) {
         document.body.removeChild(modal);
     }
+}
+
+function abrirModalDevolucion(ventaId) {
+    const venta = obtenerVentaPorId(ventaId);
+    if (!venta) {
+        mostrarNotificacion('⚠️ No se encontró la venta');
+        return;
+    }
+
+    const productosDisponibles = (venta.productos || []).filter(p => (p.cantidad_disponible_devolucion || 0) > 0);
+    if (productosDisponibles.length === 0) {
+        mostrarNotificacion('⚠️ Esta venta no tiene productos disponibles para devolver');
+        return;
+    }
+
+    devolucionActiva = venta;
+    reintegrosDevolucion = [];
+    document.getElementById('devolucionMetodoReintegro').value = 'Efectivo';
+    document.getElementById('devolucionMonedaReintegro').value = 'USD';
+    document.getElementById('devolucionTasaReintegro').value = tasaDolar.toFixed(2);
+    document.getElementById('devolucionMontoReintegro').value = '';
+    document.getElementById('devolucionMotivo').value = '';
+
+    document.getElementById('devolucionVentaInfo').innerHTML = `
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px;">
+            <div><strong>Venta ID:</strong><br>${venta.id}</div>
+            <div><strong>Fecha:</strong><br>${venta.fecha || 'S/F'}</div>
+            <div><strong>Cliente:</strong><br>${venta.cliente || 'Consumidor Final'}</div>
+            <div><strong>Total venta:</strong><br>$${(venta.total_dolares || 0).toFixed(2)}</div>
+        </div>
+    `;
+
+    document.getElementById('devolucionProductosLista').innerHTML = productosDisponibles.map(producto => `
+        <div style="display: grid; grid-template-columns: minmax(180px, 1fr) 110px 120px 120px; gap: 10px; align-items: center; padding: 10px; border-bottom: 1px solid #f1f5f9;">
+            <div>
+                <strong>${producto.nombre}</strong><br>
+                <small>Vendidos: ${producto.cantidad} | Devueltos: ${producto.cantidad_devuelta || 0}</small>
+            </div>
+            <div>
+                <small>Disponible</small><br>
+                <strong>${producto.cantidad_disponible_devolucion}</strong>
+            </div>
+            <div>
+                <small>Precio unit.</small><br>
+                <strong>$${(producto.precio_unitario_dolares || 0).toFixed(2)}</strong>
+            </div>
+            <div>
+                <label style="font-size: 0.8em; display: block; margin-bottom: 4px;">A devolver</label>
+                <input
+                    type="number"
+                    min="0"
+                    max="${producto.cantidad_disponible_devolucion}"
+                    value="0"
+                    class="form-control input-devolucion-cantidad"
+                    data-detalle-id="${producto.detalle_venta_id || producto.id}"
+                    data-producto-id="${producto.producto_id || ''}"
+                    data-nombre="${escaparAtributoHtml(producto.nombre)}"
+                    data-precio="${producto.precio_unitario_dolares || 0}"
+                    oninput="actualizarResumenDevolucion()"
+                >
+            </div>
+        </div>
+    `).join('');
+
+    renderListaReintegrosDevolucion();
+    sincronizarFormularioReintegro();
+    actualizarResumenDevolucion();
+    document.getElementById('modalDevolucion').style.display = 'block';
+}
+
+function cerrarModalDevolucion() {
+    document.getElementById('modalDevolucion').style.display = 'none';
+    devolucionActiva = null;
+    reintegrosDevolucion = [];
+}
+
+function sincronizarFormularioReintegro() {
+    const moneda = document.getElementById('devolucionMonedaReintegro').value;
+    const inputTasa = document.getElementById('devolucionTasaReintegro');
+    if (moneda === 'USD') {
+        inputTasa.value = tasaDolar.toFixed(2);
+    } else if (!parseFloat(inputTasa.value || '0')) {
+        inputTasa.value = tasaDolar.toFixed(2);
+    }
+    actualizarVistaFormularioReintegro();
+}
+
+function actualizarVistaFormularioReintegro() {
+    const moneda = document.getElementById('devolucionMonedaReintegro').value;
+    const monto = parseFloat(document.getElementById('devolucionMontoReintegro').value || '0') || 0;
+    const tasa = parseFloat(document.getElementById('devolucionTasaReintegro').value || '0') || 0;
+    const equivalenteUSD = moneda === 'BS' ? (tasa > 0 ? monto / tasa : 0) : monto;
+    document.getElementById('devolucionVistaFormulario').textContent = `${moneda} ${monto.toFixed(2)} equivalen a $${equivalenteUSD.toFixed(2)}`;
+}
+
+function agregarReintegroDevolucion() {
+    const metodo = document.getElementById('devolucionMetodoReintegro').value;
+    const moneda = document.getElementById('devolucionMonedaReintegro').value;
+    const monto = parseFloat(document.getElementById('devolucionMontoReintegro').value || '0') || 0;
+    const tasa = parseFloat(document.getElementById('devolucionTasaReintegro').value || '0') || 0;
+
+    if (monto <= 0) {
+        alert('Ingrese un monto de reintegro válido');
+        return;
+    }
+    if (moneda === 'BS' && tasa <= 0) {
+        alert('Ingrese una tasa válida para el reintegro en bolívares');
+        return;
+    }
+
+    const equivalenteUSD = moneda === 'BS' ? monto / tasa : monto;
+    reintegrosDevolucion.push({
+        metodo,
+        moneda,
+        monto: roundAmount(monto),
+        tasa: moneda === 'BS' ? roundAmount(tasa) : 0,
+        equivalente_usd: roundAmount(equivalenteUSD),
+    });
+
+    document.getElementById('devolucionMontoReintegro').value = '';
+    renderListaReintegrosDevolucion();
+    actualizarVistaFormularioReintegro();
+    actualizarResumenDevolucion();
+}
+
+function eliminarReintegroDevolucion(index) {
+    reintegrosDevolucion.splice(index, 1);
+    renderListaReintegrosDevolucion();
+    actualizarResumenDevolucion();
+}
+
+function renderListaReintegrosDevolucion() {
+    const contenedor = document.getElementById('devolucionListaReintegros');
+    if (!contenedor) return;
+
+    if (!reintegrosDevolucion.length) {
+        contenedor.innerHTML = '<div style="padding: 10px; color: #64748b; background: white; border-radius: 6px; border: 1px dashed #cbd5e1;">No hay entregas agregadas todavía.</div>';
+        return;
+    }
+
+    contenedor.innerHTML = reintegrosDevolucion.map((item, index) => `
+        <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; margin-bottom: 8px;">
+            <div>
+                <strong>${item.metodo}</strong><br>
+                <small>${item.moneda} ${item.monto.toFixed(2)}${item.moneda === 'BS' ? ` | Tasa ${item.tasa.toFixed(2)}` : ''} | Equiv. $${item.equivalente_usd.toFixed(2)}</small>
+            </div>
+            <button type="button" class="btn-secondary" onclick="eliminarReintegroDevolucion(${index})">🗑️</button>
+        </div>
+    `).join('');
+}
+
+function roundAmount(value) {
+    return Math.round((parseFloat(value || '0') || 0) * 100) / 100;
+}
+
+function obtenerItemsDevolucionSeleccionados() {
+    const inputs = Array.from(document.querySelectorAll('.input-devolucion-cantidad'));
+    return inputs.map(input => {
+        const cantidad = Math.max(0, parseInt(input.value || '0', 10) || 0);
+        const maximo = parseInt(input.getAttribute('max') || '0', 10);
+        const cantidadFinal = Math.min(cantidad, maximo);
+        input.value = cantidadFinal;
+        return {
+            detalle_venta_id: parseInt(input.dataset.detalleId, 10),
+            producto_id: input.dataset.productoId ? parseInt(input.dataset.productoId, 10) : null,
+            nombre: input.dataset.nombre,
+            precio: parseFloat(input.dataset.precio || '0'),
+            cantidad: cantidadFinal,
+            subtotal: cantidadFinal * parseFloat(input.dataset.precio || '0'),
+        };
+    }).filter(item => item.cantidad > 0);
+}
+
+function actualizarResumenDevolucion() {
+    const items = obtenerItemsDevolucionSeleccionados();
+    const totalUSD = roundAmount(items.reduce((sum, item) => sum + item.subtotal, 0));
+    const entregadoUSD = roundAmount(reintegrosDevolucion.reduce((sum, item) => sum + (item.equivalente_usd || 0), 0));
+    const entregadoBS = roundAmount(reintegrosDevolucion.filter(item => item.moneda === 'BS').reduce((sum, item) => sum + item.monto, 0));
+    const diferenciaUSD = roundAmount(totalUSD - entregadoUSD);
+
+    document.getElementById('devolucionTotalUSD').textContent = `$${totalUSD.toFixed(2)}`;
+    document.getElementById('devolucionEntregadoUSD').textContent = `$${entregadoUSD.toFixed(2)}`;
+    document.getElementById('devolucionEntregadoBS').textContent = `Bs ${entregadoBS.toFixed(2)}`;
+    document.getElementById('devolucionFaltanteUSD').textContent = `${diferenciaUSD >= 0 ? '$' : '-$'}${Math.abs(diferenciaUSD).toFixed(2)}`;
+    document.getElementById('btnGuardarDevolucion').disabled = items.length === 0 || reintegrosDevolucion.length === 0 || Math.abs(diferenciaUSD) > 0.05;
+}
+
+async function guardarDevolucionVenta() {
+    if (!devolucionActiva) return;
+
+    const items = obtenerItemsDevolucionSeleccionados();
+    if (items.length === 0) {
+        alert('Seleccione al menos un producto para devolver');
+        return;
+    }
+
+    if (reintegrosDevolucion.length === 0) {
+        alert('Debe agregar al menos una entrega de reintegro');
+        return;
+    }
+
+    const totalUSD = roundAmount(items.reduce((sum, item) => sum + item.subtotal, 0));
+    const entregadoUSD = roundAmount(reintegrosDevolucion.reduce((sum, item) => sum + (item.equivalente_usd || 0), 0));
+    if (Math.abs(totalUSD - entregadoUSD) > 0.05) {
+        alert('El total de reintegro no coincide con la devolución');
+        return;
+    }
+
+    const payload = {
+        motivo: document.getElementById('devolucionMotivo').value.trim(),
+        reintegros: reintegrosDevolucion.map(item => ({
+            metodo: item.metodo,
+            moneda: item.moneda,
+            monto: item.monto,
+            tasa: item.tasa,
+        })),
+        items: items.map(item => ({
+            detalle_venta_id: item.detalle_venta_id,
+            producto_id: item.producto_id,
+            cantidad: item.cantidad,
+        })),
+    };
+
+    const btnGuardar = document.getElementById('btnGuardarDevolucion');
+    const textoOriginal = btnGuardar.textContent;
+
+    try {
+        btnGuardar.disabled = true;
+        btnGuardar.textContent = '⌛ Registrando...';
+
+        const respuesta = await ApiService.registrarDevolucionVenta(devolucionActiva.id, payload);
+        const ventaId = devolucionActiva.id;
+
+        cerrarModalDevolucion();
+        await cargarProductos();
+        await cargarDatosVentas();
+        mostrarVentas();
+        cargarTodasLasVentas();
+
+        const ventaActualizada = obtenerVentaPorId(ventaId) || devolucionActiva;
+        mostrarNotificacion('✅ Devolución registrada con reintegro');
+        verTicketDevolucion(respuesta.devolucion, ventaActualizada);
+    } catch (e) {
+        alert(`No se pudo registrar la devolución: ${e.message || 'Error inesperado'}`);
+    } finally {
+        btnGuardar.disabled = false;
+        btnGuardar.textContent = textoOriginal;
+    }
+}
+
+function verTicketDevolucion(devolucion, venta) {
+    const detalles = (devolucion.detalles || []).map(detalle => `
+        <div style="margin-bottom: 8px; font-size: 0.85em;">
+            <div style="display: flex; justify-content: space-between;">
+                <span>${detalle.producto_nombre}</span>
+                <span>${detalle.cantidad} x $${(detalle.precio_unitario_dolares || 0).toFixed(2)}</span>
+            </div>
+            <div style="text-align: right; font-weight: bold;">$${(detalle.subtotal_dolares || 0).toFixed(2)}</div>
+        </div>
+    `).join('');
+
+    const reintegrosHtml = (devolucion.reintegros_entregados || []).map(reintegro => `
+        <div style="margin-bottom: 6px; font-size: 0.85em; display: flex; justify-content: space-between; gap: 8px;">
+            <span>${reintegro.metodo}</span>
+            <span>${reintegro.moneda} ${Number(reintegro.monto || 0).toFixed(2)}</span>
+        </div>
+    `).join('');
+
+    const motivo = devolucion.motivo ? `<div style="margin-top: 10px;"><strong>Motivo:</strong> ${devolucion.motivo}</div>` : '';
+    const html = `
+        <div style="font-family: 'Courier New', monospace; background: white; padding: 16px; max-width: 320px; margin: 0 auto;">
+            <div style="text-align: center; border-bottom: 2px dashed #333; padding-bottom: 10px; margin-bottom: 10px;">
+                <div style="font-size: 1.3em; font-weight: bold;">TICKET DEVOLUCION</div>
+                <div>Devolución #${devolucion.id}</div>
+                <div>Venta #${devolucion.venta_id}</div>
+                <div>${devolucion.fecha}</div>
+            </div>
+            <div style="margin-bottom: 10px; font-size: 0.9em;">
+                <div><strong>Cliente:</strong> ${(venta && venta.cliente) || devolucion.cliente || 'Cliente General'}</div>
+                <div><strong>Reintegro total:</strong> $${(devolucion.total_reintegrado_dolares || 0).toFixed(2)}</div>
+            </div>
+            <div style="border-bottom: 2px dashed #333; margin-bottom: 10px;"></div>
+            <div style="font-weight: bold; text-align: center; margin-bottom: 8px;">PRODUCTOS DEVUELTOS</div>
+            ${detalles}
+            <div style="border-top: 2px dashed #333; margin-top: 10px; padding-top: 10px; font-size: 0.9em;">
+                <div style="font-weight: bold; text-align: center; margin-bottom: 8px;">REINTEGROS ENTREGADOS</div>
+                ${reintegrosHtml || '<div style="text-align:center;">Sin detalle</div>'}
+            </div>
+            <div style="border-top: 2px dashed #333; margin-top: 10px; padding-top: 10px; font-size: 0.9em;">
+                <div style="display: flex; justify-content: space-between; font-weight: bold;">
+                    <span>Total USD:</span>
+                    <span>$${(devolucion.total_reintegrado_dolares || 0).toFixed(2)}</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-top: 4px;">
+                    <span>Total Bs:</span>
+                    <span>Bs ${(devolucion.total_reintegrado_bolivares || 0).toFixed(2)}</span>
+                </div>
+                ${motivo}
+            </div>
+        </div>
+    `;
+
+    abrirVentanaImpresionTicket(html, 'Ticket de devolución');
+}
+
+function abrirVentanaImpresionTicket(ticketHtml, titulo) {
+    const ventanaImpresion = window.open('', '_blank', 'width=300,height=600');
+    if (!ventanaImpresion) return;
+
+    ventanaImpresion.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <title>${titulo}</title>
+            <style>
+                * { margin: 0; padding: 0; box-sizing: border-box; }
+                body {
+                    font-family: 'Courier New', monospace;
+                    font-size: 12px;
+                    width: 80mm;
+                    max-width: 300px;
+                    margin: 0 auto;
+                    padding: 10px;
+                    background: white;
+                }
+                @media print {
+                    body { width: 80mm; margin: 0; padding: 5mm; }
+                    @page { size: 80mm auto; margin: 0; }
+                }
+            </style>
+        </head>
+        <body>${ticketHtml}</body>
+        </html>
+    `);
+
+    ventanaImpresion.document.close();
+    setTimeout(() => {
+        ventanaImpresion.print();
+    }, 500);
 }
 
 // ============================================
@@ -2188,81 +2498,7 @@ function imprimirTicket() {
     // Obtener el contenido del ticket sin los botones
     const ticketContent = modal.querySelector('div > div');
     if (!ticketContent) return;
-
-    const ventanaImpresion = window.open('', '_blank', 'width=300,height=600');
-    ventanaImpresion.document.write(`
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="UTF-8">
-            <title>Ticket de Venta</title>
-            <style>
-                * {
-                    margin: 0;
-                    padding: 0;
-                    box-sizing: border-box;
-                }
-                
-                body {
-                    font-family: 'Courier New', monospace;
-                    font-size: 12px;
-                    width: 80mm;
-                    max-width: 300px;
-                    margin: 0 auto;
-                    padding: 10px;
-                    background: white;
-                }
-                
-                @media print {
-                    body {
-                        width: 80mm;
-                        margin: 0;
-                        padding: 5mm;
-                    }
-                    
-                    button {
-                        display: none !important;
-                    }
-                    
-                    @page {
-                        size: 80mm auto;
-                        margin: 0;
-                    }
-                }
-                
-                /* Para impresoras de 58mm, descomentar esto:
-                body {
-                    width: 58mm;
-                    max-width: 220px;
-                    font-size: 10px;
-                }
-                
-                @media print {
-                    body {
-                        width: 58mm;
-                    }
-                    
-                    @page {
-                        size: 58mm auto;
-                    }
-                }
-                */
-            </style>
-        </head>
-        <body>
-            ${ticketContent.innerHTML}
-        </body>
-        </html>
-    `);
-
-    ventanaImpresion.document.close();
-
-    // Esperar a que se cargue y luego imprimir
-    setTimeout(() => {
-        ventanaImpresion.print();
-        // Cerrar la ventana después de imprimir (opcional)
-        // ventanaImpresion.close();
-    }, 500);
+    abrirVentanaImpresionTicket(ticketContent.innerHTML, 'Ticket de Venta');
 }
 
 // Función para agregar producto con Enter

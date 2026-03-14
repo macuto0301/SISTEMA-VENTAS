@@ -5,11 +5,23 @@
 const API = {
     baseUrl: "http://localhost:5000/api",
 
+    getAuthHeaders() {
+        try {
+            const sesion = JSON.parse(localStorage.getItem('sesion_ventas') || 'null');
+            if (sesion?.username) {
+                return { 'X-Auth-Username': sesion.username };
+            }
+        } catch (e) {
+            console.warn('No se pudo leer la sesion local', e);
+        }
+        return {};
+    },
+
     async request(endpoint, options = {}) {
         const url = `${this.baseUrl}${endpoint}`;
         try {
             const res = await fetch(url, {
-                headers: { 'Content-Type': 'application/json', ...options.headers },
+                headers: { 'Content-Type': 'application/json', ...this.getAuthHeaders(), ...options.headers },
                 ...options
             });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -84,7 +96,7 @@ const ApiService = {
         try {
             const res = await fetch(`${API.baseUrl}/productos/`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', ...API.getAuthHeaders() },
                 body: JSON.stringify(producto)
             });
             if (!res.ok) throw new Error('Error guardando');
@@ -130,7 +142,7 @@ const ApiService = {
         try {
             const res = await fetch(`${API.baseUrl}/ventas/`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', ...API.getAuthHeaders() },
                 body: JSON.stringify(venta)
             });
             if (!res.ok) throw new Error('Error guardando');
@@ -138,6 +150,26 @@ const ApiService = {
         } catch (e) {
             console.error('Error:', e);
             alert('Error de conexión. No se pudo guardar.');
+            throw e;
+        }
+    },
+
+    async registrarDevolucionVenta(ventaId, devolucion) {
+        try {
+            const res = await fetch(`${API.baseUrl}/ventas/${ventaId}/devoluciones`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', ...API.getAuthHeaders() },
+                body: JSON.stringify(devolucion)
+            });
+
+            const data = await res.json();
+            if (!res.ok) {
+                throw new Error(data.error || 'No se pudo registrar la devolución');
+            }
+
+            return data;
+        } catch (e) {
+            console.error('Error registrando devolución:', e);
             throw e;
         }
     },
@@ -168,7 +200,7 @@ const ApiService = {
             console.log('Enviando proveedor al servidor:', proveedor);
             const res = await fetch(`${API.baseUrl}/proveedores/`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', ...API.getAuthHeaders() },
                 body: JSON.stringify(proveedor)
             });
             console.log('Respuesta:', res.status);
@@ -223,7 +255,7 @@ const ApiService = {
             console.log('Enviando compra al servidor:', compra);
             const res = await fetch(`${API.baseUrl}/compras/`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', ...API.getAuthHeaders() },
                 body: JSON.stringify(compra)
             });
             console.log('Respuesta compra:', res.status);
@@ -253,7 +285,9 @@ const ApiService = {
 
     async getCompra(id) {
         try {
-            const res = await fetch(`http://localhost:5000/api/compras/${id}`);
+            const res = await fetch(`http://localhost:5000/api/compras/${id}`, {
+                headers: API.getAuthHeaders()
+            });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             return await res.json();
         } catch (e) {

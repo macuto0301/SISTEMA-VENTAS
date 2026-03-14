@@ -37,6 +37,8 @@ const AppState = {
     indiceSeleccionado: -1,
     resultadosBusqueda: [],
     ventaEnProgreso: null,
+    devolucionActiva: null,
+    reintegrosDevolucion: [],
     vueltosAgregados: [],
     ultimaVentaProcesada: null,
     ultimoNumeroVenta: 0,
@@ -120,6 +122,8 @@ var pagos = AppState.pagos;
 var proveedores = AppState.proveedores;
 var compras = AppState.compras;
 var ventaEnProgreso = AppState.ventaEnProgreso;
+var devolucionActiva = AppState.devolucionActiva;
+var reintegrosDevolucion = AppState.reintegrosDevolucion;
 var vueltosAgregados = AppState.vueltosAgregados;
 var ultimaVentaProcesada = AppState.ultimaVentaProcesada;
 var ultimoNumeroVenta = AppState.ultimoNumeroVenta;

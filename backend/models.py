@@ -59,6 +59,8 @@ class Venta(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     fecha = db.Column(db.DateTime, default=datetime.utcnow)
     cliente = db.Column(db.String(100), default='Cliente General')
+    usuario_username = db.Column(db.String(50))
+    usuario_rol = db.Column(db.String(20))
     total_dolares = db.Column(db.Float, nullable=False) # Total de lista
     total_bolivares = db.Column(db.Float, nullable=False) # Total de lista en Bs
     descuento_total = db.Column(db.Float, default=0.0)
@@ -85,6 +87,30 @@ class DetalleVenta(db.Model):
     precio_unitario = db.Column(db.Float, nullable=False)
     subtotal = db.Column(db.Float, nullable=False)
 
+class DevolucionVenta(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    venta_id = db.Column(db.Integer, db.ForeignKey('venta.id'), nullable=False)
+    fecha = db.Column(db.DateTime, default=datetime.utcnow)
+    cliente = db.Column(db.String(100), default='Cliente General')
+    motivo = db.Column(db.Text)
+    reintegros_entregados = db.Column(db.JSON)
+    metodo_reintegro = db.Column(db.String(50), nullable=False)
+    moneda_reintegro = db.Column(db.String(10), nullable=False)
+    tasa_reintegro = db.Column(db.Float, default=0.0)
+    monto_reintegrado = db.Column(db.Float, nullable=False)
+    total_reintegrado_dolares = db.Column(db.Float, nullable=False)
+    total_reintegrado_bolivares = db.Column(db.Float, default=0.0)
+
+class DetalleDevolucionVenta(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    devolucion_id = db.Column(db.Integer, db.ForeignKey('devolucion_venta.id'), nullable=False)
+    detalle_venta_id = db.Column(db.Integer, db.ForeignKey('detalle_venta.id'))
+    producto_id = db.Column(db.Integer, db.ForeignKey('producto.id'))
+    producto_nombre = db.Column(db.String(100), nullable=False)
+    cantidad = db.Column(db.Integer, nullable=False)
+    precio_unitario = db.Column(db.Float, nullable=False)
+    subtotal = db.Column(db.Float, nullable=False)
+
 class Configuracion(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     clave = db.Column(db.String(50), unique=True, nullable=False)
@@ -94,3 +120,4 @@ class Usuario(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(50), unique=True, nullable=False)
     password = db.Column(db.String(100), nullable=False) # En un entorno real debería estar hasheado
+    rol = db.Column(db.String(20), nullable=False, default='admin')

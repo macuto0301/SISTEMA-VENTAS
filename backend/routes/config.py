@@ -1,4 +1,5 @@
 from flask import Blueprint, jsonify, request
+from auth_utils import require_roles
 from models import Configuracion
 from database import db
 import requests
@@ -43,6 +44,7 @@ def get_config():
     return jsonify({c.clave: c.valor for c in configs})
 
 @config_bp.route('/', methods=['POST'])
+@require_roles('admin')
 def save_config():
     data = request.get_json() # Espera un diccionario {clave: valor}
     try:

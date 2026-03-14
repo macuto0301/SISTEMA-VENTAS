@@ -11,3 +11,6 @@ backend/__pycache__/
 backend/routes/__pycache__/
 *.sqlite3
 *.db
+*.agents/
+*.flask-dev.log
+flask-dev.log

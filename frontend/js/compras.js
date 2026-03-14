@@ -161,7 +161,50 @@ const ComprasModule = {
         AppState.compras = await ApiService.cargarCompras();
         console.log('Compras cargadas:', AppState.compras);
         compras = AppState.compras;
-        this.mostrarCompras();
+        this.aplicarFiltrosActivos();
+    },
+
+    obtenerFechaCompra(compra) {
+        if (!compra || !compra.fecha) return null;
+
+        const fecha = new Date(`${compra.fecha}T00:00:00`);
+        return Number.isNaN(fecha.getTime()) ? null : fecha;
+    },
+
+    obtenerComprasFiltradas() {
+        const inicioInput = document.getElementById('fechaInicioCompraFiltro')?.value || '';
+        const finInput = document.getElementById('fechaFinCompraFiltro')?.value || '';
+        const estadoInput = document.getElementById('estadoCompraFiltro')?.value || '';
+
+        let fechaInicio = null;
+        let fechaFin = null;
+
+        if (inicioInput) {
+            fechaInicio = new Date(`${inicioInput}T00:00:00`);
+        }
+
+        if (finInput) {
+            fechaFin = new Date(`${finInput}T23:59:59`);
+        }
+
+        return AppState.compras.filter(compra => {
+            const coincideEstado = !estadoInput || compra.estado === estadoInput;
+            if (!coincideEstado) return false;
+
+            if (!fechaInicio && !fechaFin) return true;
+
+            const fechaCompra = this.obtenerFechaCompra(compra);
+            if (!fechaCompra) return false;
+
+            if (fechaInicio && fechaCompra < fechaInicio) return false;
+            if (fechaFin && fechaCompra > fechaFin) return false;
+
+            return true;
+        });
+    },
+
+    aplicarFiltrosActivos() {
+        this.mostrarCompras(this.obtenerComprasFiltradas());
     },
 
     mostrarCompras(lista = null) {
@@ -177,6 +220,8 @@ const ComprasModule = {
 
         const pendientes = comprasMostrar.filter(c => c.estado === 'pendiente').length;
         const pagadas = comprasMostrar.filter(c => c.estado === 'pagada').length;
+        const totalDolares = comprasMostrar.reduce((sum, c) => sum + (c.total_dolares || 0), 0);
+        const totalBs = comprasMostrar.reduce((sum, c) => sum + (c.total_bs || 0), 0);
 
         container.innerHTML = `
             <div style="display: flex; gap: 20px; margin-bottom: 20px;">
@@ -191,6 +236,11 @@ const ComprasModule = {
                 <div style="background: white; padding: 15px; border-radius: 8px; flex: 1; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
                     <div style="font-size: 2em; font-weight: bold; color: #28a745;">${pagadas}</div>
                     <div style="color: #666;">Pagadas</div>
+                </div>
+                <div style="background: white; padding: 15px; border-radius: 8px; flex: 1; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+                    <div style="font-size: 1.6em; font-weight: bold; color: #17a2b8;">$${totalDolares.toFixed(2)}</div>
+                    <div style="color: #666;">Total $</div>
+                    <small style="color: #666;">Bs ${totalBs.toFixed(2)}</small>
                 </div>
             </div>
             <table style="width: 100%; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
@@ -249,7 +299,7 @@ function abrirModalCompra() {
     }
     
     // Set default dates to today
-    const today = new Date().toISOString().split('T')[0];
+    const today = obtenerFechaActualLocal();
     const inputFecha = document.getElementById('compraFecha');
     const inputFechaLibro = document.getElementById('compraFechaLibro');
     const inputNroFactura = document.getElementById('compraNroFactura');
@@ -554,6 +604,60 @@ async function marcarCompraPagada(id) {
         await ComprasModule.cargarCompras();
         mostrarNotificacion('✅ Compra marcada como pagada');
     }
+}
+
+function filtrarCompras() {
+    const inicioInput = document.getElementById('fechaInicioCompraFiltro')?.value;
+    const finInput = document.getElementById('fechaFinCompraFiltro')?.value;
+
+    if (inicioInput && finInput) {
+        const fechaInicio = new Date(`${inicioInput}T00:00:00`);
+        const fechaFin = new Date(`${finInput}T23:59:59`);
+
+        if (fechaInicio > fechaFin) {
+            alert('La fecha final no puede ser menor a la inicial');
+            return;
+        }
+    }
+
+    ComprasModule.aplicarFiltrosActivos();
+}
+
+function limpiarFiltrosCompras() {
+    const fechaInicio = document.getElementById('fechaInicioCompraFiltro');
+    const fechaFin = document.getElementById('fechaFinCompraFiltro');
+    const estado = document.getElementById('estadoCompraFiltro');
+
+    if (fechaInicio) fechaInicio.value = '';
+    if (fechaFin) fechaFin.value = '';
+    if (estado) estado.value = '';
+
+    ComprasModule.mostrarCompras(AppState.compras);
+}
+
+function cargarComprasDelDia() {
+    const hoy = obtenerFechaActualLocal();
+
+    const fechaInicio = document.getElementById('fechaInicioCompraFiltro');
+    const fechaFin = document.getElementById('fechaFinCompraFiltro');
+
+    if (fechaInicio) fechaInicio.value = hoy;
+    if (fechaFin) fechaFin.value = hoy;
+
+    ComprasModule.aplicarFiltrosActivos();
+}
+
+function cargarTodasLasCompras() {
+    limpiarFiltrosCompras();
+}
+
+function obtenerFechaActualLocal() {
+    const hoy = new Date();
+    const anio = hoy.getFullYear();
+    const mes = String(hoy.getMonth() + 1).padStart(2, '0');
+    const dia = String(hoy.getDate()).padStart(2, '0');
+
+    return `${anio}-${mes}-${dia}`;
 }
 
 // Event listeners para búsqueda de productos en compras

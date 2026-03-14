@@ -10,10 +10,31 @@ load_dotenv()
 # Ruta del frontend
 FRONTEND_PATH = os.path.join(os.path.dirname(__file__), '..', 'frontend')
 
+DEFAULT_CORS_ORIGINS = [
+    'null',
+    'http://localhost:5000',
+    'http://127.0.0.1:5000',
+    'http://localhost:5500',
+    'http://127.0.0.1:5500',
+    'http://localhost:8000',
+    'http://127.0.0.1:8000',
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+]
 
-def parse_env_list(env_name: str, default: str) -> list[str]:
-    value = os.getenv(env_name, default)
-    return [item.strip() for item in value.split(',') if item.strip()]
+
+def parse_env_list(env_name: str, default_items: list[str]) -> list[str]:
+    env_value = os.getenv(env_name, '')
+    env_items = [item.strip() for item in env_value.split(',') if item.strip()]
+
+    merged_items = default_items + env_items
+    unique_items = []
+
+    for item in merged_items:
+        if item not in unique_items:
+            unique_items.append(item)
+
+    return unique_items
 
 def create_app():
     app = Flask(__name__)
@@ -27,17 +48,14 @@ def create_app():
     def serve_static(filename):
         return send_from_directory(FRONTEND_PATH, filename)
     
-    cors_origins = parse_env_list(
-        'CORS_ORIGINS',
-        'http://localhost:8000,http://127.0.0.1:8000,http://localhost:3000'
-    )
+    cors_origins = parse_env_list('CORS_ORIGINS', DEFAULT_CORS_ORIGINS)
     cors_methods = parse_env_list(
         'CORS_METHODS',
-        'GET,POST,PUT,DELETE,OPTIONS'
+        ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
     )
     cors_headers = parse_env_list(
         'CORS_ALLOW_HEADERS',
-        'Content-Type,Authorization'
+        ['Content-Type', 'Authorization', 'X-Auth-Username']
     )
 
     CORS(app, resources={
@@ -104,6 +122,20 @@ def create_app():
                 db.session.execute(text("ALTER TABLE compra ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"))
                 db.session.commit()
                 print("Columna created_at agregada a tabla compra")
+
+            result = db.session.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name='venta'"))
+            columnas_venta = [row[0] for row in result.fetchall()]
+            print(f"Columnas en venta: {columnas_venta}")
+
+            if 'usuario_username' not in columnas_venta:
+                db.session.execute(text("ALTER TABLE venta ADD COLUMN usuario_username VARCHAR(50)"))
+                db.session.commit()
+                print("Columna usuario_username agregada a tabla venta")
+
+            if 'usuario_rol' not in columnas_venta:
+                db.session.execute(text("ALTER TABLE venta ADD COLUMN usuario_rol VARCHAR(20)"))
+                db.session.commit()
+                print("Columna usuario_rol agregada a tabla venta")
             
             # Verificar columnas en tabla proveedor
             result = db.session.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name='proveedor'"))
@@ -119,17 +151,49 @@ def create_app():
                 db.session.execute(text("ALTER TABLE proveedor ADD COLUMN fecha_creado TIMESTAMP DEFAULT CURRENT_TIMESTAMP"))
                 db.session.commit()
                 print("Columna fecha_creado agregada a tabla proveedor")
-                
+
+            result = db.session.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name='devolucion_venta'"))
+            columnas_devolucion = [row[0] for row in result.fetchall()]
+            print(f"Columnas en devolucion_venta: {columnas_devolucion}")
+
+            if columnas_devolucion and 'reintegros_entregados' not in columnas_devolucion:
+                db.session.execute(text("ALTER TABLE devolucion_venta ADD COLUMN reintegros_entregados JSON"))
+                db.session.commit()
+                print("Columna reintegros_entregados agregada a tabla devolucion_venta")
+
+            result = db.session.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name='usuario'"))
+            columnas_usuario = [row[0] for row in result.fetchall()]
+            print(f"Columnas en usuario: {columnas_usuario}")
+
+            if 'rol' not in columnas_usuario:
+                db.session.execute(text("ALTER TABLE usuario ADD COLUMN rol VARCHAR(20) DEFAULT 'admin'"))
+                db.session.commit()
+                print("Columna rol agregada a tabla usuario")
+
+            db.session.execute(text("UPDATE usuario SET rol='admin' WHERE rol IS NULL OR rol = ''"))
+            db.session.commit()
+                 
         except Exception as e:
             print(f"Error verificando columnas: {e}")
         
         # Verificar e inicializar admin si no existe
         from models import Usuario
         if not Usuario.query.filter_by(username='admin').first():
-            admin = Usuario(username='admin', password=generate_password_hash('1234'))
+            admin = Usuario(username='admin', password=generate_password_hash('1234'), rol='admin')
             db.session.add(admin)
             db.session.commit()
             print("Admin inicial creado: admin / 1234")
+
+        admin = Usuario.query.filter_by(username='admin').first()
+        if admin and admin.rol != 'admin':
+            admin.rol = 'admin'
+            db.session.commit()
+
+        if not Usuario.query.filter_by(username='cajero').first():
+            cajero = Usuario(username='cajero', password=generate_password_hash('1234'), rol='cajero')
+            db.session.add(cajero)
+            db.session.commit()
+            print("Usuario cajero inicial creado: cajero / 1234")
 
     return app
 

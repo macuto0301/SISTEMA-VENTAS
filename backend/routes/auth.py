@@ -34,7 +34,10 @@ def login():
         return jsonify({
             'success': True,
             'message': 'Login exitoso',
-            'user': {'username': user.username}
+            'user': {
+                'username': user.username,
+                'rol': user.rol,
+            }
         })
     
     return jsonify({
@@ -48,7 +51,7 @@ def init_admin():
     if Usuario.query.filter_by(username='admin').first():
         return jsonify({'message': 'Admin ya existe'}), 200
     
-    admin = Usuario(username='admin', password=generate_password_hash('1234'))
+    admin = Usuario(username='admin', password=generate_password_hash('1234'), rol='admin')
     db.session.add(admin)
     db.session.commit()
     return jsonify({'message': 'Admin creado exitosamente'}), 201
