@@ -1,0 +1,651 @@
+// ============================================
+// MÓDULO DE PROVEEDORES Y COMPRAS
+// ============================================
+
+window.window.indiceSeleccionado = -1;
+
+const ProveedoresModule = {
+    async init() {
+        await this.cargarProveedores();
+    },
+
+    async cargarProveedores() {
+        AppState.proveedores = await ApiService.cargarProveedores();
+        proveedores = AppState.proveedores;
+        this.mostrarProveedores();
+    },
+
+    mostrarProveedores(lista = null) {
+        const container = document.getElementById('listaProveedores');
+        if (!container) return;
+        
+        const proveedoresMostrar = lista || AppState.proveedores;
+        
+        if (proveedoresMostrar.length === 0) {
+            container.innerHTML = '<div class="mensaje-vacio">No hay proveedores registrados</div>';
+            return;
+        }
+
+        container.innerHTML = `
+            <table style="width: 100%; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                <thead style="background: #667eea; color: white;">
+                    <tr>
+                        <th style="padding: 12px; text-align: left;">Nombre</th>
+                        <th style="padding: 12px; text-align: left;">RIF</th>
+                        <th style="padding: 12px; text-align: left;">Teléfono</th>
+                        <th style="padding: 12px; text-align: left;">Email</th>
+                        <th style="padding: 12px; text-align: center;">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${proveedoresMostrar.map(p => `
+                        <tr style="border-bottom: 1px solid #eee;">
+                            <td style="padding: 12px;">${p.nombre}</td>
+                            <td style="padding: 12px;">${p.rif}</td>
+                            <td style="padding: 12px;">${p.telefono || '-'}</td>
+                            <td style="padding: 12px;">${p.email || '-'}</td>
+                            <td style="padding: 12px; text-align: center;">
+                                <button onclick="editarProveedor(${p.id})" class="btn-small" style="background: #ffc107; color: black;">✏️</button>
+                                <button onclick="eliminarProveedor(${p.id})" class="btn-small" style="background: #dc3545; color: white;">🗑️</button>
+                            </td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        `;
+    }
+};
+
+window.ProveedoresModule = ProveedoresModule;
+
+function abrirModalProveedor(proveedor = null) {
+    document.getElementById('proveedorId').value = proveedor ? proveedor.id : -1;
+    document.getElementById('proveedorNombre').value = proveedor ? proveedor.nombre : '';
+    document.getElementById('proveedorRif').value = proveedor ? proveedor.rif : '';
+    document.getElementById('proveedorTelefono').value = proveedor ? proveedor.telefono : '';
+    document.getElementById('proveedorEmail').value = proveedor ? proveedor.email : '';
+    document.getElementById('proveedorDireccion').value = proveedor ? proveedor.direccion : '';
+    document.getElementById('modalTituloProveedor').textContent = proveedor ? '✏️ Editar Proveedor' : '➕ Nuevo Proveedor';
+    document.getElementById('modalProveedor').style.display = 'block';
+}
+
+function cerrarModalProveedor() {
+    document.getElementById('modalProveedor').style.display = 'none';
+}
+
+async function guardarProveedor() {
+    const id = parseInt(document.getElementById('proveedorId').value);
+    const proveedor = {
+        nombre: document.getElementById('proveedorNombre').value,
+        rif: document.getElementById('proveedorRif').value,
+        telefono: document.getElementById('proveedorTelefono').value,
+        email: document.getElementById('proveedorEmail').value,
+        direccion: document.getElementById('proveedorDireccion').value
+    };
+
+    if (!proveedor.nombre || !proveedor.rif) {
+        alert('Nombre y RIF son obligatorios');
+        return;
+    }
+
+    console.log('Guardando proveedor:', proveedor);
+
+    if (id === -1) {
+        const resultado = await ApiService.guardarProveedor(proveedor);
+        console.log('Resultado guardar:', resultado);
+        await ProveedoresModule.cargarProveedores();
+        mostrarNotificacion('✅ Proveedor creado');
+    } else {
+        const actualizado = await ApiService.actualizarProveedor(id, proveedor);
+        if (!actualizado) {
+            mostrarNotificacion('⚠️ No se pudo actualizar el proveedor');
+            return;
+        }
+        mostrarNotificacion('✅ Proveedor actualizado');
+    }
+
+    await ProveedoresModule.cargarProveedores();
+    cerrarModalProveedor();
+}
+
+function editarProveedor(id) {
+    const proveedor = AppState.proveedores.find(p => p.id === id);
+    if (proveedor) {
+        abrirModalProveedor(proveedor);
+    }
+}
+
+async function eliminarProveedor(id) {
+    if (confirm('¿Está seguro de eliminar este proveedor?')) {
+        const eliminado = await ApiService.eliminarProveedor(id);
+        if (!eliminado) {
+            mostrarNotificacion('⚠️ No se pudo eliminar el proveedor');
+            return;
+        }
+        await ProveedoresModule.cargarProveedores();
+        mostrarNotificacion('✅ Proveedor eliminado');
+    }
+}
+
+function filtrarProveedores() {
+    const texto = document.getElementById('buscarProveedor').value.toLowerCase();
+    const filtrados = AppState.proveedores.filter(p => 
+        p.nombre.toLowerCase().includes(texto) || 
+        p.rif.toLowerCase().includes(texto)
+    );
+    ProveedoresModule.mostrarProveedores(filtrados);
+}
+
+// ============================================
+// MÓDULO DE COMPRAS
+// ============================================
+
+const ComprasModule = {
+    productosCompra: [],
+
+    async init() {
+        console.log('ComprasModule.init() llamado');
+        try {
+            if (!AppState.proveedores || AppState.proveedores.length === 0) {
+                console.log('Cargando proveedores...');
+                await ProveedoresModule.cargarProveedores();
+            }
+            await this.cargarCompras();
+        } catch (e) {
+            console.error('Error en ComprasModule.init():', e);
+        }
+    },
+
+    async cargarCompras() {
+        console.log('Cargando compras...');
+        AppState.compras = await ApiService.cargarCompras();
+        console.log('Compras cargadas:', AppState.compras);
+        compras = AppState.compras;
+        this.mostrarCompras();
+    },
+
+    mostrarCompras(lista = null) {
+        const container = document.getElementById('listaCompras');
+        if (!container) return;
+        
+        const comprasMostrar = lista || AppState.compras;
+        
+        if (comprasMostrar.length === 0) {
+            container.innerHTML = '<div class="mensaje-vacio">No hay compras registradas</div>';
+            return;
+        }
+
+        const pendientes = comprasMostrar.filter(c => c.estado === 'pendiente').length;
+        const pagadas = comprasMostrar.filter(c => c.estado === 'pagada').length;
+
+        container.innerHTML = `
+            <div style="display: flex; gap: 20px; margin-bottom: 20px;">
+                <div style="background: white; padding: 15px; border-radius: 8px; flex: 1; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+                    <div style="font-size: 2em; font-weight: bold; color: #667eea;">${comprasMostrar.length}</div>
+                    <div style="color: #666;">Total</div>
+                </div>
+                <div style="background: white; padding: 15px; border-radius: 8px; flex: 1; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+                    <div style="font-size: 2em; font-weight: bold; color: #ffc107;">${pendientes}</div>
+                    <div style="color: #666;">Pendientes</div>
+                </div>
+                <div style="background: white; padding: 15px; border-radius: 8px; flex: 1; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+                    <div style="font-size: 2em; font-weight: bold; color: #28a745;">${pagadas}</div>
+                    <div style="color: #666;">Pagadas</div>
+                </div>
+            </div>
+            <table style="width: 100%; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                <thead style="background: #667eea; color: white;">
+                    <tr>
+                        <th style="padding: 12px; text-align: left;">#</th>
+                        <th style="padding: 12px; text-align: left;">Factura</th>
+                        <th style="padding: 12px; text-align: left;">Fecha</th>
+                        <th style="padding: 12px; text-align: left;">Libro</th>
+                        <th style="padding: 12px; text-align: left;">Proveedor</th>
+                        <th style="padding: 12px; text-align: right;">Total $</th>
+                        <th style="padding: 12px; text-align: center;">Estado</th>
+                        <th style="padding: 12px; text-align: center;">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${comprasMostrar.map((c, idx) => `
+                        <tr style="border-bottom: 1px solid #eee;">
+                            <td style="padding: 12px; font-weight: bold;">${idx + 1}</td>
+                            <td style="padding: 12px;">${c.nro_factura || '-'}</td>
+                            <td style="padding: 12px;">${c.fecha || '-'}</td>
+                            <td style="padding: 12px;">${c.fecha_libro || '-'}</td>
+                            <td style="padding: 12px;">${c.proveedor_nombre || 'Sin proveedor'}</td>
+                            <td style="padding: 12px; text-align: right; font-weight: bold;">$${c.total_dolares.toFixed(2)}</td>
+                            <td style="padding: 12px; text-align: center;">
+                                <span style="padding: 4px 8px; border-radius: 4px; font-size: 0.85em; background: ${c.estado === 'pagada' ? '#d4edda' : c.estado === 'cancelada' ? '#f8d7da' : '#fff3cd'}; color: ${c.estado === 'pagada' ? '#155724' : c.estado === 'cancelada' ? '#721c24' : '#856404'};">
+                                    ${c.estado.toUpperCase()}
+                                </span>
+                            </td>
+                            <td style="padding: 12px; text-align: center;">
+                                <button onclick="verDetalleCompra(${c.id})" class="btn-small" style="background: #17a2b8; color: white;">👁️ Ver</button>
+                                ${c.estado === 'pendiente' ? `<button onclick="marcarCompraPagada(${c.id})" class="btn-small" style="background: #28a745; color: white;">💰 Pagar</button>` : ''}
+                            </td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        `;
+    }
+};
+
+window.ComprasModule = ComprasModule;
+
+function abrirModalCompra() {
+    ComprasModule.productosCompra = [];
+    
+    const selectProveedor = document.getElementById('compraProveedor');
+    if (selectProveedor) {
+        selectProveedor.innerHTML = '<option value="">Seleccionar proveedor...</option>';
+        AppState.proveedores.forEach(p => {
+            const opt = document.createElement('option');
+            opt.value = p.id;
+            opt.textContent = p.nombre;
+            selectProveedor.appendChild(opt);
+        });
+    }
+    
+    // Set default dates to today
+    const today = new Date().toISOString().split('T')[0];
+    const inputFecha = document.getElementById('compraFecha');
+    const inputFechaLibro = document.getElementById('compraFechaLibro');
+    const inputNroFactura = document.getElementById('compraNroFactura');
+    
+    if (inputFecha) inputFecha.value = today;
+    if (inputFechaLibro) inputFechaLibro.value = today;
+    if (inputNroFactura) inputNroFactura.value = '';
+    
+    const inputBusqueda = document.getElementById('buscarProductoCompra');
+    if (inputBusqueda) {
+        inputBusqueda.value = '';
+    }
+    
+    const listaProductos = document.getElementById('listaProductosCompra');
+    if (listaProductos) {
+        listaProductos.innerHTML = '';
+    }
+    
+    const totalSpan = document.getElementById('compraTotal');
+    if (totalSpan) {
+        totalSpan.textContent = '0.00';
+    }
+    
+    const modal = document.getElementById('modalCompra');
+    if (modal) {
+        modal.style.display = 'block';
+    }
+}
+
+function cerrarModalCompra() {
+    document.getElementById('modalCompra').style.display = 'none';
+}
+
+function filtrarProductosCompra(e) {
+    const texto = e.target.value.toLowerCase().trim();
+    const sugerencias = document.getElementById('sugerenciasCompra');
+    
+    // Resetear selección al escribir
+    window.indiceSeleccionado = -1;
+    
+    // Extraer búsqueda del formato rápido (5*codigo -> busca "codigo")
+    const matchRapido = texto.match(/^(\d+)[*\s]+(.+)$/);
+    const busqueda = matchRapido ? matchRapido[2] : texto;
+    
+    if (busqueda.length === 0) {
+        if (sugerencias) sugerencias.style.display = 'none';
+        return;
+    }
+    
+    const resultados = productos.filter(p =>
+        p.nombre.toLowerCase().includes(busqueda) ||
+        p.codigo.toLowerCase().includes(busqueda)
+    );
+    
+    if (resultados.length > 0 && sugerencias) {
+        const esRapido = !!matchRapido;
+        sugerencias.innerHTML = resultados.map(p => `
+            <div class="sugerencia-item" onclick="seleccionarProductoCompra(${p.id}, ${esRapido ? matchRapido[1] : 1})" style="cursor: pointer; padding: 10px; border-bottom: 1px solid #eee;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <strong>${p.nombre}</strong>
+                        <small style="color: #666;">(${p.codigo})</small>
+                        ${esRapido ? `<small style="color: #667eea; margin-left: 5px;">(x${matchRapido[1]})</small>` : ''}
+                    </div>
+                    <div style="text-align: right;">
+                        <div style="color: #28a745; font-weight: bold;">$${p.precio_costo.toFixed(2)}</div>
+                        <small style="color: #666;">Stock: ${p.cantidad}</small>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+        sugerencias.style.display = 'block';
+    } else if (sugerencias) {
+        sugerencias.innerHTML = '<div class="sugerencia-item" style="cursor: default; color: #666;">No se encontraron productos</div>';
+        sugerencias.style.display = 'block';
+    }
+}
+
+function agregarProductoRapido(producto, cantidad) {
+    const existente = ComprasModule.productosCompra.find(p => p.producto_id === producto.id);
+    
+    if (existente) {
+        existente.cantidad += cantidad;
+        existente.subtotal = existente.cantidad * existente.precio_unitario;
+    } else {
+        ComprasModule.productosCompra.push({
+            producto_id: producto.id,
+            producto_nombre: producto.nombre,
+            cantidad: cantidad,
+            precio_unitario: producto.precio_costo,
+            subtotal: cantidad * producto.precio_costo
+        });
+    }
+    
+    mostrarProductosCompra();
+    mostrarNotificacion(`✅ Agregado: ${cantidad}x ${producto.nombre}`);
+}
+
+function seleccionarProductoCompra(productoId, cantidad = 1) {
+    const producto = productos.find(p => p.id === productoId);
+    if (!producto) return;
+    
+    const existente = ComprasModule.productosCompra.find(p => p.producto_id === producto.id);
+    
+    if (existente) {
+        existente.cantidad += cantidad;
+        existente.subtotal = existente.cantidad * existente.precio_unitario;
+    } else {
+        ComprasModule.productosCompra.push({
+            producto_id: producto.id,
+            producto_nombre: producto.nombre,
+            cantidad: cantidad,
+            precio_unitario: producto.precio_costo,
+            subtotal: cantidad * producto.precio_costo
+        });
+    }
+    
+    document.getElementById('buscarProductoCompra').value = '';
+    const sugerencias = document.getElementById('sugerenciasCompra');
+    if (sugerencias) sugerencias.style.display = 'none';
+    
+    mostrarProductosCompra();
+    mostrarNotificacion(`✅ Agregado: ${cantidad}x ${producto.nombre}`);
+}
+
+function mostrarProductosCompra() {
+    const container = document.getElementById('listaProductosCompra');
+    if (!container) return;
+    
+    const total = ComprasModule.productosCompra.reduce((sum, p) => sum + p.subtotal, 0);
+    
+    const totalSpan = document.getElementById('compraTotal');
+    if (totalSpan) totalSpan.textContent = total.toFixed(2);
+    
+    if (ComprasModule.productosCompra.length === 0) {
+        container.innerHTML = '<div class="mensaje-vacio">Agregue productos buscando por nombre o código</div>';
+        return;
+    }
+    
+    container.innerHTML = `
+        <table style="width: 100%; background: white; border-radius: 8px; overflow: hidden;">
+            <thead style="background: #f8f9fa;">
+                <tr>
+                    <th style="padding: 10px; text-align: left;">Producto</th>
+                    <th style="padding: 10px; text-align: center; width: 100px;">Cantidad</th>
+                    <th style="padding: 10px; text-align: center; width: 120px;">Costo $</th>
+                    <th style="padding: 10px; text-align: right;">Subtotal</th>
+                    <th style="padding: 10px; text-align: center; width: 50px;"></th>
+                </tr>
+            </thead>
+            <tbody>
+                ${ComprasModule.productosCompra.map((p, idx) => `
+                    <tr style="border-bottom: 1px solid #eee;">
+                        <td style="padding: 10px;">${p.producto_nombre}</td>
+                        <td style="padding: 5px; text-align: center;">
+                            <input type="number" min="1" value="${p.cantidad}" 
+                                onchange="actualizarProductoCompra(${idx}, 'cantidad', this.value)"
+                                style="width: 70px; padding: 5px; text-align: center; border: 1px solid #ddd; border-radius: 4px;">
+                        </td>
+                        <td style="padding: 5px; text-align: center;">
+                            <input type="number" step="0.01" min="0" value="${p.precio_unitario.toFixed(2)}"
+                                onchange="actualizarProductoCompra(${idx}, 'costo', this.value)"
+                                style="width: 90px; padding: 5px; text-align: center; border: 1px solid #ddd; border-radius: 4px;">
+                        </td>
+                        <td style="padding: 10px; text-align: right; font-weight: bold;">$${p.subtotal.toFixed(2)}</td>
+                        <td style="padding: 10px; text-align: center;">
+                            <button onclick="eliminarProductoCompra(${idx})" style="background: #dc3545; color: white; border: none; border-radius: 4px; padding: 4px 8px; cursor: pointer;">✕</button>
+                        </td>
+                    </tr>
+                `).join('')}
+            </tbody>
+        </table>
+    `;
+}
+
+function actualizarProductoCompra(index, campo, valor) {
+    if (campo === 'cantidad') {
+        ComprasModule.productosCompra[index].cantidad = parseInt(valor) || 1;
+    } else if (campo === 'costo') {
+        ComprasModule.productosCompra[index].precio_unitario = parseFloat(valor) || 0;
+    }
+    const p = ComprasModule.productosCompra[index];
+    p.subtotal = p.cantidad * p.precio_unitario;
+    mostrarProductosCompra();
+}
+
+function eliminarProductoCompra(index) {
+    ComprasModule.productosCompra.splice(index, 1);
+    mostrarProductosCompra();
+}
+
+async function guardarCompra() {
+    const proveedorId = parseInt(document.getElementById('compraProveedor').value);
+    const nroFactura = document.getElementById('compraNroFactura').value.trim();
+    const fechaFactura = document.getElementById('compraFecha').value;
+    const fechaLibro = document.getElementById('compraFechaLibro').value;
+    
+    if (!proveedorId) {
+        alert('Seleccione un proveedor');
+        return;
+    }
+    
+    if (ComprasModule.productosCompra.length === 0) {
+        alert('Agregue al menos un producto');
+        return;
+    }
+    
+    const proveedorSeleccionado = AppState.proveedores.find(p => p.id === proveedorId);
+    const nombreProveedor = proveedorSeleccionado ? proveedorSeleccionado.nombre : 'Proveedor';
+    
+    const total = ComprasModule.productosCompra.reduce((sum, p) => sum + p.subtotal, 0);
+    
+    const compra = {
+        proveedor_id: proveedorId,
+        proveedor_nombre: nombreProveedor,
+        nro_factura: nroFactura,
+        fecha: fechaFactura,
+        fecha_libro: fechaLibro,
+        total_dolares: total,
+        total_bs: total * tasaDolar,
+        estado: 'pendiente',
+        detalles: ComprasModule.productosCompra
+    };
+    
+    console.log('Guardando compra:', compra);
+    
+    try {
+        const resultado = await ApiService.guardarCompra(compra);
+        console.log('Resultado compra:', resultado);
+        
+        AppState.productos = await ApiService.cargarProductos();
+        productos = AppState.productos;
+        mostrarProductos();
+        
+        mostrarNotificacion('✅ Compra registrada');
+        cerrarModalCompra();
+        await ComprasModule.cargarCompras();
+    } catch (e) {
+        console.error('Error al guardar compra:', e);
+        alert('Error al guardar la compra');
+    }
+}
+
+async function verDetalleCompra(id) {
+    console.log('ApiService:', ApiService);
+    console.log('getCompra:', ApiService.getCompra);
+    try {
+        const compra = await ApiService.getCompra(id);
+        
+        const detallesHtml = compra.detalles.map(d => `
+            <tr style="border-bottom: 1px solid #eee;">
+                <td style="padding: 10px;">${d.producto_nombre}</td>
+                <td style="padding: 10px; text-align: center;">${d.cantidad}</td>
+                <td style="padding: 10px; text-align: right;">$${d.precio_unitario.toFixed(2)}</td>
+                <td style="padding: 10px; text-align: right; font-weight: bold;">$${d.subtotal.toFixed(2)}</td>
+            </tr>
+        `).join('');
+        
+        const totalBs = compra.total_bs || (compra.total_dolares * tasaDolar);
+        
+        document.getElementById('detalleCompraInfo').innerHTML = `
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                <div><strong>Nro. Factura:</strong> ${compra.nro_factura || '-'}</div>
+                <div><strong>Proveedor:</strong> ${compra.proveedor_nombre}</div>
+                <div><strong>Fecha Factura:</strong> ${compra.fecha || '-'}</div>
+                <div><strong>Fecha Libro:</strong> ${compra.fecha_libro || '-'}</div>
+                <div><strong>Estado:</strong> <span style="padding: 2px 6px; border-radius: 4px; background: ${compra.estado === 'pagada' ? '#d4edda' : '#fff3cd'}; color: ${compra.estado === 'pagada' ? '#155724' : '#856404'};">${compra.estado.toUpperCase()}</span></div>
+                <div><strong>Total:</strong> <span style="font-weight: bold; color: #667eea;">$${compra.total_dolares.toFixed(2)}</span> / <span style="font-weight: bold;">Bs. ${totalBs.toFixed(2)}</span></div>
+            </div>
+        `;
+        
+        document.getElementById('detalleCompraTabla').innerHTML = `
+            <table style="width: 100%; background: white; border-radius: 8px; overflow: hidden;">
+                <thead style="background: #f8f9fa;">
+                    <tr>
+                        <th style="padding: 10px; text-align: left;">Producto</th>
+                        <th style="padding: 10px; text-align: center;">Cantidad</th>
+                        <th style="padding: 10px; text-align: right;">Costo $</th>
+                        <th style="padding: 10px; text-align: right;">Subtotal</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${detallesHtml}
+                </tbody>
+            </table>
+        `;
+        
+        document.getElementById('modalDetalleCompra').style.display = 'block';
+    } catch (e) {
+        console.error('Error al cargar detalle:', e);
+        alert('Error al cargar los detalles de la compra');
+    }
+}
+
+function cerrarModalDetalleCompra() {
+    document.getElementById('modalDetalleCompra').style.display = 'none';
+}
+
+async function marcarCompraPagada(id) {
+    if (confirm('¿Marcar esta compra como pagada?')) {
+        await ApiService.actualizarEstadoCompra(id, 'pagada');
+        await ComprasModule.cargarCompras();
+        mostrarNotificacion('✅ Compra marcada como pagada');
+    }
+}
+
+// Event listeners para búsqueda de productos en compras
+// window.indiceSeleccionado is now window.window.indiceSeleccionado
+
+document.addEventListener('DOMContentLoaded', function() {
+    const inputBusqueda = document.getElementById('buscarProductoCompra');
+    if (inputBusqueda) {
+        inputBusqueda.addEventListener('input', filtrarProductosCompra);
+        inputBusqueda.addEventListener('keydown', function(e) {
+            const sugerencias = document.getElementById('sugerenciasCompra');
+            const items = sugerencias?.querySelectorAll('.sugerencia-item') || [];
+            
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                if (items.length > 0) {
+                    window.indiceSeleccionado = Math.min(window.indiceSeleccionado + 1, items.length - 1);
+                    actualizarSeleccion(items);
+                }
+                return;
+            }
+            
+            if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                if (items.length > 0) {
+                    window.indiceSeleccionado = Math.max(window.indiceSeleccionado - 1, 0);
+                    actualizarSeleccion(items);
+                }
+                return;
+            }
+            
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                
+                if (window.indiceSeleccionado >= 0 && items[window.indiceSeleccionado]) {
+                    items[window.indiceSeleccionado].click();
+                    window.indiceSeleccionado = -1;
+                    return;
+                }
+                
+                const texto = this.value.toLowerCase().trim();
+                const matchRapido = texto.match(/^(\d+)[*\s]+(.+)$/);
+                
+                if (matchRapido) {
+                    const cantidad = parseInt(matchRapido[1]);
+                    const buscar = matchRapido[2].toLowerCase();
+                    
+                    const resultados = productos.filter(p =>
+                        p.nombre.toLowerCase().includes(buscar) ||
+                        p.codigo.toLowerCase().includes(buscar)
+                    );
+                    
+                    if (resultados.length > 0) {
+                        agregarProductoRapido(resultados[0], cantidad);
+                        this.value = '';
+                        if (sugerencias) sugerencias.style.display = 'none';
+                        return;
+                    }
+                }
+                
+                if (sugerencias) {
+                    const primera = sugerencias.querySelector('.sugerencia-item');
+                    if (primera && sugerencias.style.display === 'block') {
+                        primera.click();
+                    }
+                }
+            }
+            if (e.key === 'Escape') {
+                if (sugerencias) sugerencias.style.display = 'none';
+                window.indiceSeleccionado = -1;
+            }
+        });
+    }
+    
+    function actualizarSeleccion(items) {
+        items.forEach((item, idx) => {
+            if (idx === window.indiceSeleccionado) {
+                item.style.background = '#e9ecef';
+                item.style.fontWeight = 'bold';
+            } else {
+                item.style.background = '';
+                item.style.fontWeight = '';
+            }
+        });
+    }
+    
+    // Cerrar sugerencias al hacer click fuera
+    document.addEventListener('click', function(e) {
+        const sugerencias = document.getElementById('sugerenciasCompra');
+        if (sugerencias && !e.target.closest('#sugerenciasCompra') && !e.target.closest('#buscarProductoCompra')) {
+            sugerencias.style.display = 'none';
+        }
+        window.indiceSeleccionado = -1;
+    });
+});

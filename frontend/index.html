@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Ventas - Productos en $ y Bs</title>
+    <link rel="stylesheet" href="styles.css">
+    <!-- Flatpickr para forzar formato de fecha -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://npmcdn.com/flatpickr/dist/l10n/es.js"></script>
+    <!-- Módulos de la aplicación -->
+    <script src="js/utils.js"></script>
+    <script src="js/state.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/informes.js"></script>
+    <script src="js/compras.js"></script>
+    <script src="script.js"></script>
+</head>
+
+<body>
+    <!-- Pantalla de Login -->
+    <div id="panelLogin"
+        style="display: flex; justify-content: center; align-items: center; min-height: 100vh; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+        <div class="modal-content"
+            style="max-width: 400px; padding: 40px; text-align: center; box-shadow: 0 15px 35px rgba(0,0,0,0.4);">
+            <div style="font-size: 3em; margin-bottom: 20px;">🛡️</div>
+            <h2 style="margin-bottom: 10px; color: #333;">Acceso al Sistema</h2>
+            <p style="color: #666; font-size: 0.9em; margin-bottom: 30px;">Por favor, ingrese sus credenciales para
+                continuar.</p>
+
+            <form id="formLogin" onsubmit="manejarLogin(event)">
+                <div class="form-group" style="text-align: left;">
+                    <label>Usuario:</label>
+                    <input type="text" id="loginUser" required placeholder="Nombre de usuario"
+                        style="width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8px;">
+                </div>
+                <div class="form-group" style="text-align: left; margin-bottom: 30px;">
+                    <label>Contraseña:</label>
+                    <input type="password" id="loginPass" required placeholder="••••••••"
+                        style="width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8px;">
+                </div>
+                <button type="submit" class="btn-primary" style="width: 100%; padding: 15px; font-size: 1.1em;">
+                    🚀 Entrar al Sistema
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Panel Principal (Sistema) -->
+    <div id="panelPrincipal" class="container" style="display: none;">
+        <header style="position: relative;">
+            <div
+                style="position: absolute; top: 15px; right: 25px; display: flex; align-items: center; gap: 15px; background: rgba(0,0,0,0.2); padding: 8px 15px; border-radius: 20px; font-size: 0.85em;">
+                <span>👤 <strong id="nombreUsuarioDisplay">Admin</strong></span>
+                <button onclick="cerrarSesion()"
+                    style="background: none; border: none; color: #ffeb3b; cursor: pointer; text-decoration: underline; font-weight: bold;">Salir</button>
+            </div>
+            <div id="infoEmpresa" style="margin-bottom: 5px;">
+                <span id="nombreEmpresaDisplay" style="font-size: 1.1em; font-weight: bold; color: #667eea;">Empresa</span>
+                <span id="rifEmpresaDisplay" style="font-size: 0.9em; color: #555; margin-left: 10px;"></span>
+            </div>
+            <div id="direccionEmpresaDisplay" style="font-size: 0.8em; color: #666; margin-bottom: 5px;"></div>
+            <h1>🛍️ Sistema de Gestión de Ventas</h1>
+            <div class="config-bar">
+                <div class="fecha-actual">
+                    📅 <span id="fechaActual"></span>
+                </div>
+            </div>
+        </header>
+
+        <nav class="tabs">
+            <button class="tab-btn active" onclick="cambiarTab('productos')">📦 Productos</button>
+            <button class="tab-btn" onclick="cambiarTab('ventas')">💰 Ventas</button>
+            <button class="tab-btn" onclick="cambiarTab('proveedores')">🚚 Proveedores</button>
+            <button class="tab-btn" onclick="cambiarTab('compras')">🛒 Compras</button>
+            <button class="tab-btn" onclick="cambiarTab('informes')">📊 Informes</button>
+            <div class="header-items">
+                <div class="tasa-info" style="margin-right: 15px; font-size: 0.9em; color: #555;">
+                    <span id="infoTasa">Venta: Bs 36.50 | Vuelto: 36.50 | G: 30% | Bono: 0%</span>
+                </div>
+                <button onclick="abrirModalConfiguracion()" class="btn-secondary"
+                    style="padding: 5px 10px; font-size: 0.9em;">
+                    ⚙️ Configurar
+                </button>
+            </div>
+        </nav>
+
+        <!-- Panel de Productos -->
+        <div id="panelProductos" class="tab-panel active">
+            <div class="panel-header" style="flex-wrap: wrap; gap: 15px;">
+                <h2>Gestión de Productos</h2>
+                <div class="search-container" style="flex: 1; min-width: 250px;">
+                    <input type="text" id="buscarProductoGestion"
+                        placeholder="🔍 Buscar por nombre, código o descripción..."
+                        style="width: 100%; padding: 10px 15px; border-radius: 8px; border: 1px solid #ddd; font-size: 0.9em;"
+                        oninput="filtrarProductosGestion()">
+                </div>
+                <button onclick="mostrarFormularioProducto()" class="btn-primary">➕ Nuevo Producto</button>
+            </div>
+
+            <div class="productos-grid" id="productosGrid">
+                <!-- Los productos se cargarán aquí dinámicamente -->
+            </div>
+        </div>
+
+        <!-- Panel de Ventas -->
+        <div id="panelVentas" class="tab-panel">
+            <div class="panel-header">
+                <h2>Registrar Venta</h2>
+            </div>
+
+            <div class="venta-container">
+                <div class="seleccion-productos">
+                    <h3>Seleccionar Productos</h3>
+                    <div style="position: relative;">
+                        <input type="text" id="buscarProducto" class="producto-select"
+                            placeholder="🔍 Buscar producto por nombre o código..." autocomplete="off">
+                        <div id="sugerenciasProductos" class="sugerencias-productos"></div>
+                    </div>
+
+                    <div class="carrito" id="carrito">
+                        <h4>Carrito de Compra</h4>
+                        <table id="tablaCarrito">
+                            <thead>
+                                <tr>
+                                    <th>Producto</th>
+                                    <th>Precio $</th>
+                                    <th>Precio Bs</th>
+                                    <th>Cantidad</th>
+                                    <th>Subtotal $</th>
+                                    <th>Subtotal Bs</th>
+                                    <th>Acción</th>
+                                </tr>
+                            </thead>
+                            <tbody id="carritoBody"></tbody>
+                            <tfoot>
+                                <tr>
+                                    <td colspan="3"><strong>Total:</strong></td>
+                                    <td><strong id="totalDolares">$0.00</strong></td>
+                                    <td><strong id="totalBolivares">Bs 0.00</strong></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="datos-venta">
+                    <h3>Datos de la Venta</h3>
+
+                    <!-- Resumen del total -->
+                    <div class="resumen-total"
+                        style="background: #e9ecef; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
+                        <div style="display: flex; justify-content: space-between; font-size: 1.2em;">
+                            <span><strong>Total Venta:</strong></span>
+                            <span>
+                                <span id="totalVentaDolares">$0.00</span> /
+                                <span id="totalVentaBs">Bs 0.00</span>
+                            </span>
+                        </div>
+                        <div id="containerAhorroRealTime"
+                            style="display: none; justify-content: space-between; color: #28a745; margin-top: 5px; font-size: 0.95em; border-top: 1px dashed #ccc; padding-top: 5px;">
+                            <span>Ahorro aplicado:</span>
+                            <span id="ahorroVentaRealTime">-$0.00</span>
+                        </div>
+                        <div id="containerTotalAPagarRealTime"
+                            style="display: none; justify-content: space-between; font-weight: bold; font-size: 1.3em; margin-top: 5px; color: #007bff; border-top: 1px solid #ccc; padding-top: 5px;">
+                            <span>TOTAL A PAGAR:</span>
+                            <span id="totalAPagarRealTime">$0.00</span>
+                        </div>
+                    </div>
+
+                    <!-- Aplicar Descuento section removed as per instruction -->
+
+                    <!-- Agregar pagos -->
+                    <div class="agregar-pago"
+                        style="background: #f8f9fa; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
+                        <h4>Agregar Pago</h4>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px;">
+                            <select id="medioPago" required>
+                                <option value="">Medio de pago...</option>
+                                <option value="Efectivo en Dólares">💵 Efectivo en Dólares</option>
+                                <option value="Efectivo en Bolívares">💶 Efectivo en Bolívares</option>
+                                <option value="Tarjeta de Débito">💳 Tarjeta de Débito</option>
+                                <option value="Pago Móvil">📱 Pago Móvil</option>
+                                <option value="Tarjeta de Crédito">💳 Tarjeta de Crédito</option>
+                                <option value="Transferencia en Bs">🏦 Transferencia en Bs</option>
+                                <option value="Transferencia en Dólares">🏦 Transferencia en Dólares</option>
+                            </select>
+                            <input type="number" id="montoPago" step="0.01" min="0" placeholder="Monto">
+                            <button type="button" id="btnAgregarPago" class="btn-success">➕ Agregar</button>
+                        </div>
+                    </div>
+
+                    <!-- Lista de pagos realizados -->
+                    <div class="lista-pagos" style="margin-bottom: 20px;">
+                        <h4>Pagos Realizados</h4>
+                        <div id="listaPagos" style="max-height: 200px; overflow-y: auto;">
+                            <!-- Los pagos se mostrarán aquí -->
+                        </div>
+                    </div>
+
+                    <!-- Resumen de pagos -->
+                    <div class="resumen-pagos"
+                        style="background: #e3f2fd; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                            <div>
+                                <small>Pagado en $:</small>
+                                <strong id="totalPagadoDolares">$0.00</strong>
+                            </div>
+                            <div>
+                                <small>Pagado en Bs:</small>
+                                <strong id="totalPagadoBs">Bs 0.00</strong>
+                            </div>
+                            <div>
+                                <small>Pendiente $:</small>
+                                <strong id="pendienteDolares" style="color: #dc3545;">$0.00</strong>
+                            </div>
+                            <div>
+                                <small>Pendiente Bs:</small>
+                                <strong id="pendienteBs" style="color: #dc3545;">Bs 0.00</strong>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Datos del cliente -->
+                    <div class="form-group">
+                        <label>Cliente (opcional):</label>
+                        <input type="text" id="cliente" placeholder="Nombre del cliente">
+                    </div>
+
+                    <!-- Botones de acción -->
+                    <div class="form-actions">
+                        <button type="button" id="btnProcesarVenta" onclick="procesarVenta()" class="btn-success"
+                            disabled>
+                            ✅ Procesar Venta
+                        </button>
+                        <button type="button" onclick="limpiarCarrito()" class="btn-secondary">
+                            🗑️ Limpiar Todo
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Panel de Informes -->
+        <div id="panelInformes" class="tab-panel">
+            <div class="panel-header">
+                <h2>Informes de Ventas</h2>
+                <div class="filtros-informe" style="display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap;">
+                    <div>
+                        <label style="display: block; font-size: 0.8em; margin-bottom: 2px;">Desde:</label>
+                        <input type="date" id="fechaInicioInforme" class="form-control" style="padding: 5px;">
+                    </div>
+                    <div>
+                        <label style="display: block; font-size: 0.8em; margin-bottom: 2px;">Hasta:</label>
+                        <input type="date" id="fechaFinInforme" class="form-control" style="padding: 5px;">
+                    </div>
+                    <button onclick="filtrarInformesPorFecha()" class="btn-primary"
+                        style="height: 32px; margin-bottom: 2px;">🔍 Filtrar</button>
+                    <button onclick="limpiarFiltrosFecha()" class="btn-secondary" 
+                        style="height: 32px; margin-bottom: 2px;">🧹 Limpiar</button>
+
+                    <div style="margin-left: auto; display: flex; gap: 5px;">
+                        <button onclick="cargarVentasDelDia()" class="btn-secondary" style="height: 32px;">📅
+                            Hoy</button>
+                        <button onclick="cargarTodasLasVentas()" class="btn-secondary" style="height: 32px;">📋
+                            Todas</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="resumen-ventas" id="resumenVentas">
+                <!-- Resumen de ventas -->
+            </div>
+
+            <div class="tabla-informes" id="tablaInformes">
+                <!-- Tabla de ventas -->
+            </div>
+        </div>
+
+        <!-- Panel de Proveedores -->
+        <div id="panelProveedores" class="tab-panel">
+            <div class="panel-header">
+                <h2>🚚 Proveedores</h2>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <input type="text" id="buscarProveedor" placeholder="Buscar proveedor..." 
+                        onkeyup="filtrarProveedores()" class="form-control" style="width: 250px;">
+                    <button onclick="abrirModalProveedor()" class="btn-primary">➕ Nuevo Proveedor</button>
+                </div>
+            </div>
+            <div id="listaProveedores" style="padding: 15px;">
+                <!-- Lista de proveedores -->
+            </div>
+        </div>
+
+        <!-- Panel de Compras -->
+        <div id="panelCompras" class="tab-panel">
+            <div class="panel-header">
+                <h2>🛒 Compras</h2>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <button onclick="abrirModalCompra()" class="btn-primary">➕ Nueva Compra</button>
+                </div>
+            </div>
+            <div id="listaCompras" style="padding: 15px;">
+                <!-- Lista de compras -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para crear/editar productos -->
+    <div id="modalProducto" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="cerrarModalProducto()">&times;</span>
+            <h2 id="modalTitulo">Nuevo Producto</h2>
+            <form id="formProducto">
+                <input type="hidden" id="productoId" value="-1">
+
+                <div class="form-group">
+                    <label>Nombre del Producto:</label>
+                    <input type="text" id="productoNombre" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Descripción:</label>
+                    <textarea id="productoDescripcion" rows="2" required></textarea>
+                </div>
+
+                <div class="form-group" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div>
+                        <label>Precio Costo ($):</label>
+                        <input type="number" id="productoPrecioCosto" step="0.01" min="0">
+                    </div>
+                    <div>
+                        <label>% Ganancia:</label>
+                        <input type="number" id="productoPorcentajeGanancia" step="0.0001" min="0">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Precio Venta en Dólares ($):</label>
+                    <input type="number" id="productoPrecioDolares" step="0.01" min="0" required>
+                </div>
+
+                <div class="form-group" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div>
+                        <label>Precio en Bs:</label>
+                        <input type="number" id="productoPrecioBolivares" step="0.01" min="0">
+                    </div>
+                    <div>
+                        <label>Redondeo:</label>
+                        <select id="productoMetodoRedondeo" onchange="calcularPrecioBolivares()"
+                            style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 5px; height: 38px;">
+                            <option value="none">Sin Redondeo</option>
+                            <option value="no_decimals">Sin Decimales</option>
+                            <option value="five_cents">Cinco céntimos (0.05)</option>
+                            <option value="unit_up">Unidad Superior</option>
+                            <option value="five_units">Cinco Unidades (5.00)</option>
+                            <option value="ten_up">Decena Superior (10.00)</option>
+                            <option value="hundred_up">Centena Superior (100.00)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Cantidad en Stock:</label>
+                    <input type="number" id="productoCantidad" min="0" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Categoría:</label>
+                    <input type="text" id="productoCategoria" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Código (opcional):</label>
+                    <input type="text" id="productoCodigo" placeholder="Dejar vacío para auto-generar">
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn-success">💾 Guardar Producto</button>
+                    <button type="button" onclick="cerrarModalProducto()" class="btn-secondary">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal para gestionar vuelto -->
+    <div id="modalGestionVuelto" class="modal">
+        <div class="modal-content" style="max-width: 500px;">
+            <h2 style="color: #007bff; margin-top: 0;">💰 Gestión de Vuelto Multimoneda</h2>
+
+            <!-- Resumen de Vuelto -->
+            <div
+                style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 20px; text-align: center;">
+                <div style="background: #e7f3ff; padding: 10px; border-radius: 8px;">
+                    <span style="font-size: 0.8em; color: #555;">Excedente:</span><br>
+                    <strong id="montoExcedenteVuelto" style="font-size: 1.1em; color: #007bff;">$0.00</strong><br>
+                    <span id="montoExcedenteVueltoBs" style="font-size: 0.85em; color: #007bff; font-weight: bold;">Bs
+                        0.00</span>
+                </div>
+                <div style="background: #e6ffed; padding: 10px; border-radius: 8px;">
+                    <span style="font-size: 0.8em; color: #555;">Entregado:</span><br>
+                    <strong id="montoEntregadoVuelto" style="font-size: 1.1em; color: #28a745;">$0.00</strong><br>
+                    <span id="montoEntregadoVueltoBs" style="font-size: 0.85em; color: #28a745; font-weight: bold;">Bs
+                        0.00</span>
+                </div>
+                <div style="background: #fff5f5; padding: 10px; border-radius: 8px;">
+                    <span style="font-size: 0.8em; color: #555;">Faltante:</span><br>
+                    <strong id="montoFaltanteVuelto" style="font-size: 1.1em; color: #dc3545;">$0.00</strong><br>
+                    <span id="montoFaltanteVueltoBs" style="font-size: 0.85em; color: #dc3545; font-weight: bold;">Bs
+                        0.00</span>
+                </div>
+            </div>
+
+            <!-- Sección para agregar vuelto -->
+            <div
+                style="background: #f8f9fa; padding: 15px; border-radius: 10px; border: 1px solid #eee; margin-bottom: 20px;">
+                <h4
+                    style="margin-top: 0; margin-bottom: 15px; font-size: 0.95em; border-bottom: 1px solid #ddd; padding-bottom: 5px;">
+                    Añadir Entrega</h4>
+
+                <div style="margin-bottom: 12px;">
+                    <label
+                        style="font-weight: bold; display: block; margin-bottom: 5px; font-size: 0.85em;">Moneda:</label>
+                    <div style="display: flex; gap: 8px;">
+                        <label
+                            style="flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 5px; cursor: pointer; display: flex; align-items: center; gap: 5px; background: white; font-size: 0.85em;">
+                            <input type="radio" name="monedaVuelto" value="USD" checked
+                                onchange="actualizarMetodosVuelto('USD')"> Dólares
+                        </label>
+                        <label
+                            style="flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 5px; cursor: pointer; display: flex; align-items: center; gap: 5px; background: white; font-size: 0.85em;">
+                            <input type="radio" name="monedaVuelto" value="BS" onchange="actualizarMetodosVuelto('BS')">
+                            Bolívares
+                        </label>
+                    </div>
+                </div>
+
+                <div id="containerTasaVuelto" style="margin-bottom: 12px; display: none;">
+                    <label for="tasaVuelto"
+                        style="font-weight: bold; display: block; margin-bottom: 3px; font-size: 0.85em;">Tasa
+                        USD/Bs:</label>
+                    <input type="number" id="tasaVuelto" step="0.01"
+                        style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 5px;"
+                        oninput="actualizarConversionesVuelto()">
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
+                    <div>
+                        <label
+                            style="font-weight: bold; display: block; margin-bottom: 3px; font-size: 0.85em;">Método:</label>
+                        <select id="metodoEntregaVuelto"
+                            style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 5px; font-size: 0.85em;">
+                            <option value="Efectivo">Efectivo</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label
+                            style="font-weight: bold; display: block; margin-bottom: 3px; font-size: 0.85em;">Monto:</label>
+                        <input type="number" id="montoEntregaVuelto" step="0.01"
+                            style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 5px; font-size: 0.85em;"
+                            placeholder="0.00" oninput="actualizarConversionesVuelto()">
+                        <div id="previewConversionVuelto"
+                            style="font-size: 0.75em; color: #666; margin-top: 3px; display: none;">Equivale a: <span
+                                id="valorequivaleUSD">$0.00</span></div>
+                    </div>
+                </div>
+
+                <button onclick="agregarVueltoALista()" class="btn-primary"
+                    style="width: 100%; padding: 10px; font-size: 0.9em;">➕ Agregar a la lista</button>
+            </div>
+
+            <!-- Lista de vueltos agregados -->
+            <div style="margin-bottom: 20px;">
+                <h4 style="margin-top: 0; margin-bottom: 10px; font-size: 0.95em;">Vueltos Agregados:</h4>
+                <div id="listaVueltosAgregados"
+                    style="max-height: 150px; overflow-y: auto; background: white; border: 1px solid #eee; border-radius: 5px; padding: 5px;">
+                    <!-- Se llena con JS -->
+                </div>
+            </div>
+
+            <div
+                style="text-align: right; border-top: 1px solid #eee; padding-top: 15px; display: flex; gap: 10px; justify-content: flex-end;">
+                <button class="btn-secondary" onclick="finalizarVentaSinVuelto()">No entregar vuelto</button>
+                <button class="btn-success" onclick="confirmarVuelto()">✅ Finalizar Venta</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modalVuelto" class="modal">
+        <div class="modal-content modal-small">
+            <span class="close" onclick="cerrarModalVuelto()">&times;</span>
+            <h2>✅ Venta Procesada</h2>
+            <div id="vueltoInfo" class="vuelto-info"></div>
+            <button onclick="cerrarModalVuelto()" class="btn-primary"
+                style="width: 100%; padding: 12px; font-size: 1.1em;">Aceptar</button>
+        </div>
+    </div>
+
+    <!-- Modal Configuración -->
+    <div id="modalConfiguracion" class="modal">
+        <div class="modal-content" style="max-width: 600px;">
+            <span class="close" onclick="cerrarModalConfiguracion()">&times;</span>
+            <h2 style="text-align: center; margin-bottom: 20px;">⚙️ Configuración</h2>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                <!-- Columna Izquierda: Datos Empresa -->
+                <div style="padding-right: 15px; border-right: 1px solid #eee;">
+                    <label style="font-weight: bold; display: block; margin-bottom: 10px; color: #667eea;">📋 Datos de la Empresa</label>
+                    
+                    <div style="margin-bottom: 10px;">
+                        <label for="configNombreEmpresa" style="font-weight: bold; display: block; margin-bottom: 5px;">Nombre:</label>
+                        <input type="text" id="configNombreEmpresa" placeholder="Mi Empresa C.A."
+                            style="width: 100%; padding: 8px; font-size: 0.95em; border: 1px solid #ccc; border-radius: 5px;">
+                    </div>
+
+                    <div style="margin-bottom: 10px;">
+                        <label for="configRifEmpresa" style="font-weight: bold; display: block; margin-bottom: 5px;">RIF:</label>
+                        <input type="text" id="configRifEmpresa" placeholder="J-12345678-9"
+                            style="width: 100%; padding: 8px; font-size: 0.95em; border: 1px solid #ccc; border-radius: 5px;">
+                    </div>
+
+                    <div style="margin-bottom: 10px;">
+                        <label for="configDireccionEmpresa" style="font-weight: bold; display: block; margin-bottom: 5px;">Dirección:</label>
+                        <textarea id="configDireccionEmpresa" rows="2" placeholder="Av. Principal, Ciudad..."
+                            style="width: 100%; padding: 8px; font-size: 0.95em; border: 1px solid #ccc; border-radius: 5px; resize: vertical;"></textarea>
+                    </div>
+                </div>
+
+                <!-- Columna Derecha: Tasas y Porcentajes -->
+                <div>
+                    <label style="font-weight: bold; display: block; margin-bottom: 10px; color: #667eea;">💰 Tasas y Porcentajes</label>
+
+                    <div style="margin-bottom: 12px;">
+                        <label for="configTasaDolar" style="font-weight: bold; display: block; margin-bottom: 5px;">Tasa Venta (Bs/$):</label>
+                        <div style="display: flex; gap: 8px;">
+                            <input type="number" id="configTasaDolar" step="0.01"
+                                style="flex: 1; padding: 8px; font-size: 0.95em; border: 1px solid #ccc; border-radius: 5px;">
+                            <button onclick="actualizarTasaBCV()" class="btn-secondary" title="Actualizar desde BCV"
+                                style="padding: 0 12px; background: #e3f2fd; color: #1976d2; border-color: #bbdefb;">
+                                🔄
+                            </button>
+                        </div>
+                    </div>
+
+                    <div style="margin-bottom: 12px;">
+                        <label for="configTasaVueltoGeneral" style="font-weight: bold; display: block; margin-bottom: 5px;">Tasa Vueltos (Bs/$):</label>
+                        <input type="number" id="configTasaVueltoGeneral" step="0.01"
+                            style="width: 100%; padding: 8px; font-size: 0.95em; border: 1px solid #ccc; border-radius: 5px;">
+                    </div>
+
+                    <div style="margin-bottom: 12px;">
+                        <label for="configPorcentajeDescuentoModal" style="font-weight: bold; display: block; margin-bottom: 5px;">% Desc. Pagos Divisas:</label>
+                        <input type="number" id="configPorcentajeDescuentoModal" step="1" min="0" max="100"
+                            style="width: 100%; padding: 8px; font-size: 0.95em; border: 1px solid #ccc; border-radius: 5px;">
+                    </div>
+
+                    <div style="margin-bottom: 10px;">
+                        <label for="configPorcentajeGananciaDefecto" style="font-weight: bold; display: block; margin-bottom: 5px;">% Ganancia Defecto:</label>
+                        <input type="number" id="configPorcentajeGananciaDefecto" step="0.01" min="0"
+                            style="width: 100%; padding: 8px; font-size: 0.95em; border: 1px solid #ccc; border-radius: 5px;">
+                    </div>
+                </div>
+            </div>
+
+            <div style="text-align: right; border-top: 1px solid #eee; padding-top: 15px; margin-top: 15px;">
+                <button class="btn-secondary" onclick="cerrarModalConfiguracion()">Cancelar</button>
+                <button class="btn-primary" onclick="guardarConfiguracion()">💾 Guardar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Proveedor -->
+    <div id="modalProveedor" class="modal">
+        <div class="modal-content" style="max-width: 450px;">
+            <span class="close" onclick="cerrarModalProveedor()">&times;</span>
+            <h2 id="modalTituloProveedor" style="text-align: center; margin-bottom: 20px;">➕ Nuevo Proveedor</h2>
+            
+            <input type="hidden" id="proveedorId" value="-1">
+            
+            <div style="margin-bottom: 12px;">
+                <label for="proveedorNombre" style="font-weight: bold; display: block; margin-bottom: 5px;">Nombre:</label>
+                <input type="text" id="proveedorNombre" placeholder="Nombre del proveedor"
+                    style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;">
+            </div>
+
+            <div style="margin-bottom: 12px;">
+                <label for="proveedorRif" style="font-weight: bold; display: block; margin-bottom: 5px;">RIF:</label>
+                <input type="text" id="proveedorRif" placeholder="J-12345678-9"
+                    style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;">
+            </div>
+
+            <div style="margin-bottom: 12px;">
+                <label for="proveedorTelefono" style="font-weight: bold; display: block; margin-bottom: 5px;">Teléfono:</label>
+                <input type="text" id="proveedorTelefono" placeholder="0412-1234567"
+                    style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;">
+            </div>
+
+            <div style="margin-bottom: 12px;">
+                <label for="proveedorEmail" style="font-weight: bold; display: block; margin-bottom: 5px;">Email:</label>
+                <input type="email" id="proveedorEmail" placeholder="correo@ejemplo.com"
+                    style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;">
+            </div>
+
+            <div style="margin-bottom: 15px;">
+                <label for="proveedorDireccion" style="font-weight: bold; display: block; margin-bottom: 5px;">Dirección:</label>
+                <textarea id="proveedorDireccion" rows="2" placeholder="Dirección del proveedor"
+                    style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px; resize: vertical;"></textarea>
+            </div>
+
+            <div style="text-align: right; border-top: 1px solid #eee; padding-top: 15px;">
+                <button class="btn-secondary" onclick="cerrarModalProveedor()">Cancelar</button>
+                <button class="btn-primary" onclick="guardarProveedor()">💾 Guardar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Compra -->
+    <div id="modalCompra" class="modal">
+        <div class="modal-content" style="max-width: 700px;">
+            <span class="close" onclick="cerrarModalCompra()">&times;</span>
+            <h2 style="text-align: center; margin-bottom: 20px;">🛒 Nueva Compra</h2>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                <div>
+                    <label for="compraNroFactura" style="font-weight: bold; display: block; margin-bottom: 5px;">Nro. Factura:</label>
+                    <input type="text" id="compraNroFactura" 
+                        placeholder="Ej: FAC-001234"
+                        style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;">
+                </div>
+                <div>
+                    <label for="compraFecha" style="font-weight: bold; display: block; margin-bottom: 5px;">Fecha Factura:</label>
+                    <input type="date" id="compraFecha" 
+                        style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;">
+                </div>
+                <div>
+                    <label for="compraFechaLibro" style="font-weight: bold; display: block; margin-bottom: 5px;">Fecha Libro:</label>
+                    <input type="date" id="compraFechaLibro" 
+                        style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;">
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                <div>
+                    <label for="compraProveedor" style="font-weight: bold; display: block; margin-bottom: 5px;">Proveedor:</label>
+                    <select id="compraProveedor"
+                        style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;">
+                        <option value="">Seleccionar proveedor...</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="font-weight: bold; display: block; margin-bottom: 5px;">Total:</label>
+                    <div style="font-size: 1.5em; font-weight: bold; color: #667eea;">
+                        $ <span id="compraTotal">0.00</span>
+                    </div>
+                </div>
+            </div>
+
+            <div style="margin-bottom: 15px; padding: 15px; background: #f5f5f5; border-radius: 8px;">
+                <h4 style="margin: 0 0 10px 0;">Agregar Producto</h4>
+                
+                <!-- Buscador de productos -->
+                <div style="position: relative;">
+                    <input type="text" id="buscarProductoCompra" class="form-control"
+                        placeholder="🔍 Buscar producto por nombre o código... (Ej: 5*codigo para agregar 5 unidades)"
+                        autocomplete="off"
+                        style="width: 100%; padding: 10px; font-size: 1em;">
+                    <div id="sugerenciasCompra" class="sugerencias-productos" style="position: absolute; top: 100%; left: 0; right: 0; z-index: 1000; max-height: 250px; overflow-y: auto; display: none;"></div>
+                </div>
+            </div>
+
+            <div id="listaProductosCompra" style="margin-bottom: 15px; max-height: 200px; overflow-y: auto;">
+                <!-- Productos agregados -->
+            </div>
+
+            <div style="text-align: right; border-top: 1px solid #eee; padding-top: 15px;">
+                <button class="btn-secondary" onclick="cerrarModalCompra()">Cancelar</button>
+                <button class="btn-primary" onclick="guardarCompra()">💾 Registrar Compra</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Ver Detalle Compra -->
+    <div id="modalDetalleCompra" class="modal">
+        <div class="modal-content" style="max-width: 600px;">
+            <span class="close" onclick="cerrarModalDetalleCompra()">&times;</span>
+            <h2 style="text-align: center; margin-bottom: 20px;">📋 Detalle de Compra</h2>
+            
+            <div id="detalleCompraInfo" style="margin-bottom: 15px; padding: 15px; background: #f5f5f5; border-radius: 8px;">
+            </div>
+            
+            <div id="detalleCompraTabla" style="max-height: 300px; overflow-y: auto;">
+            </div>
+            
+            <div style="text-align: right; margin-top: 15px;">
+                <button class="btn-secondary" onclick="cerrarModalDetalleCompra()">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    </div> <!-- Cierre panelPrincipal -->
+</body>
+
+</html>
