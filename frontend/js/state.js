@@ -132,6 +132,8 @@ const AppState = {
     }
 };
 
+window.AppState = AppState;
+
 // Referencias directas para compatibilidad
 var productos = AppState.productos;
 var ventas = AppState.ventas;

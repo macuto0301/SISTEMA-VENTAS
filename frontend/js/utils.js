@@ -40,6 +40,11 @@ const Utils = {
         return new Date(anio, mes, dia, hora, min);
     },
 
+    obtenerTimestampFecha(fechaStr) {
+        const fecha = this.parsearFecha(fechaStr);
+        return fecha ? fecha.getTime() : 0;
+    },
+
     aplicarRedondeoBs(monto, metodo = 'none') {
         if (metodo === 'none') return monto;
         if (metodo === 'entero') return Math.round(monto);

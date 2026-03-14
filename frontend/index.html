@@ -14,9 +14,29 @@
     <script src="js/utils.js"></script>
     <script src="js/state.js"></script>
     <script src="js/api.js"></script>
+    <script src="js/shared/pricing.js"></script>
+    <script src="js/shared/media.js"></script>
+    <script src="js/core/state-cache.js"></script>
+    <script src="js/features/clientes/media.js"></script>
+    <script src="js/features/clientes/management.js"></script>
+    <script src="js/features/cxc/management.js"></script>
+    <script src="js/features/productos/media.js"></script>
+    <script src="js/features/productos/gallery.js"></script>
+    <script src="js/features/productos/management.js"></script>
+    <script src="js/features/ventas/data.js"></script>
+    <script src="js/features/ventas/cart.js"></script>
+    <script src="js/features/ventas/payments.js"></script>
+    <script src="js/features/ventas/checkout.js"></script>
+    <script src="js/features/ventas/postventa.js"></script>
+    <script src="js/features/ventas/search.js"></script>
+    <script src="js/features/ventas/shortcuts.js"></script>
+    <script src="js/core/navigation.js"></script>
+    <script src="js/core/auth.js"></script>
+    <script src="js/core/config.js"></script>
     <script src="js/table.js"></script>
     <script src="js/informes.js"></script>
     <script src="js/compras.js"></script>
+    <script src="js/core/bootstrap.js"></script>
     <script src="script.js"></script>
 </head>
 
@@ -52,7 +72,7 @@
                     <p>Ingresa tus credenciales para continuar al centro de operaciones.</p>
                 </div>
 
-                <form id="formLogin" class="login-form" onsubmit="manejarLogin(event)">
+                <form id="formLogin" class="login-form" onsubmit="event.preventDefault(); if (window.AuthCore && typeof window.AuthCore.manejarLogin === 'function') { window.AuthCore.manejarLogin(event); } return false;">
                     <div class="form-group login-form-group">
                         <label for="loginUser">Usuario</label>
                         <input type="text" id="loginUser" required placeholder="Nombre de usuario" autocomplete="username">
@@ -106,20 +126,20 @@
                         <span class="sidebar-nav-kicker">Menu</span>
                         <strong class="sidebar-nav-title">Navegacion</strong>
                     </div>
-                    <button id="btnToggleSidebar" type="button" class="sidebar-toggle-btn" onclick="toggleSidebar()" aria-expanded="true" title="Ocultar menu">
+                    <button id="btnToggleSidebar" type="button" class="sidebar-toggle-btn" aria-expanded="true" title="Ocultar menu">
                         <span class="sidebar-toggle-icon">◀</span>
                     </button>
                 </div>
 
                 <nav class="tabs tabs-vertical">
-                    <button class="tab-btn active" data-tab="productos" onclick="cambiarTab('productos')"><span class="tab-icon">📦</span><span class="tab-label">Productos</span></button>
-                    <button class="tab-btn" data-tab="ventas" onclick="cambiarTab('ventas')"><span class="tab-icon">💰</span><span class="tab-label">Ventas</span></button>
-                    <button class="tab-btn" data-tab="clientes" onclick="cambiarTab('clientes')"><span class="tab-icon">👥</span><span class="tab-label">Clientes</span></button>
-                    <button class="tab-btn" data-tab="cuentas" onclick="cambiarTab('cuentas')"><span class="tab-icon">📒</span><span class="tab-label">CxC</span></button>
-                    <button class="tab-btn" data-tab="proveedores" onclick="cambiarTab('proveedores')"><span class="tab-icon">🚚</span><span class="tab-label">Proveedores</span></button>
-                    <button class="tab-btn" data-tab="compras" onclick="cambiarTab('compras')"><span class="tab-icon">🛒</span><span class="tab-label">Compras</span></button>
-                    <button class="tab-btn" data-tab="informes" onclick="cambiarTab('informes')"><span class="tab-icon">📊</span><span class="tab-label">Informes</span></button>
-                    <button id="btnConfiguracion" class="tab-btn tab-btn-config" type="button" onclick="abrirModalConfiguracion()"><span class="tab-icon">⚙️</span><span class="tab-label">Configurar</span></button>
+                    <button class="tab-btn active" data-tab="productos"><span class="tab-icon">📦</span><span class="tab-label">Productos</span></button>
+                    <button class="tab-btn" data-tab="ventas"><span class="tab-icon">💰</span><span class="tab-label">Ventas</span></button>
+                    <button class="tab-btn" data-tab="clientes"><span class="tab-icon">👥</span><span class="tab-label">Clientes</span></button>
+                    <button class="tab-btn" data-tab="cuentas"><span class="tab-icon">📒</span><span class="tab-label">CxC</span></button>
+                    <button class="tab-btn" data-tab="proveedores"><span class="tab-icon">🚚</span><span class="tab-label">Proveedores</span></button>
+                    <button class="tab-btn" data-tab="compras"><span class="tab-icon">🛒</span><span class="tab-label">Compras</span></button>
+                    <button class="tab-btn" data-tab="informes"><span class="tab-icon">📊</span><span class="tab-label">Informes</span></button>
+                    <button id="btnConfiguracion" class="tab-btn tab-btn-config" type="button"><span class="tab-icon">⚙️</span><span class="tab-label">Configurar</span></button>
                 </nav>
             </aside>
 
@@ -134,10 +154,9 @@
                 <div class="search-container" style="flex: 1; min-width: 250px;">
                     <input type="text" id="buscarProductoGestion"
                         placeholder="🔍 Buscar por nombre, código o descripción..."
-                        style="width: 100%; padding: 10px 15px; border-radius: 8px; border: 1px solid #ddd; font-size: 0.9em;"
-                        oninput="filtrarProductosGestion()">
+                        style="width: 100%; padding: 10px 15px; border-radius: 8px; border: 1px solid #ddd; font-size: 0.9em;">
                 </div>
-                <button onclick="mostrarFormularioProducto()" class="btn-primary">➕ Nuevo Producto</button>
+                <button id="btnNuevoProducto" type="button" class="btn-primary" onclick="window.ProductosFeature?.mostrarFormularioProducto?.()">➕ Nuevo Producto</button>
             </div>
 
             <div class="productos-grid" id="productosGrid">
@@ -163,6 +182,15 @@
                         <input type="text" id="buscarProducto" class="producto-select"
                             placeholder="🔍 Buscar producto por nombre o código..." autocomplete="off">
                         <div id="sugerenciasProductos" class="sugerencias-productos"></div>
+                    </div>
+
+                    <div style="margin-top: 12px; max-width: 320px;">
+                        <label for="listaPrecioVenta" style="display:block; margin-bottom: 6px; font-weight: 600;">Lista de precio activa:</label>
+                        <select id="listaPrecioVenta" class="form-control">
+                            <option value="1">Precio 1</option>
+                            <option value="2">Precio 2</option>
+                            <option value="3">Precio 3</option>
+                        </select>
                     </div>
 
                     <div class="carrito-shell">
@@ -265,8 +293,8 @@
                     <h2>Clientes</h2>
                 </div>
                 <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
-                    <input type="text" id="buscarCliente" class="form-control" placeholder="Buscar cliente..." oninput="cargarClientes()" style="width: 260px;">
-                    <button onclick="abrirModalCliente()" class="btn-primary">➕ Nuevo Cliente</button>
+                    <input type="text" id="buscarCliente" class="form-control" placeholder="Buscar cliente..." style="width: 260px;">
+                    <button id="btnNuevoCliente" type="button" class="btn-primary">➕ Nuevo Cliente</button>
                 </div>
             </div>
             <div id="listaClientes" style="padding: 15px;"></div>
@@ -281,8 +309,8 @@
                 <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
                     <input type="hidden" id="clienteCuentaPorCobrar" value="">
                     <input type="text" id="clienteCuentaPorCobrarNombre" class="form-control" value="" placeholder="Seleccione un cliente..." readonly style="width: 320px; background: #fff; cursor: pointer;">
-                    <button class="btn-primary" type="button" onclick="abrirModalBuscarClienteCxc()">🔎 Buscar</button>
-                    <button class="btn-secondary" type="button" onclick="limpiarClienteCxc()">Limpiar</button>
+                    <button id="btnBuscarClienteCxc" class="btn-primary" type="button">🔎 Buscar</button>
+                    <button id="btnLimpiarClienteCxc" class="btn-secondary" type="button">Limpiar</button>
                 </div>
             </div>
             <div style="padding: 15px;">
@@ -325,15 +353,15 @@
                             <option value="">Todos</option>
                         </select>
                     </div>
-                    <button onclick="filtrarInformesPorFecha()" class="btn-primary"
+                    <button id="btnFiltrarInformes" type="button" class="btn-primary"
                         style="height: 32px; margin-bottom: 2px;">🔍 Filtrar</button>
-                    <button onclick="limpiarFiltrosFecha()" class="btn-secondary" 
+                    <button id="btnLimpiarInformes" type="button" class="btn-secondary" 
                         style="height: 32px; margin-bottom: 2px;">🧹 Limpiar</button>
 
                     <div style="margin-left: auto; display: flex; gap: 5px;">
-                        <button onclick="cargarVentasDelDia()" class="btn-secondary" style="height: 32px;">📅
+                        <button id="btnVentasHoy" type="button" class="btn-secondary" style="height: 32px;">📅
                             Hoy</button>
-                        <button onclick="cargarTodasLasVentas()" class="btn-secondary" style="height: 32px;">📋
+                        <button id="btnVentasTodas" type="button" class="btn-secondary" style="height: 32px;">📋
                             Todas</button>
                     </div>
                 </div>
@@ -413,7 +441,7 @@
     <!-- Modal para crear/editar productos -->
     <div id="modalProducto" class="modal">
         <div class="modal-content">
-            <span class="close" onclick="cerrarModalProducto()">&times;</span>
+            <span id="btnCerrarModalProducto" class="close" onclick="if (window.ProductosFeature?.cerrarModalProducto) { window.ProductosFeature.cerrarModalProducto(); }">&times;</span>
             <h2 id="modalTitulo">Nuevo Producto</h2>
             <form id="formProducto" class="producto-form-grid">
                 <input type="hidden" id="productoId" value="-1">
@@ -435,7 +463,7 @@
                     <input type="hidden" id="productoFotoEliminar" value="false">
                     <div id="productoFotoPreview" class="producto-foto-preview-list producto-foto-preview-empty">Sin fotos cargadas</div>
                     <div class="producto-foto-actions">
-                        <button type="button" class="btn-secondary" onclick="limpiarFotoProductoSeleccionada()">Quitar todas las fotos</button>
+                        <button id="btnLimpiarFotosProducto" type="button" class="btn-secondary">Quitar todas las fotos</button>
                     </div>
                 </div>
 
@@ -510,7 +538,7 @@
 
                 <div class="form-actions producto-form-span-2">
                     <button type="submit" class="btn-success">💾 Guardar Producto</button>
-                    <button type="button" onclick="cerrarModalProducto()" class="btn-secondary">Cancelar</button>
+                        <button id="btnCancelarProducto" type="button" class="btn-secondary">Cancelar</button>
                 </div>
             </form>
         </div>
@@ -686,14 +714,6 @@
                     <div class="carrito-header-inline">
                         <h4>Agregar Pago (F4)</h4>
                     </div>
-                    <div style="margin-bottom: 12px;">
-                        <label for="listaPrecioVenta" style="display:block; margin-bottom: 6px; font-weight: 600;">Lista de precio activa:</label>
-                        <select id="listaPrecioVenta" class="form-control">
-                            <option value="1">Precio 1</option>
-                            <option value="2">Precio 2</option>
-                            <option value="3">Precio 3</option>
-                        </select>
-                    </div>
                     <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px;">
                         <select id="medioPago" required>
                             <option value="">Medio de pago...</option>
@@ -823,7 +843,7 @@
     <!-- Modal Configuración -->
     <div id="modalConfiguracion" class="modal">
         <div class="modal-content" style="max-width: 600px;">
-            <span class="close" onclick="cerrarModalConfiguracion()">&times;</span>
+            <span id="btnCerrarModalConfiguracion" class="close" onclick="if (window.ConfigCore?.cerrarModalConfiguracion) { window.ConfigCore.cerrarModalConfiguracion(); }">&times;</span>
             <h2 style="text-align: center; margin-bottom: 20px;">⚙️ Configuración</h2>
 
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
@@ -859,7 +879,7 @@
                         <div style="display: flex; gap: 8px;">
                             <input type="number" id="configTasaDolar" step="0.01"
                                 style="flex: 1; padding: 8px; font-size: 0.95em; border: 1px solid #ccc; border-radius: 5px;">
-                            <button onclick="actualizarTasaBCV()" class="btn-secondary" title="Actualizar desde BCV"
+                            <button id="btnConfigActualizarBcv" type="button" onclick="if (window.ConfigCore?.actualizarTasaBCV) { window.ConfigCore.actualizarTasaBCV(event); }" class="btn-secondary" title="Actualizar desde BCV"
                                 style="padding: 0 12px; background: #e3f2fd; color: #1976d2; border-color: #bbdefb;">
                                 🔄
                             </button>
@@ -895,8 +915,8 @@
             </div>
 
             <div style="text-align: right; border-top: 1px solid #eee; padding-top: 15px; margin-top: 15px;">
-                <button class="btn-secondary" onclick="cerrarModalConfiguracion()">Cancelar</button>
-                <button class="btn-primary" onclick="guardarConfiguracion()">💾 Guardar</button>
+                <button id="btnConfigCancelar" type="button" class="btn-secondary" onclick="if (window.ConfigCore?.cerrarModalConfiguracion) { window.ConfigCore.cerrarModalConfiguracion(); }">Cancelar</button>
+                <button id="btnConfigGuardar" type="button" class="btn-primary" onclick="if (window.ConfigCore?.guardarConfiguracion) { window.ConfigCore.guardarConfiguracion(); }">💾 Guardar</button>
             </div>
         </div>
     </div>
@@ -949,7 +969,7 @@
     <!-- Modal Cliente -->
     <div id="modalCliente" class="modal">
         <div class="modal-content">
-            <span class="close" onclick="cerrarModalCliente()">&times;</span>
+            <span id="btnCerrarModalCliente" class="close">&times;</span>
             <h2 id="modalTituloCliente" style="text-align: center; margin-bottom: 20px;">👥 Nuevo Cliente</h2>
 
             <input type="hidden" id="modalClienteId" value="-1">
@@ -989,7 +1009,7 @@
                     <input type="hidden" id="clienteFotoPerfilEliminar" value="false">
                     <div id="clienteFotoPerfilPreview" class="cliente-foto-preview cliente-foto-preview-empty">Sin foto de perfil</div>
                     <div class="producto-foto-actions">
-                        <button type="button" class="btn-secondary" onclick="limpiarFotoCliente('perfil')">Quitar foto</button>
+                        <button id="btnLimpiarFotoClientePerfil" type="button" class="btn-secondary">Quitar foto</button>
                     </div>
                 </div>
                 <div>
@@ -998,14 +1018,14 @@
                     <input type="hidden" id="clienteFotoCedulaEliminar" value="false">
                     <div id="clienteFotoCedulaPreview" class="cliente-foto-preview cliente-foto-preview-empty">Sin foto de cédula</div>
                     <div class="producto-foto-actions">
-                        <button type="button" class="btn-secondary" onclick="limpiarFotoCliente('cedula')">Quitar foto</button>
+                        <button id="btnLimpiarFotoClienteCedula" type="button" class="btn-secondary">Quitar foto</button>
                     </div>
                 </div>
             </div>
 
             <div class="cliente-modal-actions">
-                <button class="btn-secondary" onclick="cerrarModalCliente()">Cancelar</button>
-                <button class="btn-primary" onclick="guardarClienteDesdeModal()">💾 Guardar</button>
+                <button id="btnCancelarCliente" type="button" class="btn-secondary">Cancelar</button>
+                <button id="btnGuardarCliente" type="button" class="btn-primary">💾 Guardar</button>
             </div>
         </div>
     </div>
@@ -1041,7 +1061,7 @@
 
     <div id="modalAbonoCuenta" class="modal">
         <div class="modal-content" style="max-width: 560px;">
-            <span class="close" onclick="cerrarModalAbonoCuenta()">&times;</span>
+            <span id="btnCerrarModalAbonoCuenta" class="close" onclick="window.CxcFeature?.cerrarModalAbonoCuenta?.()">&times;</span>
             <h2 id="tituloModalAbonoCuenta" style="text-align: center; margin-bottom: 18px;">Registrar Abono</h2>
 
             <input type="hidden" id="abonoCuentaId" value="">
@@ -1122,8 +1142,8 @@
             </div>
 
             <div style="text-align: right; border-top: 1px solid #eee; padding-top: 15px;">
-                <button class="btn-secondary" onclick="cerrarModalAbonoCuenta()">Cancelar</button>
-                <button class="btn-primary" onclick="guardarAbonoCuentaDesdeModal()">💾 Guardar Abono</button>
+                <button id="btnCancelarAbonoCuenta" type="button" class="btn-secondary" onclick="window.CxcFeature?.cerrarModalAbonoCuenta?.()">Cancelar</button>
+                <button id="btnGuardarAbonoCuenta" type="button" class="btn-primary" onclick="window.CxcFeature?.guardarAbonoCuentaDesdeModal?.()">💾 Guardar Abono</button>
             </div>
         </div>
     </div>

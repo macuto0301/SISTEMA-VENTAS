@@ -2,8 +2,23 @@
 // FUNCIONES DE API
 // ============================================
 
+function resolverApiBaseUrl() {
+    const origin = typeof window !== 'undefined' ? window.location?.origin : '';
+    const origenHttpValido = typeof origin === 'string' && /^https?:\/\//.test(origin);
+
+    if (typeof window !== 'undefined' && typeof window.API_URL === 'string' && window.API_URL.trim()) {
+        return window.API_URL.trim().replace(/\/$/, '');
+    }
+
+    if (origenHttpValido && origin !== 'null') {
+        return `${origin}/api`;
+    }
+
+    return 'http://localhost:5000/api';
+}
+
 const API = {
-    baseUrl: "http://localhost:5000/api",
+    baseUrl: resolverApiBaseUrl(),
 
     buildQuery(params = {}) {
         const searchParams = new URLSearchParams();
@@ -18,7 +33,8 @@ const API = {
 
     getAuthHeaders() {
         try {
-            const sesion = JSON.parse(localStorage.getItem('sesion_ventas') || 'null');
+            const sesionGuardada = localStorage.getItem('sesion_ventas') || sessionStorage.getItem('sesion_ventas');
+            const sesion = JSON.parse(sesionGuardada || 'null');
             if (sesion?.username) {
                 return { 'X-Auth-Username': sesion.username };
             }

@@ -3,6 +3,17 @@
 // ============================================
 
 const InformesService = {
+    obtenerAppState() {
+        return window.AppState || { ventas: [], paginacion: { ventas: { page: 1, page_size: 10, total: 0, total_pages: 1 } } };
+    },
+
+    async cargarDatosVentasSeguras(params) {
+        if (typeof window.cargarDatosVentas === 'function') {
+            return window.cargarDatosVentas(params);
+        }
+        return window.VentasDataFeature?.cargarDatosVentas?.(params);
+    },
+
     construirParametrosBackend({ soloHoy = false, aplicarFecha = false, page = 1, pageSize = null, search = '', filters = {} } = {}) {
         const rolFiltro = this.obtenerValorFiltro('filtroRolInforme');
         const usuarioFiltro = this.obtenerValorFiltro('filtroUsuarioInforme');
@@ -62,7 +73,7 @@ const InformesService = {
     },
 
     obtenerVentasFiltradas() {
-        return AppState.ventas || [];
+        return this.obtenerAppState().ventas || [];
     },
 
     actualizarOpcionesUsuarios() {
@@ -71,7 +82,7 @@ const InformesService = {
 
         const valorActual = selectUsuario.value;
         const usuarios = [...new Set(
-            (AppState.ventas || [])
+            (this.obtenerAppState().ventas || [])
                 .map(venta => (venta.usuario_username || '').trim())
                 .filter(Boolean)
         )].sort((a, b) => a.localeCompare(b, 'es'));
@@ -99,19 +110,21 @@ const InformesService = {
 
     async cargarVentasDelDia() {
         this.actualizarOpcionesUsuarios();
-        await cargarDatosVentas(this.construirParametrosBackend({
+        const appState = this.obtenerAppState();
+        await this.cargarDatosVentasSeguras(this.construirParametrosBackend({
             soloHoy: true,
             page: 1,
-            pageSize: AppState.paginacion.ventas?.page_size || 10
+            pageSize: appState.paginacion.ventas?.page_size || 10
         }));
         this.mostrar(this.obtenerVentasFiltradas(), this.construirTitulo('Ventas de Hoy'));
     },
 
     async cargarTodasLasVentas() {
+        const appState = this.obtenerAppState();
         this.actualizarOpcionesUsuarios();
-        await cargarDatosVentas(this.construirParametrosBackend({
-            page: AppState.paginacion.ventas?.page || 1,
-            pageSize: AppState.paginacion.ventas?.page_size || 10
+        await this.cargarDatosVentasSeguras(this.construirParametrosBackend({
+            page: appState.paginacion.ventas?.page || 1,
+            pageSize: appState.paginacion.ventas?.page_size || 10
         }));
         this.mostrar(this.obtenerVentasFiltradas(), this.construirTitulo('Todas las Ventas'));
     },
@@ -131,10 +144,11 @@ const InformesService = {
             return;
         }
 
-        await cargarDatosVentas(this.construirParametrosBackend({
+        const appState = this.obtenerAppState();
+        await this.cargarDatosVentasSeguras(this.construirParametrosBackend({
             aplicarFecha: true,
             page: 1,
-            pageSize: AppState.paginacion.ventas?.page_size || 10
+            pageSize: appState.paginacion.ventas?.page_size || 10
         }));
 
         const label = `Del ${fechaInicio.toLocaleDateString('es-ES')} al ${fechaFin.toLocaleDateString('es-ES')}`;
@@ -210,27 +224,21 @@ const InformesService = {
                 pageSize: 10,
                 remotePagination: {
                     enabled: true,
-                    page: AppState.paginacion.ventas?.page || 1,
-                    pageSize: AppState.paginacion.ventas?.page_size || 10,
-                    total: AppState.paginacion.ventas?.total || ventasLista.length,
-                    totalPages: AppState.paginacion.ventas?.total_pages || 1,
+                    page: this.obtenerAppState().paginacion.ventas?.page || 1,
+                    pageSize: this.obtenerAppState().paginacion.ventas?.page_size || 10,
+                    total: this.obtenerAppState().paginacion.ventas?.total || ventasLista.length,
+                    totalPages: this.obtenerAppState().paginacion.ventas?.total_pages || 1,
                     onPageChange: async ({ page, pageSize }) => {
-                        if (typeof cargarDatosVentas === 'function') {
-                            await cargarDatosVentas(this.construirParametrosBackend({ page, pageSize }));
-                            this.mostrar(AppState.ventas, titulo);
-                        }
+                        await this.cargarDatosVentasSeguras(this.construirParametrosBackend({ page, pageSize }));
+                        this.mostrar(this.obtenerAppState().ventas, titulo);
                     },
                     onPageSizeChange: async ({ page, pageSize }) => {
-                        if (typeof cargarDatosVentas === 'function') {
-                            await cargarDatosVentas(this.construirParametrosBackend({ page, pageSize }));
-                            this.mostrar(AppState.ventas, titulo);
-                        }
+                        await this.cargarDatosVentasSeguras(this.construirParametrosBackend({ page, pageSize }));
+                        this.mostrar(this.obtenerAppState().ventas, titulo);
                     },
                     onQueryChange: async ({ page, pageSize, search, filters }) => {
-                        if (typeof cargarDatosVentas === 'function') {
-                            await cargarDatosVentas(this.construirParametrosBackend({ page, pageSize, search, filters }));
-                            this.mostrar(AppState.ventas, titulo);
-                        }
+                        await this.cargarDatosVentasSeguras(this.construirParametrosBackend({ page, pageSize, search, filters }));
+                        this.mostrar(this.obtenerAppState().ventas, titulo);
                     }
                 },
                 columns: [
@@ -334,3 +342,5 @@ const InformesService = {
         }
     }
 };
+
+window.InformesService = InformesService;
