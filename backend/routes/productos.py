@@ -43,6 +43,11 @@ def build_producto_fotos_urls(fotos: list[str]) -> list[str]:
     return urls
 
 
+def normalize_producto_tipo(value, default: str = 'producto') -> str:
+    tipo = str(value or default).strip().lower()
+    return 'servicio' if tipo == 'servicio' else 'producto'
+
+
 def serialize_producto(producto: Producto) -> dict:
     fotos = producto.fotos
     precios = []
@@ -59,6 +64,8 @@ def serialize_producto(producto: Producto) -> dict:
         'id': producto.id,
         'codigo': producto.codigo,
         'nombre': producto.nombre,
+        'tipo': normalize_producto_tipo(producto.tipo),
+        'maneja_existencia': producto.maneja_existencia,
         'descripcion': producto.descripcion,
         'ubicacion': producto.ubicacion,
         'marca': producto.marca,
@@ -285,7 +292,7 @@ def get_productos():
     if unidad:
         query = query.filter(Producto.unidad.ilike(f'%{unidad}%'))
     if in_stock in ('true', '1', 'si', 'yes'):
-        query = query.filter(Producto.cantidad > 0)
+        query = query.filter(or_(Producto.tipo == 'servicio', Producto.cantidad > 0))
 
     query = query.order_by(Producto.nombre)
 
@@ -318,6 +325,7 @@ def crear_producto():
         nuevo = Producto()
         nuevo.codigo = data.get('codigo')
         nuevo.nombre = data['nombre']
+        nuevo.tipo = normalize_producto_tipo(data.get('tipo'))
         nuevo.descripcion = data.get('descripcion')
         nuevo.ubicacion = data.get('ubicacion')
         nuevo.marca = data.get('marca')
@@ -366,6 +374,7 @@ def editar_producto(id):
 
         prod.nombre = data.get('nombre', prod.nombre)
         prod.codigo = data.get('codigo', prod.codigo)
+        prod.tipo = normalize_producto_tipo(data.get('tipo'), prod.tipo)
         prod.descripcion = data.get('descripcion', prod.descripcion)
         prod.ubicacion = data.get('ubicacion', prod.ubicacion)
         prod.marca = data.get('marca', prod.marca)

@@ -20,6 +20,7 @@ class Producto(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     codigo = db.Column(db.String(50), unique=True, nullable=False)
     nombre = db.Column(db.String(100), nullable=False)
+    tipo = db.Column(db.String(20), default='producto')
     descripcion = db.Column(db.Text)
     ubicacion = db.Column(db.String(100))
     marca = db.Column(db.String(100))
@@ -56,6 +57,14 @@ class Producto(db.Model):
         fotos = [foto for foto in (value or []) if isinstance(foto, str) and foto]
         self.fotos_json = json.dumps(fotos)
         self.foto_path = fotos[0] if fotos else None
+
+    @property
+    def es_servicio(self):
+        return (self.tipo or 'producto').strip().lower() == 'servicio'
+
+    @property
+    def maneja_existencia(self):
+        return not self.es_servicio
 
 class Proveedor(db.Model):
     id = db.Column(db.Integer, primary_key=True)

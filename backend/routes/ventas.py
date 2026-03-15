@@ -22,6 +22,10 @@ from models import (
 ventas_bp = Blueprint('ventas', __name__)
 
 
+def producto_maneja_existencia(producto: Producto | None) -> bool:
+    return bool(producto and getattr(producto, 'maneja_existencia', True))
+
+
 def serializar_detalle_venta(detalle: DetalleVenta, cantidad_devuelta: int = 0) -> dict:
     cantidad_disponible = max(0, detalle.cantidad - cantidad_devuelta)
     return {
@@ -183,7 +187,7 @@ def registrar_venta():
             if not prod:
                 prod = Producto.query.filter_by(nombre=item['nombre']).first()
 
-            if prod:
+            if producto_maneja_existencia(prod):
                 if prod.cantidad < item['cantidad']:
                     db.session.rollback()
                     return jsonify({'error': f'Stock insuficiente para: {prod.nombre}'}), 400
@@ -442,7 +446,7 @@ def registrar_devolucion(venta_id: int):
 
             if detalle_venta.producto_id:
                 producto = Producto.query.get(detalle_venta.producto_id)
-                if producto:
+                if producto_maneja_existencia(producto):
                     producto.cantidad += cantidad
 
         db.session.commit()

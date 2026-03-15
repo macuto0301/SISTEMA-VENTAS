@@ -59,6 +59,13 @@ const VentasCartFeature = {
         return lista === 0 ? 'Libre' : `Precio ${lista}`;
     },
 
+    productoManejaExistencia(producto) {
+        if (typeof producto?.maneja_existencia === 'boolean') {
+            return producto.maneja_existencia;
+        }
+        return String(producto?.tipo || 'producto').trim().toLowerCase() !== 'servicio';
+    },
+
     obtenerCostoProductoSeguro(producto) {
         if (typeof window.obtenerCostoProducto === 'function') {
             return window.obtenerCostoProducto(producto);
@@ -319,8 +326,9 @@ const VentasCartFeature = {
         const listaPrecio = this.obtenerListaPrecioVentaSeleccionada();
         const precioSeleccionado = this.obtenerPrecioCarritoDesdeProducto(producto, listaPrecio);
         const indiceExistente = carrito.findIndex(item => item.productoIndex === productoIndex && item.lista_precio === listaPrecio);
+        const manejaExistencia = this.productoManejaExistencia(producto);
 
-        if (producto.cantidad <= 0) {
+        if (manejaExistencia && producto.cantidad <= 0) {
             this.mostrarAlertaSegura('Producto sin stock disponible', {
                 titulo: 'Sin stock',
                 variante: 'warning'
@@ -331,7 +339,7 @@ const VentasCartFeature = {
         const existente = indiceExistente >= 0 ? carrito[indiceExistente] : null;
 
         if (existente) {
-            if (existente.cantidad < producto.cantidad) {
+            if (!manejaExistencia || existente.cantidad < producto.cantidad) {
                 existente.cantidad++;
                 existente.subtotal_dolares = existente.precio_dolares * existente.cantidad;
             } else {
@@ -375,6 +383,7 @@ const VentasCartFeature = {
                 const prodOriginal = productos[item.productoIndex];
                 const precioEditable = this.puedeEditarPrecioVentaSeguro();
                 const codigo = prodOriginal?.codigo || '-';
+                const maxCantidad = this.productoManejaExistencia(prodOriginal) ? ` max="${prodOriginal.cantidad}"` : '';
 
                 return `
                     <tr data-carrito-index="${index}" class="${index === indiceCarritoSeleccionado ? 'carrito-seleccionado' : ''}" onclick="seleccionarFilaCarrito(${index})">
@@ -387,7 +396,7 @@ const VentasCartFeature = {
                             <button class="btn-eliminar-item" onclick="event.stopPropagation(); eliminarDelCarrito(${index})" aria-label="Eliminar producto">x</button>
                         </td>
                         <td class="carrito-col-cantidad">
-                            <input type="number" min="1" max="${productos[item.productoIndex].cantidad}" 
+                            <input type="number" min="1"${maxCantidad} 
                                    value="${item.cantidad}" onchange="actualizarCantidadCarrito(${index}, this.value)" onclick="event.stopPropagation()"
                                    class="carrito-cantidad-input">
                         </td>
@@ -423,7 +432,7 @@ const VentasCartFeature = {
         cantidad = parseInt(cantidad, 10);
         const producto = productos[carrito[index].productoIndex];
 
-        if (cantidad > producto.cantidad) {
+        if (this.productoManejaExistencia(producto) && cantidad > producto.cantidad) {
             this.mostrarAlertaSegura(`Solo hay ${producto.cantidad} unidades disponibles.`, {
                 titulo: 'Stock insuficiente',
                 variante: 'warning'

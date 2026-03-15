@@ -15,6 +15,10 @@ PRICE_FIELDS = (
 )
 
 
+def producto_maneja_existencia(producto: Producto | None) -> bool:
+    return bool(producto and getattr(producto, 'maneja_existencia', True))
+
+
 def registrar_historial_precios_compra(producto: Producto, valores_anteriores: dict) -> None:
     for precio_field, _, tipo_precio in PRICE_FIELDS:
         precio_anterior = round(float(valores_anteriores.get(precio_field) or 0.0), 2)
@@ -150,7 +154,8 @@ def crear_compra():
                     'precio_3_dolares': producto.precio_3_dolares,
                 }
                 precio_anterior = producto.precio_costo
-                producto.cantidad += item['cantidad']
+                if producto_maneja_existencia(producto):
+                    producto.cantidad += item['cantidad']
                 producto.precio_costo = item['precio_unitario']
 
                 for precio_field, porcentaje_field, _ in PRICE_FIELDS:
@@ -233,7 +238,7 @@ def eliminar_compra(id):
         for detalle in compra.detalles:
             if detalle.producto_id:
                 producto = Producto.query.get(detalle.producto_id)
-                if producto and producto.cantidad >= detalle.cantidad:
+                if producto_maneja_existencia(producto) and producto.cantidad >= detalle.cantidad:
                     producto.cantidad -= detalle.cantidad
         compra.estado = 'cancelada'
         db.session.commit()

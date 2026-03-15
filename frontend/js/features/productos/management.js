@@ -13,7 +13,8 @@ const ProductosFeature = {
         if (!this._productModal && window.SVModal) {
             this._productModal = window.SVModal.enhance('modalProducto', {
                 titleSelector: '#modalTitulo',
-                closeSelector: '#btnCerrarModalProducto'
+                closeSelector: '#btnCerrarModalProducto',
+                backdropDismissible: false
             });
         }
 
@@ -35,6 +36,7 @@ const ProductosFeature = {
                 nombre: window.SVField.enhance('productoNombre'),
                 descripcion: window.SVField.enhance('productoDescripcion'),
                 categoria: window.SVField.enhance('productoCategoria'),
+                tipo: window.SVField.enhance('productoTipo'),
                 ubicacion: window.SVField.enhance('productoUbicacion'),
                 marca: window.SVField.enhance('productoMarca'),
                 modelo: window.SVField.enhance('productoModelo'),
@@ -224,6 +226,17 @@ const ProductosFeature = {
             .replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;')
             .replace(/'/g, '&#39;');
+    },
+
+    normalizarTipoProducto(tipo) {
+        return String(tipo || 'producto').trim().toLowerCase() === 'servicio' ? 'servicio' : 'producto';
+    },
+
+    productoManejaExistencia(producto) {
+        if (typeof producto?.maneja_existencia === 'boolean') {
+            return producto.maneja_existencia;
+        }
+        return this.normalizarTipoProducto(producto?.tipo) !== 'servicio';
     },
 
     descargarBlob(blob, nombreArchivo) {
@@ -678,6 +691,7 @@ const ProductosFeature = {
         const precioDolares2 = parseFloat(document.getElementById('productoPrecioDolares2').value) || 0;
         const precioDolares3 = parseFloat(document.getElementById('productoPrecioDolares3').value) || 0;
         const categoria = document.getElementById('productoCategoria').value;
+        const tipo = this.normalizarTipoProducto(document.getElementById('productoTipo')?.value);
         const ubicacion = document.getElementById('productoUbicacion').value;
         const marca = document.getElementById('productoMarca').value;
         const modelo = document.getElementById('productoModelo').value;
@@ -716,6 +730,7 @@ const ProductosFeature = {
         const formData = new FormData();
         formData.append('codigo', codigo);
         formData.append('nombre', nombre);
+        formData.append('tipo', tipo);
         formData.append('descripcion', descripcion);
         formData.append('precio_costo', String(precioCosto));
         formData.append('porcentaje_ganancia', String(porcentajeGanancia1));
@@ -893,6 +908,14 @@ const ProductosFeature = {
                     render: row => row.categoria || 'Sin categoria'
                 },
                 {
+                    id: 'tipo',
+                    label: 'Tipo',
+                    key: 'tipo',
+                    filterable: true,
+                    filterType: 'select',
+                    render: row => this.normalizarTipoProducto(row.tipo) === 'servicio' ? 'Servicio' : 'Producto'
+                },
+                {
                     id: 'ubicacion',
                     label: 'Ubicacion',
                     key: 'ubicacion',
@@ -905,9 +928,7 @@ const ProductosFeature = {
                     key: 'cantidad',
                     align: 'center',
                     filterable: true,
-                    type: 'badge',
-                    badgeTone: row => Number(row.cantidad || 0) <= 0 ? 'danger' : Number(row.cantidad || 0) < 5 ? 'warning' : 'success',
-                    render: row => Number(row.cantidad || 0)
+                    render: row => this.productoManejaExistencia(row) ? Number(row.cantidad || 0) : 'N/A'
                 },
                 {
                     id: 'precio1',
@@ -1003,6 +1024,7 @@ const ProductosFeature = {
         document.getElementById('productoPrecioDolares1').value = '';
         document.getElementById('productoPrecioDolares2').value = '';
         document.getElementById('productoPrecioDolares3').value = '';
+        document.getElementById('productoTipo').value = 'producto';
         document.getElementById('productoMetodoRedondeo').value = 'none';
         document.getElementById('productoCantidad').value = 0;
         document.getElementById('productoCodigo').disabled = false;
@@ -1102,6 +1124,7 @@ const ProductosFeature = {
         this.calcularPrecioBolivares();
         document.getElementById('productoCantidad').value = producto.cantidad;
         document.getElementById('productoCategoria').value = producto.categoria;
+        document.getElementById('productoTipo').value = this.normalizarTipoProducto(producto.tipo);
         document.getElementById('productoUbicacion').value = producto.ubicacion || '';
         document.getElementById('productoMarca').value = producto.marca || '';
         document.getElementById('productoModelo').value = producto.modelo || '';

@@ -279,6 +279,11 @@ def create_app():
                 db.session.commit()
                 print("Columna unidad agregada a tabla producto")
 
+            if columnas_producto and 'tipo' not in columnas_producto:
+                db.session.execute(text("ALTER TABLE producto ADD COLUMN tipo VARCHAR(20) DEFAULT 'producto'"))
+                db.session.commit()
+                print("Columna tipo agregada a tabla producto")
+
             if columnas_producto:
                 db.session.execute(text("UPDATE producto SET fotos_json = CONCAT('[\"', foto_path, '\"]') WHERE foto_path IS NOT NULL AND foto_path <> '' AND (fotos_json IS NULL OR fotos_json = '')"))
                 db.session.execute(text("UPDATE producto SET precio_1_dolares = precio_dolares WHERE precio_1_dolares IS NULL OR precio_1_dolares = 0"))
@@ -289,6 +294,7 @@ def create_app():
                 db.session.execute(text("UPDATE producto SET porcentaje_ganancia_3 = porcentaje_ganancia WHERE porcentaje_ganancia_3 IS NULL OR porcentaje_ganancia_3 = 0"))
                 db.session.execute(text("UPDATE producto SET precio_dolares = precio_1_dolares WHERE precio_dolares IS NULL OR precio_dolares = 0"))
                 db.session.execute(text("UPDATE producto SET porcentaje_ganancia = porcentaje_ganancia_1 WHERE porcentaje_ganancia IS NULL OR porcentaje_ganancia = 0"))
+                db.session.execute(text("UPDATE producto SET tipo = 'producto' WHERE tipo IS NULL OR TRIM(tipo) = ''"))
                 db.session.commit()
 
             result = db.session.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name='historial_precio'"))

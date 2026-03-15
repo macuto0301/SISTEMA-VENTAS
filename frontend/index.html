@@ -393,7 +393,7 @@
     </div>
 
     <!-- Modal para crear/editar productos -->
-    <div id="modalProducto" class="modal" onclick="if (event.target === this) { window.ProductosFeature?.cerrarModalProducto?.(); }">
+    <div id="modalProducto" class="modal">
         <div class="modal-content">
             <span id="btnCerrarModalProducto" class="close" onclick="if (window.ProductosFeature?.cerrarModalProducto) { window.ProductosFeature.cerrarModalProducto(); }">&times;</span>
             <h2 id="modalTitulo">Nuevo Producto</h2>
@@ -436,6 +436,14 @@
                 </div>
 
                 <div class="form-group">
+                    <label for="productoTipo">Tipo:</label>
+                    <select id="productoTipo" name="productoTipo">
+                        <option value="producto">Producto</option>
+                        <option value="servicio">Servicio</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
                     <label for="productoUnidad">Unidad:</label>
                     <input type="text" id="productoUnidad" placeholder="Ej: unidad, caja, paquete" name="productoUnidad">
                 </div>
@@ -457,7 +465,7 @@
                 <div class="form-group">
                     <label for="productoCantidad">Cantidad en Stock:</label>
                     <input type="number" id="productoCantidad" min="0" value="0" readonly disabled name="productoCantidad">
-                    <small style="display: block; margin-top: 4px; color: #666;">El stock se actualiza solo desde compras.</small>
+                    <small style="display: block; margin-top: 4px; color: #666;">Los servicios no manejan stock. En productos, el stock se actualiza solo desde compras.</small>
                 </div>
 
                 <div class="form-group producto-precios-resumen-box">
