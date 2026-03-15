@@ -1,8 +1,25 @@
 const ProductosMediaFeature = {
     productoFotosSeleccionadas: [],
     productoFotosExistentes: [],
+    _mediaUploader: null,
+
+    inicializarMediaUploader() {
+        if (!this._mediaUploader && window.SVMediaUploader) {
+            this._mediaUploader = window.SVMediaUploader.enhance('productoMediaUploader', {
+                inputSelector: '#productoFoto',
+                previewSelector: '#productoFotoPreview',
+                clearSelector: '#btnLimpiarFotosProducto',
+                hintSelector: '[data-role="hint"]',
+                badgeSelector: '[data-role="badge"]',
+                emptyLabel: 'Sin fotos cargadas'
+            });
+        }
+
+        return this._mediaUploader;
+    },
 
     liberarObjectUrlFotoProducto() {
+        this.inicializarMediaUploader();
         const preview = document.getElementById('productoFotoPreview');
         if (!preview) return;
 
@@ -31,6 +48,7 @@ const ProductosMediaFeature = {
     },
 
     actualizarPreviewFotoProducto() {
+        const uploader = this.inicializarMediaUploader();
         const preview = document.getElementById('productoFotoPreview');
         if (!preview) return;
 
@@ -39,6 +57,7 @@ const ProductosMediaFeature = {
         if (!fotos.length) {
             preview.className = 'producto-foto-preview-list producto-foto-preview-empty';
             preview.textContent = 'Sin fotos cargadas';
+            uploader?.setEmpty('Sin fotos cargadas');
             return;
         }
 
@@ -50,6 +69,7 @@ const ProductosMediaFeature = {
                 <span class="producto-foto-thumb-badge">${foto.tipo === 'existente' ? 'Guardada' : 'Nueva'}</span>
             </div>
         `).join('');
+        uploader?.setFilled(fotos.length, `${fotos.length} foto${fotos.length === 1 ? '' : 's'} listas`);
     },
 
     sincronizarInputFotosProducto() {

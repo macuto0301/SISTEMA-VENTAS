@@ -10,13 +10,9 @@ const API_URL = (window.API?.baseUrl || (() => {
 const API_ORIGIN = API_URL.replace(/\/api$/, '');
 const MAX_PRODUCT_IMAGES = 5;
 const PRICE_LIST_NUMBERS = [1, 2, 3];
+window.API_URL = API_URL;
+window.API_ORIGIN = API_ORIGIN;
 window.PRICE_LIST_NUMBERS = PRICE_LIST_NUMBERS;
-const productoFotosSeleccionadas = window.ProductosMediaFeature?.productoFotosSeleccionadas || [];
-const productoFotosExistentes = window.ProductosMediaFeature?.productoFotosExistentes || [];
-const clienteFotosState = window.ClientesMediaFeature?.clienteFotosState || {
-    perfil: { currentUrl: '', currentPath: '', objectUrl: '', remove: false },
-    cedula: { currentUrl: '', currentPath: '', objectUrl: '', remove: false }
-};
 
 function obtenerPaginacion(nombre) {
     return window.StateCacheCore?.obtenerPaginacion(nombre);

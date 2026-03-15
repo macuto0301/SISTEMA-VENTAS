@@ -1,4 +1,39 @@
 const CxcFeature = {
+    _clientPicker: null,
+
+    inicializarComponentesCxc() {
+        if (!this._clientPicker && window.SVEntityPicker && document.getElementById('clienteCxcPicker')) {
+            this._clientPicker = window.SVEntityPicker.enhance('clienteCxcPicker', {
+                inputSelector: '#clienteCuentaPorCobrarNombre',
+                clearSelector: '#btnLimpiarClienteCxc',
+                detailSelector: '#clienteCxcSeleccionadoCard',
+                statusSelector: '[data-role="status"]',
+                defaultLabel: 'Seleccione un cliente...',
+                emptyStatus: 'Sin cliente seleccionado',
+                emptyActionLabel: 'Limpiar',
+                clearLabel: 'Limpiar',
+                getLabel: cliente => `${cliente.nombre}${cliente.documento ? ` - ${cliente.documento}` : ''}`,
+                getStatus: cliente => cliente.documento || 'Cliente con cuenta corriente',
+                renderDetail: cliente => `
+                    ${this.renderAvatarCliente(cliente, 'cliente-seleccionado-avatar')}
+                    <div class="cliente-seleccionado-info">
+                        <strong>${this.escaparHtml(cliente.nombre || 'Cliente')}</strong>
+                        <small>Favor $${(cliente.saldo_a_favor_usd || 0).toFixed(2)} · CxC $${(cliente.saldo_por_cobrar_usd || 0).toFixed(2)}</small>
+                    </div>
+                `
+            });
+        }
+    },
+
+    escaparHtml(valor) {
+        return String(valor ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    },
+
     renderAvatarCliente(cliente, className = 'cliente-card-avatar') {
         if (typeof window.renderAvatarCliente === 'function') {
             return window.renderAvatarCliente(cliente, className);
@@ -21,6 +56,7 @@ const CxcFeature = {
     },
 
     async cargarCuentasPorCobrar(options = {}) {
+        this.inicializarComponentesCxc();
         const inputId = document.getElementById('clienteCuentaPorCobrar');
         const inputNombre = document.getElementById('clienteCuentaPorCobrarNombre');
         if (!inputId || !inputNombre) return;
@@ -31,10 +67,12 @@ const CxcFeature = {
         if (cliente) {
             inputId.value = String(cliente.id);
             inputNombre.value = `${cliente.nombre}${cliente.documento ? ` - ${cliente.documento}` : ''}`;
+            this._clientPicker?.setEntity(cliente);
             await this.cargarEstadoCuentaClienteSeleccionado(cliente.id);
         } else {
             inputId.value = '';
             inputNombre.value = '';
+            this._clientPicker?.setEntity(null);
             window.AppState.cuentasPorCobrar = [];
             window.AppState.estadoCuentaClienteActual = null;
             window.cuentasPorCobrar = window.AppState.cuentasPorCobrar;
@@ -43,10 +81,12 @@ const CxcFeature = {
     },
 
     async cargarEstadoCuentaClienteSeleccionado(clienteId = null) {
+        this.inicializarComponentesCxc();
         const inputId = document.getElementById('clienteCuentaPorCobrar');
         const inputNombre = document.getElementById('clienteCuentaPorCobrarNombre');
         const id = clienteId || inputId?.value;
         if (!id) {
+            this._clientPicker?.setEntity(null);
             window.AppState.cuentasPorCobrar = [];
             window.AppState.estadoCuentaClienteActual = null;
             window.cuentasPorCobrar = [];
@@ -60,12 +100,14 @@ const CxcFeature = {
             if (inputNombre) {
                 const cliente = estado?.cliente;
                 inputNombre.value = cliente ? `${cliente.nombre}${cliente.documento ? ` - ${cliente.documento}` : ''}` : '';
+                this._clientPicker?.setEntity(cliente || null);
             }
             window.AppState.estadoCuentaClienteActual = estado;
             window.AppState.cuentasPorCobrar = estado.cuentas_por_cobrar || [];
             window.cuentasPorCobrar = window.AppState.cuentasPorCobrar;
             this.renderDetalleCuentaCliente();
         } catch (e) {
+            this._clientPicker?.setEntity(null);
             window.AppState.estadoCuentaClienteActual = null;
             window.AppState.cuentasPorCobrar = [];
             window.cuentasPorCobrar = [];
@@ -108,6 +150,7 @@ const CxcFeature = {
     },
 
     renderListaBusquedaClienteCxc() {
+        this.inicializarComponentesCxc();
         const contenedor = document.getElementById('listaBusquedaClienteCxc');
         const termino = (document.getElementById('buscarClienteCxcModal')?.value || '').trim().toLowerCase();
         if (!contenedor) return;
@@ -119,7 +162,11 @@ const CxcFeature = {
         });
 
         if (!lista.length) {
-            contenedor.innerHTML = '<div class="mensaje-vacio">No hay clientes para mostrar.</div>';
+            contenedor.innerHTML = window.SVEmptyState?.createHtml({
+                icon: '::',
+                title: 'No hay clientes para mostrar',
+                description: 'Prueba con otro nombre, documento o telefono.'
+            }) || '<div class="mensaje-vacio">No hay clientes para mostrar.</div>';
             return;
         }
 
@@ -143,15 +190,81 @@ const CxcFeature = {
     },
 
     limpiarClienteCxc() {
+        this.inicializarComponentesCxc();
         const inputId = document.getElementById('clienteCuentaPorCobrar');
         const inputNombre = document.getElementById('clienteCuentaPorCobrarNombre');
         if (inputId) inputId.value = '';
         if (inputNombre) inputNombre.value = '';
+        this._clientPicker?.setEntity(null);
         window.AppState.clientesCxcBusqueda = [];
         window.AppState.estadoCuentaClienteActual = null;
         window.AppState.cuentasPorCobrar = [];
         window.cuentasPorCobrar = [];
         this.renderDetalleCuentaCliente();
+    },
+
+    renderResumenClienteCxc(cliente) {
+        const clienteHtml = window.SVSummaryCard?.createHtml({
+            variant: 'info',
+            content: `
+                <div class="cxc-summary-client">
+                    ${this.renderAvatarCliente(cliente, 'cliente-seleccionado-avatar')}
+                    <div>
+                        <small class="cxc-summary-overline">Cliente</small>
+                        <strong>${this.escaparHtml(cliente.nombre || 'Cliente')}</strong>
+                        <small>${this.escaparHtml(cliente.documento || 'Sin documento')}</small>
+                    </div>
+                </div>
+            `
+        });
+
+        const cobrarHtml = window.SVSummaryCard?.createHtml({
+            title: 'Total por cobrar',
+            value: `$${(cliente.saldo_por_cobrar_usd || 0).toFixed(2)}`,
+            variant: 'warning'
+        });
+
+        const favorHtml = window.SVSummaryCard?.createHtml({
+            title: 'Saldo a favor',
+            value: `$${(cliente.saldo_a_favor_usd || 0).toFixed(2)}`,
+            variant: 'success'
+        });
+
+        return [clienteHtml, cobrarHtml, favorHtml].join('');
+    },
+
+    renderCuentaCxc(cuenta) {
+        return `
+            <div class="cxc-document-card" data-status="${this.escaparHtml(cuenta.estado || 'pendiente')}">
+                <div class="cxc-document-card-header">
+                    <strong>Factura / Venta #${cuenta.numero_venta || cuenta.venta_id}</strong>
+                    <span class="cxc-document-status">${this.escaparHtml(cuenta.estado || 'pendiente')}</span>
+                </div>
+                <div class="cxc-document-date">Emitida: ${this.escaparHtml(cuenta.fecha_emision || 'Sin fecha')}</div>
+                <div class="cxc-document-totals">
+                    <div><small>Original</small><strong>$${(cuenta.monto_original_usd || 0).toFixed(2)}</strong></div>
+                    <div><small>Abonado</small><strong>$${(cuenta.monto_abonado_usd || 0).toFixed(2)}</strong></div>
+                    <div><small>Pendiente</small><strong>$${(cuenta.saldo_pendiente_usd || 0).toFixed(2)}</strong></div>
+                </div>
+                <div class="producto-acciones">
+                    <button class="btn-success" onclick="window.CxcFeature?.registrarAbonoCuentaPrompt?.(${cuenta.id})">💵 Abonar</button>
+                </div>
+            </div>
+        `;
+    },
+
+    renderFilaTransaccionCxc(transaccion) {
+        return `
+            <tr>
+                <td class="cxc-table-cell">${this.escaparHtml(transaccion.fecha || '')}</td>
+                <td class="cxc-table-cell cxc-table-cell-strong">${this.escaparHtml(transaccion.tipo || '')}</td>
+                <td class="cxc-table-cell">${this.escaparHtml(transaccion.descripcion || '')}</td>
+                <td class="cxc-table-cell cxc-table-cell-right">$${(transaccion.cargo_usd || 0).toFixed(2)}</td>
+                <td class="cxc-table-cell cxc-table-cell-right">$${(transaccion.abono_usd || 0).toFixed(2)}</td>
+                <td class="cxc-table-cell cxc-table-cell-right">${transaccion.saldo_documento_usd === null || transaccion.saldo_documento_usd === undefined ? '-' : `$${Number(transaccion.saldo_documento_usd).toFixed(2)}`}</td>
+                <td class="cxc-table-cell">${this.escaparHtml(transaccion.estado || '')}</td>
+            </tr>
+        `;
     },
 
     renderDetalleCuentaCliente(mensaje = '') {
@@ -172,80 +285,35 @@ const CxcFeature = {
         const cuentas = Array.isArray(estado.cuentas_por_cobrar) ? estado.cuentas_por_cobrar : [];
 
         resumen.style.display = 'grid';
-        resumen.innerHTML = `
-            <div style="background: #eef7ff; border-radius: 12px; padding: 14px;">
-                <div style="display:flex; gap:12px; align-items:center;">
-                    ${this.renderAvatarCliente(cliente, 'cliente-seleccionado-avatar')}
-                    <div>
-                        <small style="display:block; color:#5b6470; margin-bottom:4px;">Cliente</small>
-                        <strong>${cliente.nombre}</strong><br>
-                        <small>${cliente.documento || 'Sin documento'}</small>
-                    </div>
-                </div>
-            </div>
-            <div style="background: #fff6e8; border-radius: 12px; padding: 14px;">
-                <small style="display:block; color:#5b6470; margin-bottom:4px;">Total por cobrar</small>
-                <strong>$${(cliente.saldo_por_cobrar_usd || 0).toFixed(2)}</strong>
-            </div>
-            <div style="background: #eefbf3; border-radius: 12px; padding: 14px;">
-                <small style="display:block; color:#5b6470; margin-bottom:4px;">Saldo a favor</small>
-                <strong>$${(cliente.saldo_a_favor_usd || 0).toFixed(2)}</strong>
-            </div>
-        `;
+        resumen.innerHTML = this.renderResumenClienteCxc(cliente);
 
         if (!transacciones.length && !cuentas.length) {
             detalle.innerHTML = '<div class="mensaje-vacio">Este cliente no tiene transacciones en cuentas por cobrar.</div>';
             return;
         }
 
-        const cuentasHtml = cuentas.map(cuenta => `
-            <div style="background:white; border:1px solid #e6e6e6; border-left:4px solid ${cuenta.estado === 'pagada' ? '#198754' : '#dc3545'}; border-radius:10px; padding:14px; margin-bottom:12px;">
-                <div style="display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:8px;">
-                    <strong>Factura / Venta #${cuenta.numero_venta || cuenta.venta_id}</strong>
-                    <span style="text-transform:capitalize; color:#5b6470;">${cuenta.estado}</span>
-                </div>
-                <div style="font-size:0.92em; color:#5b6470; margin-bottom:10px;">Emitida: ${cuenta.fecha_emision || 'Sin fecha'}</div>
-                <div style="display:grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap:10px; margin-bottom:12px;">
-                    <div><small>Original</small><br><strong>$${(cuenta.monto_original_usd || 0).toFixed(2)}</strong></div>
-                    <div><small>Abonado</small><br><strong>$${(cuenta.monto_abonado_usd || 0).toFixed(2)}</strong></div>
-                    <div><small>Pendiente</small><br><strong>$${(cuenta.saldo_pendiente_usd || 0).toFixed(2)}</strong></div>
-                </div>
-                <div class="producto-acciones">
-                    <button class="btn-success" onclick="window.CxcFeature?.registrarAbonoCuentaPrompt?.(${cuenta.id})">💵 Abonar</button>
-                </div>
-            </div>
-        `).join('');
+        const cuentasHtml = cuentas.map(cuenta => this.renderCuentaCxc(cuenta)).join('');
 
-        const transaccionesHtml = transacciones.map(transaccion => `
-            <tr>
-                <td style="padding: 10px; border-bottom: 1px solid #eee;">${transaccion.fecha || ''}</td>
-                <td style="padding: 10px; border-bottom: 1px solid #eee; font-weight: bold;">${transaccion.tipo || ''}</td>
-                <td style="padding: 10px; border-bottom: 1px solid #eee;">${transaccion.descripcion || ''}</td>
-                <td style="padding: 10px; border-bottom: 1px solid #eee; text-align: right;">$${(transaccion.cargo_usd || 0).toFixed(2)}</td>
-                <td style="padding: 10px; border-bottom: 1px solid #eee; text-align: right;">$${(transaccion.abono_usd || 0).toFixed(2)}</td>
-                <td style="padding: 10px; border-bottom: 1px solid #eee; text-align: right;">${transaccion.saldo_documento_usd === null || transaccion.saldo_documento_usd === undefined ? '-' : `$${Number(transaccion.saldo_documento_usd).toFixed(2)}`}</td>
-                <td style="padding: 10px; border-bottom: 1px solid #eee;">${transaccion.estado || ''}</td>
-            </tr>
-        `).join('');
+        const transaccionesHtml = transacciones.map(transaccion => this.renderFilaTransaccionCxc(transaccion)).join('');
 
         detalle.innerHTML = `
-            <div style="margin-bottom: 16px;">
-                <h3 style="margin-bottom: 10px;">Documentos pendientes</h3>
+            <div class="cxc-detail-section">
+                <h3 class="cxc-section-title">Documentos pendientes</h3>
                 ${cuentasHtml || '<div class="mensaje-vacio">No hay cuentas registradas.</div>'}
             </div>
-            <div>
-                <h3 style="margin-bottom: 10px;">Transacciones del cliente</h3>
-                <div style="overflow-x:auto; background:white; border:1px solid #e6e6e6; border-radius:12px;">
-                    <table style="width:100%; border-collapse:collapse; min-width: 820px;">
+            <div class="cxc-detail-section">
+                <h3 class="cxc-section-title">Transacciones del cliente</h3>
+                <div class="cxc-table-shell">
+                    <table class="cxc-table">
                         <thead>
-                            <tr style="background:#f8fafc; text-align:left;">
-                                <th style="padding: 10px; border-bottom: 1px solid #eee;">Fecha</th>
-                                <th style="padding: 10px; border-bottom: 1px solid #eee;">Tipo</th>
-                                <th style="padding: 10px; border-bottom: 1px solid #eee;">Descripción</th>
-                                <th style="padding: 10px; border-bottom: 1px solid #eee; text-align: right;">Debe</th>
-                                <th style="padding: 10px; border-bottom: 1px solid #eee; text-align: right;">Abono</th>
-                                <th style="padding: 10px; border-bottom: 1px solid #eee; text-align: right;">Saldo Doc.</th>
-                                <th style="padding: 10px; border-bottom: 1px solid #eee;">Estado</th>
+                            <tr class="cxc-table-head-row">
+                                <th class="cxc-table-head">Fecha</th>
+                                <th class="cxc-table-head">Tipo</th>
+                                <th class="cxc-table-head">Descripción</th>
+                                <th class="cxc-table-head cxc-table-head-right">Debe</th>
+                                <th class="cxc-table-head cxc-table-head-right">Abono</th>
+                                <th class="cxc-table-head cxc-table-head-right">Saldo Doc.</th>
+                                <th class="cxc-table-head">Estado</th>
                             </tr>
                         </thead>
                         <tbody>${transaccionesHtml}</tbody>

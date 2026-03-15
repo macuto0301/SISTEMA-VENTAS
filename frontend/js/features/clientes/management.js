@@ -1,22 +1,85 @@
 const ClientesFeature = {
-    resetearFotosCliente(cliente = null) {
-        if (typeof window.resetearFotosCliente === 'function') {
-            return window.resetearFotosCliente(cliente);
+    _clientModal: null,
+    _clientFields: null,
+    _clientActions: null,
+    _clientSearchBox: null,
+    _clientSearchVentaBox: null,
+    _clientVentaPicker: null,
+
+    inicializarComponentesCliente() {
+        if (!this._clientModal && window.SVModal) {
+            this._clientModal = window.SVModal.enhance('modalCliente', {
+                titleSelector: '#modalTituloCliente',
+                closeSelector: '#btnCerrarModalCliente'
+            });
         }
+
+        if (!this._clientFields && window.SVField) {
+            this._clientFields = {
+                nombre: window.SVField.enhance('clienteNombreModal'),
+                documento: window.SVField.enhance('clienteDocumentoModal'),
+                telefono: window.SVField.enhance('clienteTelefonoModal'),
+                email: window.SVField.enhance('clienteEmailModal'),
+                direccion: window.SVField.enhance('clienteDireccionModal')
+            };
+        }
+
+        if (!this._clientActions && window.SVButtonGroup) {
+            this._clientActions = window.SVButtonGroup.enhance(document.querySelector('#modalCliente .cliente-modal-actions'));
+        }
+
+        if (!this._clientSearchBox && window.SVSearchBox && document.getElementById('buscarCliente')) {
+            this._clientSearchBox = window.SVSearchBox.enhance('buscarCliente');
+        }
+
+        if (!this._clientSearchVentaBox && window.SVSearchBox && document.getElementById('buscarClienteVentaModal')) {
+            this._clientSearchVentaBox = window.SVSearchBox.enhance('buscarClienteVentaModal', { fullWidth: true });
+        }
+
+        if (!this._clientVentaPicker && window.SVEntityPicker && document.getElementById('clienteVentaPicker')) {
+            this._clientVentaPicker = window.SVEntityPicker.enhance('clienteVentaPicker', {
+                inputSelector: '#cliente',
+                clearSelector: '#btnLimpiarClienteVenta',
+                detailSelector: '#clienteSeleccionadoCard',
+                statusSelector: '[data-role="status"]',
+                defaultLabel: 'Cliente General / Contado',
+                emptyStatus: 'Venta a contado',
+                emptyActionLabel: 'Contado',
+                clearLabel: 'Limpiar',
+                getLabel: cliente => `${cliente.nombre}${cliente.documento ? ` - ${cliente.documento}` : ''}`,
+                getStatus: cliente => cliente.documento || 'Cliente identificado',
+                renderDetail: cliente => `
+                    ${this.renderAvatarCliente(cliente, 'cliente-seleccionado-avatar')}
+                    <div class="cliente-seleccionado-info">
+                        <strong>${this.escaparHtml(cliente.nombre || 'Cliente')}</strong>
+                        <small>Favor $${(cliente.saldo_a_favor_usd || 0).toFixed(2)} · CxC $${(cliente.saldo_por_cobrar_usd || 0).toFixed(2)}</small>
+                    </div>
+                `
+            });
+        }
+
+        return this._clientFields;
+    },
+
+    obtenerCampoCliente(nombre) {
+        this.inicializarComponentesCliente();
+        return this._clientFields?.[nombre] || null;
+    },
+
+    limpiarErroresModalCliente() {
+        this.inicializarComponentesCliente();
+        Object.values(this._clientFields || {}).forEach(field => field?.clearError?.());
+    },
+
+    resetearFotosCliente(cliente = null) {
         return window.ClientesMediaFeature?.resetearFotosCliente?.(cliente);
     },
 
     construirUrlFotoCliente(path) {
-        if (typeof window.construirUrlFotoCliente === 'function') {
-            return window.construirUrlFotoCliente(path);
-        }
         return window.ClientesMediaFeature?.construirUrlFotoCliente?.(path) || '';
     },
 
     renderAvatarCliente(cliente, className = 'cliente-card-avatar') {
-        if (typeof window.renderAvatarCliente === 'function') {
-            return window.renderAvatarCliente(cliente, className);
-        }
         return window.ClientesMediaFeature?.renderAvatarCliente?.(cliente, className) || `<div class="${className}">CL</div>`;
     },
 
@@ -70,6 +133,7 @@ const ClientesFeature = {
     },
 
     async cargarClientes(options = {}) {
+        this.inicializarComponentesCliente();
         const paginacionActual = this.obtenerPaginacion('clientes');
         const page = options.page || paginacionActual.page || 1;
         const pageSize = options.pageSize || paginacionActual.page_size || 10;
@@ -87,11 +151,14 @@ const ClientesFeature = {
     },
 
     renderSelectClientesVenta() {
+        this.inicializarComponentesCliente();
         const valorActual = document.getElementById('clienteId')?.value || '';
         const input = document.getElementById('cliente');
+        let clienteSeleccionado = null;
         if (input) {
             if (valorActual) {
                 const cliente = window.clientes.find(item => String(item.id) === String(valorActual));
+                clienteSeleccionado = cliente || null;
                 input.value = cliente
                     ? `${cliente.nombre}${cliente.documento ? ` - ${cliente.documento}` : ''}`
                     : 'Cliente General / Contado';
@@ -99,6 +166,8 @@ const ClientesFeature = {
                 input.value = 'Cliente General / Contado';
             }
         }
+
+        this._clientVentaPicker?.setEntity(clienteSeleccionado);
 
         this.actualizarInfoClienteSeleccionado();
     },
@@ -139,6 +208,7 @@ const ClientesFeature = {
     },
 
     renderListaBusquedaClienteVenta() {
+        this.inicializarComponentesCliente();
         const contenedor = document.getElementById('listaBusquedaClienteVenta');
         const termino = (document.getElementById('buscarClienteVentaModal')?.value || '').trim().toLowerCase();
         if (!contenedor) return;
@@ -154,7 +224,11 @@ const ClientesFeature = {
         });
 
         if (!lista.length) {
-            contenedor.innerHTML = '<div class="mensaje-vacio">No hay clientes para mostrar.</div>';
+            contenedor.innerHTML = window.SVEmptyState?.createHtml({
+                icon: '::',
+                title: 'No hay clientes para mostrar',
+                description: 'Prueba con otro nombre, documento o telefono.'
+            }) || '<div class="mensaje-vacio">No hay clientes para mostrar.</div>';
             return;
         }
 
@@ -173,6 +247,7 @@ const ClientesFeature = {
     },
 
     seleccionarClienteVenta(clienteId) {
+        this.inicializarComponentesCliente();
         const cliente = window.clientes.find(item => Number(item.id) === Number(clienteId))
             || window.AppState.clientesVentaBusqueda?.find(item => Number(item.id) === Number(clienteId))
             || null;
@@ -186,16 +261,20 @@ const ClientesFeature = {
                 : 'Cliente General / Contado';
         }
 
+        this._clientVentaPicker?.setEntity(cliente);
+
         this.cerrarModalBuscarClienteVenta();
         this.actualizarInfoClienteSeleccionado();
         window.actualizarListaPagos?.();
     },
 
     limpiarClienteVenta() {
+        this.inicializarComponentesCliente();
         const hidden = document.getElementById('clienteId');
         const input = document.getElementById('cliente');
         if (hidden) hidden.value = '';
         if (input) input.value = 'Cliente General / Contado';
+        this._clientVentaPicker?.setEntity(null);
         this.actualizarInfoClienteSeleccionado();
         window.actualizarListaPagos?.();
     },
@@ -207,7 +286,6 @@ const ClientesFeature = {
         const inputSaldo = document.getElementById('montoSaldoFavorVenta');
         const panelSaldoFavor = document.getElementById('panelSaldoFavorCliente');
         const panelCredito = document.getElementById('panelCreditoCliente');
-        const tarjetaCliente = document.getElementById('clienteSeleccionadoCard');
 
         if (saldoDisponible) {
             saldoDisponible.textContent = `$${((cliente && cliente.saldo_a_favor_usd) || 0).toFixed(2)}`;
@@ -215,7 +293,7 @@ const ClientesFeature = {
 
         if (!cliente) {
             if (info) info.textContent = 'Sin saldo a favor disponible.';
-            if (tarjetaCliente) tarjetaCliente.innerHTML = '';
+            this._clientVentaPicker?.setEntity(null);
             if (panelSaldoFavor) panelSaldoFavor.style.display = 'none';
             if (panelCredito) panelCredito.style.display = 'none';
             if (inputSaldo) inputSaldo.value = '0';
@@ -239,18 +317,11 @@ const ClientesFeature = {
             info.textContent = `Saldo a favor: $${(cliente.saldo_a_favor_usd || 0).toFixed(2)} | Por cobrar: $${(cliente.saldo_por_cobrar_usd || 0).toFixed(2)}`;
         }
 
-        if (tarjetaCliente) {
-            tarjetaCliente.innerHTML = `
-                ${this.renderAvatarCliente(cliente, 'cliente-seleccionado-avatar')}
-                <div class="cliente-seleccionado-info">
-                    <strong>${cliente.nombre}</strong>
-                    <small>${cliente.documento || 'Sin documento'}</small>
-                </div>
-            `;
-        }
+        this._clientVentaPicker?.setEntity(cliente);
     },
 
     renderClientes() {
+        this.inicializarComponentesCliente();
         const contenedor = document.getElementById('listaClientes');
         if (!contenedor) return;
 
@@ -381,22 +452,27 @@ const ClientesFeature = {
     },
 
     abrirModalCliente(clienteId = null, seleccionarDespues = false) {
+        this.inicializarComponentesCliente();
         const cliente = clienteId ? window.clientes.find(item => item.id === clienteId) : null;
         document.getElementById('modalClienteId').value = cliente ? cliente.id : -1;
         document.getElementById('modalClienteSeleccionarDespues').value = seleccionarDespues ? 'true' : 'false';
-        document.getElementById('modalTituloCliente').textContent = cliente ? '✏️ Editar Cliente' : '👥 Nuevo Cliente';
-        document.getElementById('clienteNombreModal').value = cliente ? cliente.nombre || '' : '';
-        document.getElementById('clienteDocumentoModal').value = cliente ? cliente.documento || '' : '';
-        document.getElementById('clienteTelefonoModal').value = cliente ? cliente.telefono || '' : '';
-        document.getElementById('clienteEmailModal').value = cliente ? cliente.email || '' : '';
-        document.getElementById('clienteDireccionModal').value = cliente ? cliente.direccion || '' : '';
+        this._clientModal?.setTitle(cliente ? 'Editar cliente' : 'Nuevo cliente');
+        this.obtenerCampoCliente('nombre')?.setValue(cliente ? cliente.nombre || '' : '');
+        this.obtenerCampoCliente('documento')?.setValue(cliente ? cliente.documento || '' : '');
+        this.obtenerCampoCliente('telefono')?.setValue(cliente ? cliente.telefono || '' : '');
+        this.obtenerCampoCliente('email')?.setValue(cliente ? cliente.email || '' : '');
+        this.obtenerCampoCliente('direccion')?.setValue(cliente ? cliente.direccion || '' : '');
+        this.limpiarErroresModalCliente();
         this.resetearFotosCliente(cliente);
-        document.getElementById('modalCliente').style.display = 'block';
+        this._clientModal?.open()?.focusFirstField();
     },
 
     cerrarModalCliente() {
+        this.inicializarComponentesCliente();
         this.resetearFotosCliente(null);
-        document.getElementById('modalCliente').style.display = 'none';
+        this.limpiarErroresModalCliente();
+        this._clientActions?.setLoading('btnGuardarCliente', false);
+        this._clientModal?.close();
     },
 
     crearClienteRapidoDesdeVenta(seleccionarDespues = true) {
@@ -404,14 +480,20 @@ const ClientesFeature = {
     },
 
     async guardarClienteDesdeModal() {
+        this.inicializarComponentesCliente();
         const id = parseInt(document.getElementById('modalClienteId').value || '-1', 10);
         const seleccionarDespues = document.getElementById('modalClienteSeleccionarDespues').value === 'true';
+        const nombre = this.obtenerCampoCliente('nombre')?.getValue?.().trim() || '';
+        const documento = this.obtenerCampoCliente('documento')?.getValue?.().trim() || '';
+        const telefono = this.obtenerCampoCliente('telefono')?.getValue?.().trim() || '';
+        const email = this.obtenerCampoCliente('email')?.getValue?.().trim() || '';
+        const direccion = this.obtenerCampoCliente('direccion')?.getValue?.().trim() || '';
         const payload = new FormData();
-        payload.append('nombre', document.getElementById('clienteNombreModal').value.trim());
-        payload.append('documento', document.getElementById('clienteDocumentoModal').value.trim());
-        payload.append('telefono', document.getElementById('clienteTelefonoModal').value.trim());
-        payload.append('email', document.getElementById('clienteEmailModal').value.trim());
-        payload.append('direccion', document.getElementById('clienteDireccionModal').value.trim());
+        payload.append('nombre', nombre);
+        payload.append('documento', documento);
+        payload.append('telefono', telefono);
+        payload.append('email', email);
+        payload.append('direccion', direccion);
         payload.append('remove_foto_perfil', document.getElementById('clienteFotoPerfilEliminar').value);
         payload.append('remove_foto_cedula', document.getElementById('clienteFotoCedulaEliminar').value);
 
@@ -420,12 +502,17 @@ const ClientesFeature = {
         if (fotoPerfil) payload.append('foto_perfil', fotoPerfil);
         if (fotoCedula) payload.append('foto_cedula', fotoCedula);
 
+        this.limpiarErroresModalCliente();
+
         if (!String(payload.get('nombre') || '').trim()) {
+            this.obtenerCampoCliente('nombre')?.setError('El nombre del cliente es obligatorio').focus();
             window.mostrarNotificacion('❌ El nombre del cliente es obligatorio');
             return;
         }
 
         try {
+            this._clientActions?.setLoading('btnGuardarCliente', true, id === -1 ? 'Guardando...' : 'Actualizando...');
+            this._clientModal?.setBusy(true, id === -1 ? 'Guardando cliente...' : 'Actualizando cliente...');
             let respuesta = null;
             if (id === -1) {
                 respuesta = await window.ApiService.crearCliente(payload);
@@ -445,6 +532,8 @@ const ClientesFeature = {
 
             this.cerrarModalCliente();
         } catch (e) {
+            this._clientActions?.setLoading('btnGuardarCliente', false);
+            this._clientModal?.setBusy(false);
             window.mostrarNotificacion(`❌ ${e.message || 'No se pudo guardar el cliente'}`);
         }
     },

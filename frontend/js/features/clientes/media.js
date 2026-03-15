@@ -1,15 +1,33 @@
 const ClientesMediaFeature = {
-    construirUrlFotoCliente(path) {
-        if (typeof window.construirUrlFotoCliente === 'function') {
-            return window.construirUrlFotoCliente(path);
+    _uploaders: {},
+
+    inicializarMediaUploaders() {
+        if (!this._uploaders.perfil && window.SVMediaUploader) {
+            this._uploaders.perfil = window.SVMediaUploader.enhance('clientePerfilUploader', {
+                inputSelector: '#clienteFotoPerfilModal',
+                previewSelector: '#clienteFotoPerfilPreview',
+                clearSelector: '#btnLimpiarFotoClientePerfil',
+                badgeSelector: '[data-role="badge"]',
+                emptyLabel: 'Sin foto de perfil'
+            });
         }
+
+        if (!this._uploaders.cedula && window.SVMediaUploader) {
+            this._uploaders.cedula = window.SVMediaUploader.enhance('clienteCedulaUploader', {
+                inputSelector: '#clienteFotoCedulaModal',
+                previewSelector: '#clienteFotoCedulaPreview',
+                clearSelector: '#btnLimpiarFotoClienteCedula',
+                badgeSelector: '[data-role="badge"]',
+                emptyLabel: 'Sin foto de cédula'
+            });
+        }
+    },
+
+    construirUrlFotoCliente(path) {
         return window.MediaUtils?.construirUrlFotoCliente?.(path) || window.MediaUtils?.construirUrl?.(path, window.API_ORIGIN || window.location.origin) || '';
     },
 
     obtenerInicialesCliente(nombre) {
-        if (typeof window.obtenerInicialesCliente === 'function') {
-            return window.obtenerInicialesCliente(nombre);
-        }
         return window.Utils?.obtenerInicialesCliente?.(nombre) || String(nombre || 'CL').trim().split(/\s+/).slice(0, 2).map(parte => parte.charAt(0).toUpperCase()).join('') || 'CL';
     },
 
@@ -27,19 +45,23 @@ const ClientesMediaFeature = {
     },
 
     actualizarPreviewFotoCliente(tipo) {
+        this.inicializarMediaUploaders();
         const preview = document.getElementById(tipo === 'perfil' ? 'clienteFotoPerfilPreview' : 'clienteFotoCedulaPreview');
         const state = this.clienteFotosState[tipo];
+        const uploader = this._uploaders[tipo];
         if (!preview || !state) return;
 
         const url = state.objectUrl || state.currentUrl;
         if (url) {
             preview.className = 'cliente-foto-preview';
             preview.innerHTML = `<img src="${url}" alt="Foto de ${tipo === 'perfil' ? 'perfil' : 'cedula'} del cliente">`;
+            uploader?.setFilled(1, tipo === 'perfil' ? 'Foto de perfil lista' : 'Foto de cédula lista');
             return;
         }
 
         preview.className = 'cliente-foto-preview cliente-foto-preview-empty';
         preview.textContent = tipo === 'perfil' ? 'Sin foto de perfil' : 'Sin foto de cedula';
+        uploader?.setEmpty(tipo === 'perfil' ? 'Sin foto de perfil' : 'Sin foto de cédula');
     },
 
     resetearFotosCliente(cliente = null) {

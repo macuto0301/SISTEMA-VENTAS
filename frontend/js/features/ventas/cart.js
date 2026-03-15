@@ -1,4 +1,43 @@
 const VentasCartFeature = {
+    renderResumenPos(totalItems = 0, totalDolares = 0, totalBs = 0) {
+        const container = document.getElementById('ventasPosSummaryCards');
+        if (!container) return;
+
+        if (!window.SVSummaryCard?.createHtml) {
+            container.innerHTML = `
+                <div class="ventas-pos-summary-card">
+                    <div class="ventas-pos-summary-grid">
+                        <span class="ventas-pos-summary-label">Items</span>
+                        <strong>${totalItems}</strong>
+                        <span class="ventas-pos-summary-label">Total USD</span>
+                        <strong>$${totalDolares.toFixed(2)}</strong>
+                        <span class="ventas-pos-summary-label">Total Bs</span>
+                        <strong>Bs ${totalBs.toFixed(2)}</strong>
+                    </div>
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = [
+            window.SVSummaryCard.createHtml({
+                title: 'Items',
+                value: String(totalItems),
+                variant: 'info'
+            }),
+            window.SVSummaryCard.createHtml({
+                title: 'Total USD',
+                value: `$${totalDolares.toFixed(2)}`,
+                variant: 'warning'
+            }),
+            window.SVSummaryCard.createHtml({
+                title: 'Total Bs',
+                value: `Bs ${totalBs.toFixed(2)}`,
+                variant: 'success'
+            })
+        ].join('');
+    },
+
     obtenerListasPrecioDisponibles() {
         if (Array.isArray(window.PRICE_LIST_NUMBERS) && window.PRICE_LIST_NUMBERS.length) {
             return window.PRICE_LIST_NUMBERS;
@@ -324,9 +363,6 @@ const VentasCartFeature = {
 
     actualizarCarrito() {
         const tbody = document.getElementById('carritoBody');
-        const itemsResumen = document.getElementById('posItemsCount');
-        const dolaresResumen = document.getElementById('posResumenDolares');
-        const bolivaresResumen = document.getElementById('posResumenBolivares');
         let totalDolares = 0;
 
         if (carrito.length === 0) {
@@ -372,9 +408,7 @@ const VentasCartFeature = {
         }, 0);
 
         document.getElementById('totalDolares').textContent = `$${totalDolares.toFixed(2)}`;
-        if (itemsResumen) itemsResumen.textContent = String(carrito.length);
-        if (dolaresResumen) dolaresResumen.textContent = `$${totalDolares.toFixed(2)}`;
-        if (bolivaresResumen) bolivaresResumen.textContent = `Bs ${totalBs.toFixed(2)}`;
+        this.renderResumenPos(carrito.length, totalDolares, totalBs);
 
         if (typeof window.actualizarResumenPagos === 'function') {
             window.actualizarResumenPagos(totalDolares, totalBs);

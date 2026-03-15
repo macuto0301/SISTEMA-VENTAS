@@ -1,5 +1,104 @@
 const ProductosFeature = {
+    _productModal: null,
+    _priceModal: null,
+    _priceListModal: null,
+    _productFields: null,
+    _priceFields: null,
+    _productActions: null,
+    _priceActions: null,
+    _priceListActions: null,
+    _productSearchBox: null,
+
+    inicializarComponentesProducto() {
+        if (!this._productModal && window.SVModal) {
+            this._productModal = window.SVModal.enhance('modalProducto', {
+                titleSelector: '#modalTitulo',
+                closeSelector: '#btnCerrarModalProducto'
+            });
+        }
+
+        if (!this._priceModal && window.SVModal) {
+            this._priceModal = window.SVModal.enhance('modalProductoPrecios', {
+                closeSelector: '#btnCerrarModalPreciosProducto'
+            });
+        }
+
+        if (!this._priceListModal && window.SVModal) {
+            this._priceListModal = window.SVModal.enhance('modalListaPrecios', {
+                closeSelector: '#btnCerrarModalListaPrecios'
+            });
+        }
+
+        if (!this._productFields && window.SVField) {
+            this._productFields = {
+                codigo: window.SVField.enhance('productoCodigo'),
+                nombre: window.SVField.enhance('productoNombre'),
+                descripcion: window.SVField.enhance('productoDescripcion'),
+                categoria: window.SVField.enhance('productoCategoria'),
+                ubicacion: window.SVField.enhance('productoUbicacion'),
+                marca: window.SVField.enhance('productoMarca'),
+                modelo: window.SVField.enhance('productoModelo'),
+                unidad: window.SVField.enhance('productoUnidad')
+            };
+
+            this._productFields.codigo?.setHelp('Si lo dejas vacio se genera automaticamente.');
+        }
+
+        if (!this._priceFields && window.SVField) {
+            this._priceFields = {
+                costo: window.SVField.enhance('productoPrecioCosto'),
+                ganancia1: window.SVField.enhance('productoPorcentajeGanancia1'),
+                precio1: window.SVField.enhance('productoPrecioDolares1'),
+                ganancia2: window.SVField.enhance('productoPorcentajeGanancia2'),
+                precio2: window.SVField.enhance('productoPrecioDolares2'),
+                ganancia3: window.SVField.enhance('productoPorcentajeGanancia3'),
+                precio3: window.SVField.enhance('productoPrecioDolares3'),
+                precioBs: window.SVField.enhance('productoPrecioBolivares'),
+                redondeo: window.SVField.enhance('productoMetodoRedondeo')
+            };
+        }
+
+        if (!this._productActions && window.SVButtonGroup) {
+            this._productActions = window.SVButtonGroup.enhance(document.querySelector('#modalProducto .form-actions'));
+        }
+
+        if (!this._priceActions && window.SVButtonGroup) {
+            this._priceActions = window.SVButtonGroup.enhance(document.querySelector('#modalProductoPrecios .form-actions'));
+        }
+
+        if (!this._priceListActions && window.SVButtonGroup) {
+            this._priceListActions = window.SVButtonGroup.enhance(document.querySelector('#modalListaPrecios .form-actions'));
+        }
+
+        if (!this._productSearchBox && window.SVSearchBox && document.getElementById('buscarProductoGestion')) {
+            this._productSearchBox = window.SVSearchBox.enhance('buscarProductoGestion', { fullWidth: true });
+        }
+
+        return this._productFields;
+    },
+
+    obtenerCampoProducto(nombre) {
+        this.inicializarComponentesProducto();
+        return this._productFields?.[nombre] || null;
+    },
+
+    obtenerCampoPrecio(nombre) {
+        this.inicializarComponentesProducto();
+        return this._priceFields?.[nombre] || null;
+    },
+
+    limpiarErroresProducto() {
+        this.inicializarComponentesProducto();
+        Object.values(this._productFields || {}).forEach(field => field?.clearError?.());
+    },
+
+    limpiarErroresPrecios() {
+        this.inicializarComponentesProducto();
+        Object.values(this._priceFields || {}).forEach(field => field?.clearError?.());
+    },
+
     actualizarResumenPreciosProducto() {
+        this.inicializarComponentesProducto();
         const costo = parseFloat(document.getElementById('productoPrecioCosto')?.value) || 0;
         const precio1 = parseFloat(document.getElementById('productoPrecioDolares1')?.value) || 0;
         const precio2 = parseFloat(document.getElementById('productoPrecioDolares2')?.value) || 0;
@@ -85,23 +184,14 @@ const ProductosFeature = {
     },
 
     construirUrlFotoProducto(fotoUrl) {
-        if (typeof window.construirUrlFotoProducto === 'function') {
-            return window.construirUrlFotoProducto(fotoUrl);
-        }
         return window.MediaUtils?.construirUrl?.(fotoUrl, this.getApiBase().replace(/\/api$/, '')) || '';
     },
 
     obtenerUrlsGaleriaProducto(producto) {
-        if (typeof window.obtenerUrlsGaleriaProducto === 'function') {
-            return window.obtenerUrlsGaleriaProducto(producto);
-        }
         return window.MediaUtils?.obtenerUrlsGaleriaProducto?.(producto, this.getApiBase().replace(/\/api$/, '')) || [];
     },
 
     resetearEstadoFotoProducto(currentPhotos = []) {
-        if (typeof window.resetearEstadoFotoProducto === 'function') {
-            return window.resetearEstadoFotoProducto(currentPhotos);
-        }
         return window.ProductosMediaFeature?.resetearEstadoFotoProducto?.(currentPhotos);
     },
 
@@ -202,6 +292,7 @@ const ProductosFeature = {
     },
 
     abrirModalListaPrecios() {
+        this.inicializarComponentesProducto();
         const modal = document.getElementById('modalListaPrecios');
         const form = document.getElementById('formListaPrecios');
         if (!modal || !form) return;
@@ -220,14 +311,14 @@ const ProductosFeature = {
         if (cantidadModo) cantidadModo.value = 'blank';
         const incluirSinExistencia = document.getElementById('listaPreciosIncluirSinExistencia');
         if (incluirSinExistencia) incluirSinExistencia.checked = false;
-        modal.style.display = 'block';
+        this._priceListActions?.setLoading('btnGenerarListaPrecios', false);
+        this._priceListModal?.open();
     },
 
     cerrarModalListaPrecios() {
-        const modal = document.getElementById('modalListaPrecios');
-        if (modal) {
-            modal.style.display = 'none';
-        }
+        this.inicializarComponentesProducto();
+        this._priceListActions?.setLoading('btnGenerarListaPrecios', false);
+        this._priceListModal?.close();
     },
 
     async cargarProductosParaLista() {
@@ -418,23 +509,21 @@ const ProductosFeature = {
     },
 
     async generarListaPrecios(event) {
+        this.inicializarComponentesProducto();
         if (event) event.preventDefault();
 
         const tipoPrecio = Number(document.getElementById('listaPreciosTipoPrecio')?.value || 1);
         const formatoSalida = document.getElementById('listaPreciosFormatoSalida')?.value || 'excel';
         const modoCantidad = document.getElementById('listaPreciosCantidadModo')?.value || 'blank';
         const descuento = Math.max(0, Math.min(100, parseFloat(document.getElementById('listaPreciosDescuento')?.value || '0') || 0));
-        const btnGenerar = document.getElementById('btnGenerarListaPrecios');
-        const textoOriginal = btnGenerar?.textContent || 'Generar lista';
-
         try {
-            if (btnGenerar) {
-                btnGenerar.disabled = true;
-                btnGenerar.textContent = 'Generando...';
-            }
+            this._priceListActions?.setLoading('btnGenerarListaPrecios', true, 'Generando...');
+            this._priceListModal?.setBusy(true, 'Preparando lista de precios...');
 
             const productos = await this.cargarProductosParaLista();
             if (!productos.length) {
+                this._priceListActions?.setLoading('btnGenerarListaPrecios', false);
+                this._priceListModal?.setBusy(false);
                 window.mostrarNotificacion?.('⚠️ No hay productos para generar la lista');
                 return;
             }
@@ -478,10 +567,8 @@ const ProductosFeature = {
             console.error('Error generando lista de precios:', error);
             window.mostrarNotificacion?.('⚠️ No se pudo generar la lista de precios');
         } finally {
-            if (btnGenerar) {
-                btnGenerar.disabled = false;
-                btnGenerar.textContent = textoOriginal;
-            }
+            this._priceListActions?.setLoading('btnGenerarListaPrecios', false);
+            this._priceListModal?.setBusy(false);
         }
     },
 
@@ -567,8 +654,12 @@ const ProductosFeature = {
     },
 
     async guardarProducto(e) {
+        this.inicializarComponentesProducto();
         if (e) e.preventDefault();
         const formProducto = document.getElementById('formProducto');
+        this.limpiarErroresProducto();
+        this.limpiarErroresPrecios();
+
         if (formProducto && !formProducto.reportValidity()) {
             return;
         }
@@ -595,7 +686,28 @@ const ProductosFeature = {
         const fotos = (window.ProductosMediaFeature?.productoFotosSeleccionadas || []).map(item => item.file);
         const removePhoto = document.getElementById('productoFotoEliminar').value === 'true';
 
+        if (!String(nombre || '').trim()) {
+            this.obtenerCampoProducto('nombre')?.setError('El nombre del producto es obligatorio').focus();
+            window.mostrarNotificacion('⚠️ El nombre del producto es obligatorio');
+            return;
+        }
+
+        if (!String(descripcion || '').trim()) {
+            this.obtenerCampoProducto('descripcion')?.setError('La descripcion del producto es obligatoria').focus();
+            window.mostrarNotificacion('⚠️ La descripcion del producto es obligatoria');
+            return;
+        }
+
+        if (!String(categoria || '').trim()) {
+            this.obtenerCampoProducto('categoria')?.setError('La categoria del producto es obligatoria').focus();
+            window.mostrarNotificacion('⚠️ La categoria del producto es obligatoria');
+            return;
+        }
+
         if (precioDolares1 <= 0 || precioDolares2 <= 0 || precioDolares3 <= 0) {
+            this.obtenerCampoPrecio('precio1')?.setError(precioDolares1 <= 0 ? 'Debe indicar un precio mayor a cero' : '');
+            this.obtenerCampoPrecio('precio2')?.setError(precioDolares2 <= 0 ? 'Debe indicar un precio mayor a cero' : '');
+            this.obtenerCampoPrecio('precio3')?.setError(precioDolares3 <= 0 ? 'Debe indicar un precio mayor a cero' : '');
             this.abrirModalPreciosProducto();
             window.mostrarNotificacion('⚠️ Ajusta los precios P1, P2 y P3 antes de guardar');
             return;
@@ -630,6 +742,8 @@ const ProductosFeature = {
         });
 
         try {
+            this._productActions?.setLoading('btnGuardarProducto', true, idServidor ? 'Actualizando...' : 'Guardando...');
+            this._productModal?.setBusy(true, idServidor ? 'Actualizando producto...' : 'Guardando producto...');
             const apiBase = this.getApiBase();
             const url = idServidor ? `${apiBase}/productos/${idServidor}` : `${apiBase}/productos/`;
             const method = idServidor ? 'PUT' : 'POST';
@@ -646,9 +760,13 @@ const ProductosFeature = {
                 this.cerrarModalProducto();
                 return;
             }
+            this._productActions?.setLoading('btnGuardarProducto', false);
+            this._productModal?.setBusy(false);
             const error = await res.json().catch(() => null);
             window.mostrarNotificacion(`⚠️ ${error?.error || 'No se pudo guardar el producto en el servidor'}`);
         } catch (error) {
+            this._productActions?.setLoading('btnGuardarProducto', false);
+            this._productModal?.setBusy(false);
             window.mostrarNotificacion('⚠️ No se pudo guardar el producto en el servidor');
         }
     },
@@ -682,6 +800,7 @@ const ProductosFeature = {
     },
 
     mostrarProductos(productosAMostrar = null) {
+        this.inicializarComponentesProducto();
         const grid = document.getElementById('productosGrid');
         if (!grid) return;
         const lista = productosAMostrar || window.AppState.productosVista || window.productos;
@@ -861,6 +980,7 @@ const ProductosFeature = {
     },
 
     filtrarProductosGestion() {
+        this.inicializarComponentesProducto();
         const termino = document.getElementById('buscarProductoGestion').value.toLowerCase();
 
         if (!termino) {
@@ -872,7 +992,8 @@ const ProductosFeature = {
     },
 
     mostrarFormularioProducto() {
-        document.getElementById('modalTitulo').textContent = 'Nuevo Producto';
+        this.inicializarComponentesProducto();
+        this._productModal?.setTitle('Nuevo producto');
         document.getElementById('formProducto').reset();
         document.getElementById('productoId').value = '-1';
         document.getElementById('productoId').removeAttribute('data-server-id');
@@ -886,9 +1007,13 @@ const ProductosFeature = {
         document.getElementById('productoCantidad').value = 0;
         document.getElementById('productoCodigo').disabled = false;
         document.getElementById('productoPrecioBolivares').value = '';
+        this.limpiarErroresProducto();
+        this.limpiarErroresPrecios();
+        this._productActions?.setLoading('btnGuardarProducto', false);
+        this._productModal?.setBusy(false);
         this.resetearEstadoFotoProducto([]);
         this.actualizarResumenPreciosProducto();
-        document.getElementById('modalProducto').style.display = 'block';
+        this._productModal?.open()?.focusFirstField();
     },
 
     calcularPrecioVenta(lista = 1) {
@@ -937,20 +1062,24 @@ const ProductosFeature = {
     },
 
     abrirModalPreciosProducto() {
-        document.getElementById('modalProductoPrecios').style.display = 'block';
+        this.inicializarComponentesProducto();
+        this._priceModal?.open()?.focusFirstField();
     },
 
     cerrarModalPreciosProducto() {
-        document.getElementById('modalProductoPrecios').style.display = 'none';
+        this.inicializarComponentesProducto();
+        this._priceActions?.setLoading('btnCerrarPreciosProducto', false);
+        this._priceModal?.close();
         this.actualizarResumenPreciosProducto();
     },
 
     editarProducto(index) {
+        this.inicializarComponentesProducto();
         const producto = window.productos[index];
         const fotosProducto = Array.isArray(producto.fotos) ? producto.fotos : (producto.foto_path ? [producto.foto_path] : []);
         const fotosProductoUrls = Array.isArray(producto.fotos_urls) ? producto.fotos_urls : [];
 
-        document.getElementById('modalTitulo').textContent = 'Editar Producto';
+        this._productModal?.setTitle('Editar producto');
         document.getElementById('productoId').value = index;
         if (producto.id) {
             document.getElementById('productoId').setAttribute('data-server-id', producto.id);
@@ -977,18 +1106,26 @@ const ProductosFeature = {
         document.getElementById('productoMarca').value = producto.marca || '';
         document.getElementById('productoModelo').value = producto.modelo || '';
         document.getElementById('productoUnidad').value = producto.unidad || '';
+        this.limpiarErroresProducto();
+        this.limpiarErroresPrecios();
+        this._productActions?.setLoading('btnGuardarProducto', false);
+        this._productModal?.setBusy(false);
         this.resetearEstadoFotoProducto(fotosProducto.map((path, photoIndex) => ({
             path,
             url: fotosProductoUrls[photoIndex] || this.construirUrlFotoProducto(path)
         })));
 
         this.actualizarResumenPreciosProducto();
-        document.getElementById('modalProducto').style.display = 'block';
+        this._productModal?.open()?.focusFirstField();
     },
 
     cerrarModalProducto() {
+        this.inicializarComponentesProducto();
         this.resetearEstadoFotoProducto([]);
-        document.getElementById('modalProducto').style.display = 'none';
+        this.limpiarErroresProducto();
+        this.limpiarErroresPrecios();
+        this._productActions?.setLoading('btnGuardarProducto', false);
+        this._productModal?.close();
         this.cerrarModalPreciosProducto();
     }
 };

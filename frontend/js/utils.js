@@ -57,6 +57,11 @@ const Utils = {
     },
 
     mostrarNotificacion(mensaje, tipo = 'info') {
+        if (window.SVToast?.show) {
+            window.SVToast.show(mensaje, tipo);
+            return;
+        }
+
         const existente = document.getElementById('notificacion');
         if (existente) existente.remove();
 

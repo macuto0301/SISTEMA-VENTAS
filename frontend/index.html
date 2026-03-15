@@ -17,6 +17,16 @@
     <script src="js/api.js"></script>
     <script src="js/shared/pricing.js"></script>
     <script src="js/shared/media.js"></script>
+    <script src="js/components/base/modal.js"></script>
+    <script src="js/components/base/field.js"></script>
+    <script src="js/components/base/button-group.js"></script>
+    <script src="js/components/base/search-box.js"></script>
+    <script src="js/components/base/status-badge.js"></script>
+    <script src="js/components/base/empty-state.js"></script>
+    <script src="js/components/base/toast-service.js"></script>
+    <script src="js/components/composite/entity-picker.js"></script>
+    <script src="js/components/composite/media-uploader.js"></script>
+    <script src="js/components/composite/summary-card.js"></script>
     <script src="js/core/state-cache.js"></script>
     <script src="js/features/clientes/media.js"></script>
     <script src="js/features/clientes/management.js"></script>
@@ -76,11 +86,11 @@
                 <form id="formLogin" class="login-form" onsubmit="event.preventDefault(); if (window.AuthCore && typeof window.AuthCore.manejarLogin === 'function') { window.AuthCore.manejarLogin(event); } return false;">
                     <div class="form-group login-form-group">
                         <label for="loginUser">Usuario</label>
-                        <input type="text" id="loginUser" required placeholder="Nombre de usuario" autocomplete="username">
+                        <input type="text" id="loginUser" required placeholder="Nombre de usuario" autocomplete="username" name="loginUser">
                     </div>
                     <div class="form-group login-form-group">
                         <label for="loginPass">Contrasena</label>
-                        <input type="password" id="loginPass" required placeholder="••••••••" autocomplete="current-password">
+                        <input type="password" id="loginPass" required placeholder="••••••••" autocomplete="current-password" name="loginPass">
                     </div>
 
                     <div id="loginFeedback" class="login-feedback" aria-live="polite"></div>
@@ -152,7 +162,7 @@
                     <h2>Gestión de Productos</h2>
                 </div>
                 <div class="search-container" style="flex: 1; min-width: 250px;">
-                    <input type="text" id="buscarProductoGestion"
+                    <input type="text" id="buscarProductoGestion" name="buscarProductoGestion" aria-label="Buscar productos"
                         placeholder="🔍 Buscar por nombre, código o descripción..."
                         style="width: 100%; padding: 10px 15px; border-radius: 8px; border: 1px solid #ddd; font-size: 0.9em;">
                 </div>
@@ -170,48 +180,60 @@
         <!-- Panel de Ventas -->
         <div id="panelVentas" class="tab-panel">
             <div class="panel-header panel-header-surface panel-header-ventas">
-                <div style="display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(320px, 0.95fr); gap: 16px; align-items: start; width: 100%;">
-                    <div style="display: grid; gap: 10px; align-content: start;">
-                        <div style="display: grid; grid-template-columns: 70px minmax(0, 1fr) auto auto auto; gap: 8px; align-items: center;">
-                            <strong style="font-size: 0.95em;">Clientes :</strong>
-                            <input type="hidden" id="clienteId">
-                            <input type="text" id="cliente" class="form-control" value="Cliente General / Contado" placeholder="Seleccione un cliente..." readonly onclick="abrirModalBuscarClienteVenta()" style="background: #fff; cursor: pointer; min-width: 0;">
-                            <button type="button" id="btnBuscarClienteVenta" class="btn-primary" onclick="abrirModalBuscarClienteVenta()">🔎 Buscar</button>
-                            <button type="button" id="btnLimpiarClienteVenta" class="btn-secondary" onclick="limpiarClienteVenta()">Contado</button>
-                            <button type="button" class="btn-secondary" onclick="crearClienteRapidoDesdeVenta()">Nuevo</button>
+                <div class="ventas-header-layout">
+                    <div class="ventas-header-form">
+                        <div class="ventas-cliente-line">
+                            <strong class="ventas-cliente-label">Clientes :</strong>
+                            <div id="clienteVentaPicker" class="ventas-cliente-picker-shell">
+                                <input type="hidden" id="clienteId" name="clienteId">
+                                <div class="ventas-cliente-picker-actions">
+                                    <input type="text" id="cliente" name="clienteVenta" class="form-control ventas-clickable-input" value="Cliente General / Contado" placeholder="Seleccione un cliente..." aria-label="Cliente de la venta" readonly onclick="abrirModalBuscarClienteVenta()">
+                                    <button type="button" id="btnBuscarClienteVenta" class="btn-primary" onclick="abrirModalBuscarClienteVenta()">🔎 Buscar</button>
+                                    <button type="button" id="btnLimpiarClienteVenta" data-role="clear" class="btn-secondary" onclick="limpiarClienteVenta()">Contado</button>
+                                    <button type="button" class="btn-secondary" onclick="crearClienteRapidoDesdeVenta()">Nuevo</button>
+                                </div>
+                                <div class="ventas-cliente-picker-summary">
+                                    <span class="ventas-cliente-picker-status" data-role="status">Venta a contado</span>
+                                    <div id="clienteSeleccionadoCard" class="ventas-cliente-picker-detail is-empty" data-role="detail"></div>
+                                </div>
+                            </div>
                         </div>
-                        <div style="display: grid; grid-template-columns: 70px minmax(180px, 220px); gap: 8px; align-items: center;">
-                            <strong style="font-size: 0.95em;">Precio :</strong>
-                            <select id="listaPrecioVenta" class="form-control">
+                        <div class="ventas-inline-line ventas-inline-line-compact">
+                            <strong class="ventas-inline-label">Precio :</strong>
+                            <select id="listaPrecioVenta" name="listaPrecioVenta" class="form-control" aria-label="Lista de precio para la venta">
                                 <option value="1">Precio 1</option>
                                 <option value="2">Precio 2</option>
                                 <option value="3">Precio 3</option>
                             </select>
                         </div>
-                        <div style="display: grid; grid-template-columns: 70px minmax(0, 1fr); gap: 8px; align-items: start;">
-                            <strong style="font-size: 0.95em;">Buscar :</strong>
-                            <div>
-                                <div style="font-weight: 700; margin-bottom: 6px;">Seleccionar Productos (F2)</div>
-                                <div style="position: relative;">
-                                    <input type="text" id="buscarProducto" class="producto-select"
+                        <div class="ventas-inline-line ventas-inline-line-search">
+                            <strong class="ventas-inline-label">Buscar :</strong>
+                            <div class="ventas-search-block">
+                                <div class="ventas-search-title">Seleccionar Productos (F2)</div>
+                                <div class="ventas-search-input-shell">
+                                    <input type="text" id="buscarProducto" name="buscarProductoVenta" class="producto-select" aria-label="Buscar producto para la venta"
                                         placeholder="🔍 Buscar producto por nombre o código..." autocomplete="off">
                                     <div id="sugerenciasProductos" class="sugerencias-productos"></div>
                                 </div>
                             </div>
                         </div>
                     </div>
-                    <div style="justify-self: end; width: 100%; max-width: 360px;">
-                        <div style="width: 100%; background: #fff; border: 1px solid #cfd8e3; border-radius: 12px; padding: 14px 16px; box-shadow: inset 0 -2px 0 rgba(15, 23, 42, 0.08);">
-                        <div style="display: grid; grid-template-columns: 1fr auto; gap: 8px 18px; align-items: center; font-size: 0.95em;">
-                            <span style="color: #5b6470;">Items</span>
-                            <strong id="posItemsCount">0</strong>
-                            <span style="color: #5b6470;">Total USD</span>
-                            <strong id="posResumenDolares">$0.00</strong>
-                            <span style="color: #5b6470;">Total Bs</span>
-                            <strong id="posResumenBolivares">Bs 0.00</strong>
+                    <div class="ventas-summary-column">
+                        <div id="ventasPosSummaryCards" class="ventas-pos-summary-cards">
+                            <div class="sv-summary-card" data-variant="info">
+                                <small class="sv-summary-card-title">Items</small>
+                                <strong class="sv-summary-card-value">0</strong>
+                            </div>
+                            <div class="sv-summary-card" data-variant="warning">
+                                <small class="sv-summary-card-title">Total USD</small>
+                                <strong class="sv-summary-card-value">$0.00</strong>
+                            </div>
+                            <div class="sv-summary-card" data-variant="success">
+                                <small class="sv-summary-card-title">Total Bs</small>
+                                <strong class="sv-summary-card-value">Bs 0.00</strong>
+                            </div>
                         </div>
-                        </div>
-                        <div style="margin-top: 12px; display: flex; justify-content: flex-end;">
+                        <div class="ventas-summary-actions">
                             <button type="button" id="btnToggleResumenVenta" class="btn-secondary" onclick="abrirModalResumenVenta()" title="F1">Ver Atajos (F1)</button>
                         </div>
                     </div>
@@ -266,7 +288,7 @@
                     <h2>Clientes</h2>
                 </div>
                 <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
-                    <input type="text" id="buscarCliente" class="form-control" placeholder="Buscar cliente..." style="width: 260px;">
+                    <input type="text" id="buscarCliente" name="buscarCliente" class="form-control" placeholder="Buscar cliente..." aria-label="Buscar clientes" style="width: 260px;">
                     <button id="btnNuevoCliente" type="button" class="btn-primary">➕ Nuevo Cliente</button>
                 </div>
             </div>
@@ -279,11 +301,17 @@
                     <span class="section-kicker">Cobranza</span>
                     <h2>Cuentas por Cobrar</h2>
                 </div>
-                <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
-                    <input type="hidden" id="clienteCuentaPorCobrar" value="">
-                    <input type="text" id="clienteCuentaPorCobrarNombre" class="form-control" value="" placeholder="Seleccione un cliente..." readonly style="width: 320px; background: #fff; cursor: pointer;">
-                    <button id="btnBuscarClienteCxc" class="btn-primary" type="button">🔎 Buscar</button>
-                    <button id="btnLimpiarClienteCxc" class="btn-secondary" type="button">Limpiar</button>
+                <div id="clienteCxcPicker" class="cxc-cliente-picker-shell">
+                    <input type="hidden" id="clienteCuentaPorCobrar" value="" name="clienteCuentaPorCobrar">
+                    <div class="cxc-cliente-picker-actions">
+                        <input type="text" id="clienteCuentaPorCobrarNombre" name="clienteCuentaPorCobrarNombre" class="form-control" value="" placeholder="Seleccione un cliente..." aria-label="Cliente de cuentas por cobrar" readonly style="width: 320px; background: #fff; cursor: pointer;">
+                        <button id="btnBuscarClienteCxc" class="btn-primary" type="button">🔎 Buscar</button>
+                        <button id="btnLimpiarClienteCxc" data-role="clear" class="btn-secondary" type="button">Limpiar</button>
+                    </div>
+                    <div class="cxc-cliente-picker-summary">
+                        <span class="ventas-cliente-picker-status" data-role="status">Sin cliente seleccionado</span>
+                        <div id="clienteCxcSeleccionadoCard" class="ventas-cliente-picker-detail is-empty" data-role="detail"></div>
+                    </div>
                 </div>
             </div>
             <div style="padding: 15px;">
@@ -305,24 +333,24 @@
                 </div>
                 <div class="filtros-informe" style="display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap;">
                     <div>
-                        <label style="display: block; font-size: 0.8em; margin-bottom: 2px;">Desde:</label>
-                        <input type="date" id="fechaInicioInforme" class="form-control" style="padding: 5px;">
+                        <label for="fechaInicioInforme" style="display: block; font-size: 0.8em; margin-bottom: 2px;">Desde:</label>
+                        <input type="date" id="fechaInicioInforme" class="form-control" style="padding: 5px;" name="fechaInicioInforme">
                     </div>
                     <div>
-                        <label style="display: block; font-size: 0.8em; margin-bottom: 2px;">Hasta:</label>
-                        <input type="date" id="fechaFinInforme" class="form-control" style="padding: 5px;">
+                        <label for="fechaFinInforme" style="display: block; font-size: 0.8em; margin-bottom: 2px;">Hasta:</label>
+                        <input type="date" id="fechaFinInforme" class="form-control" style="padding: 5px;" name="fechaFinInforme">
                     </div>
                     <div>
-                        <label style="display: block; font-size: 0.8em; margin-bottom: 2px;">Rol:</label>
-                        <select id="filtroRolInforme" class="form-control" style="padding: 5px; min-width: 140px;">
+                        <label for="filtroRolInforme" style="display: block; font-size: 0.8em; margin-bottom: 2px;">Rol:</label>
+                        <select id="filtroRolInforme" class="form-control" style="padding: 5px; min-width: 140px;" name="filtroRolInforme">
                             <option value="">Todos</option>
                             <option value="admin">Admin</option>
                             <option value="cajero">Cajero</option>
                         </select>
                     </div>
                     <div>
-                        <label style="display: block; font-size: 0.8em; margin-bottom: 2px;">Usuario:</label>
-                        <select id="filtroUsuarioInforme" class="form-control" style="padding: 5px; min-width: 170px;">
+                        <label for="filtroUsuarioInforme" style="display: block; font-size: 0.8em; margin-bottom: 2px;">Usuario:</label>
+                        <select id="filtroUsuarioInforme" class="form-control" style="padding: 5px; min-width: 170px;" name="filtroUsuarioInforme">
                             <option value="">Todos</option>
                         </select>
                     </div>
@@ -353,7 +381,7 @@
                     <h2>🚚 Proveedores</h2>
                 </div>
                 <div style="display: flex; gap: 10px; align-items: center;">
-                    <input type="text" id="buscarProveedor" placeholder="Buscar proveedor..." 
+                    <input type="text" id="buscarProveedor" name="buscarProveedor" placeholder="Buscar proveedor..." aria-label="Buscar proveedores"
                         onkeyup="filtrarProveedores()" class="form-control" style="width: 250px;">
                     <button onclick="abrirModalProveedor()" class="btn-primary">➕ Nuevo Proveedor</button>
                 </div>
@@ -379,16 +407,16 @@
                     </div>
                     <div class="filtros-informe" style="display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap;">
                         <div>
-                            <label style="display: block; font-size: 0.8em; margin-bottom: 2px;">Desde:</label>
-                            <input type="date" id="fechaInicioCompraFiltro" class="form-control" style="padding: 5px;">
+                            <label for="fechaInicioCompraFiltro" style="display: block; font-size: 0.8em; margin-bottom: 2px;">Desde:</label>
+                            <input type="date" id="fechaInicioCompraFiltro" class="form-control" style="padding: 5px;" name="fechaInicioCompraFiltro">
                         </div>
                         <div>
-                            <label style="display: block; font-size: 0.8em; margin-bottom: 2px;">Hasta:</label>
-                            <input type="date" id="fechaFinCompraFiltro" class="form-control" style="padding: 5px;">
+                            <label for="fechaFinCompraFiltro" style="display: block; font-size: 0.8em; margin-bottom: 2px;">Hasta:</label>
+                            <input type="date" id="fechaFinCompraFiltro" class="form-control" style="padding: 5px;" name="fechaFinCompraFiltro">
                         </div>
                         <div>
-                            <label style="display: block; font-size: 0.8em; margin-bottom: 2px;">Estado:</label>
-                            <select id="estadoCompraFiltro" class="form-control" style="padding: 5px; min-width: 140px;">
+                            <label for="estadoCompraFiltro" style="display: block; font-size: 0.8em; margin-bottom: 2px;">Estado:</label>
+                            <select id="estadoCompraFiltro" class="form-control" style="padding: 5px; min-width: 140px;" name="estadoCompraFiltro">
                                 <option value="">Todos</option>
                                 <option value="pendiente">Pendiente</option>
                                 <option value="pagada">Pagada</option>
@@ -417,67 +445,70 @@
             <span id="btnCerrarModalProducto" class="close" onclick="if (window.ProductosFeature?.cerrarModalProducto) { window.ProductosFeature.cerrarModalProducto(); }">&times;</span>
             <h2 id="modalTitulo">Nuevo Producto</h2>
             <form id="formProducto" class="producto-form-grid">
-                <input type="hidden" id="productoId" value="-1">
+                <input type="hidden" id="productoId" value="-1" name="productoId">
 
                 <div class="form-group">
-                    <label>Código (opcional):</label>
-                    <input type="text" id="productoCodigo" placeholder="Dejar vacío para auto-generar">
+                    <label for="productoCodigo">Código (opcional):</label>
+                    <input type="text" id="productoCodigo" placeholder="Dejar vacío para auto-generar" name="productoCodigo">
                 </div>
 
                 <div class="form-group producto-form-span-2">
-                    <label>Nombre del Producto:</label>
-                    <input type="text" id="productoNombre" required>
+                    <label for="productoNombre">Nombre del Producto:</label>
+                    <input type="text" id="productoNombre" required name="productoNombre">
                 </div>
 
                 <div class="form-group producto-form-panel">
-                    <label>Descripción:</label>
-                    <textarea id="productoDescripcion" rows="2" required></textarea>
+                    <label for="productoDescripcion">Descripción:</label>
+                    <textarea id="productoDescripcion" rows="2" required name="productoDescripcion"></textarea>
                 </div>
 
                 <div class="form-group">
-                    <label>Categoría:</label>
-                    <input type="text" id="productoCategoria" required>
+                    <label for="productoCategoria">Categoría:</label>
+                    <input type="text" id="productoCategoria" required name="productoCategoria">
                 </div>
 
                 <div class="form-group">
-                    <label>Ubicación:</label>
-                    <input type="text" id="productoUbicacion" placeholder="Ej: Pasillo A, estante 3">
+                    <label for="productoUbicacion">Ubicación:</label>
+                    <input type="text" id="productoUbicacion" placeholder="Ej: Pasillo A, estante 3" name="productoUbicacion">
                 </div>
 
                 <div class="form-group">
-                    <label>Marca:</label>
-                    <input type="text" id="productoMarca" placeholder="Ej: Samsung">
+                    <label for="productoMarca">Marca:</label>
+                    <input type="text" id="productoMarca" placeholder="Ej: Samsung" name="productoMarca">
                 </div>
 
                 <div class="form-group">
-                    <label>Modelo:</label>
-                    <input type="text" id="productoModelo" placeholder="Ej: A15">
+                    <label for="productoModelo">Modelo:</label>
+                    <input type="text" id="productoModelo" placeholder="Ej: A15" name="productoModelo">
                 </div>
 
                 <div class="form-group">
-                    <label>Unidad:</label>
-                    <input type="text" id="productoUnidad" placeholder="Ej: unidad, caja, paquete">
+                    <label for="productoUnidad">Unidad:</label>
+                    <input type="text" id="productoUnidad" placeholder="Ej: unidad, caja, paquete" name="productoUnidad">
                 </div>
 
-                <div class="form-group producto-form-panel producto-form-fotos-panel">
-                    <label>Fotos del Producto:</label>
-                    <input type="file" id="productoFoto" accept="image/png,image/jpeg,image/webp" multiple>
-                    <small style="display: block; margin-top: 4px; color: #666;">Puedes cargar hasta 5 fotos. Cada una se comprime automaticamente y se ajusta a un formato estandar de 800 x 800.</small>
-                    <input type="hidden" id="productoFotoEliminar" value="false">
-                    <div id="productoFotoPreview" class="producto-foto-preview-list producto-foto-preview-empty">Sin fotos cargadas</div>
+                <div id="productoMediaUploader" class="form-group producto-form-panel producto-form-fotos-panel">
+                    <label for="productoFoto">Fotos del Producto:</label>
+                    <input type="file" id="productoFoto" accept="image/png,image/jpeg,image/webp" multiple name="productoFoto">
+                    <small data-role="hint" style="display: block; margin-top: 4px; color: #666;">Puedes cargar hasta 5 fotos. Cada una se comprime automaticamente y se ajusta a un formato estandar de 800 x 800.</small>
+                    <input type="hidden" id="productoFotoEliminar" value="false" name="productoFotoEliminar">
+                    <div class="sv-media-uploader-head">
+                        <span class="sv-media-uploader-badge" data-role="badge">Sin fotos cargadas</span>
+                    </div>
+                    <div id="productoFotoPreview" data-role="preview" class="producto-foto-preview-list producto-foto-preview-empty">Sin fotos cargadas</div>
                     <div class="producto-foto-actions">
-                        <button id="btnLimpiarFotosProducto" type="button" class="btn-secondary">Quitar todas las fotos</button>
+                        <button id="btnLimpiarFotosProducto" data-role="clear" type="button" class="btn-secondary">Quitar todas las fotos</button>
                     </div>
                 </div>
 
                 <div class="form-group">
-                    <label>Cantidad en Stock:</label>
-                    <input type="number" id="productoCantidad" min="0" value="0" readonly disabled>
+                    <label for="productoCantidad">Cantidad en Stock:</label>
+                    <input type="number" id="productoCantidad" min="0" value="0" readonly disabled name="productoCantidad">
                     <small style="display: block; margin-top: 4px; color: #666;">El stock se actualiza solo desde compras.</small>
                 </div>
 
                 <div class="form-group producto-precios-resumen-box">
-                    <label>Precios:</label>
+                    <div class="producto-precios-label">Precios:</div>
                     <button id="btnAbrirPreciosProducto" type="button" class="btn-secondary producto-precios-trigger">Ajustar precios</button>
                     <div id="productoResumenPrecios" class="producto-precios-resumen-grid">
                         <div class="producto-precio-chip">
@@ -504,8 +535,8 @@
                 </div>
 
                 <div class="form-actions producto-form-span-2">
-                    <button type="submit" class="btn-success">💾 Guardar Producto</button>
-                        <button id="btnCancelarProducto" type="button" class="btn-secondary">Cancelar</button>
+                    <button id="btnGuardarProducto" type="submit" class="btn-success">💾 Guardar Producto</button>
+                    <button id="btnCancelarProducto" type="button" class="btn-secondary">Cancelar</button>
                 </div>
             </form>
         </div>
@@ -517,48 +548,48 @@
             <h3>Precios del producto</h3>
             <div class="producto-precios-modal-grid">
                 <div class="form-group producto-form-span-2 producto-precios-modal-highlight">
-                    <label>Precio Costo ($):</label>
-                    <input type="number" id="productoPrecioCosto" step="0.01" min="0">
+                    <label for="productoPrecioCosto">Precio Costo ($):</label>
+                    <input type="number" id="productoPrecioCosto" step="0.01" min="0" name="productoPrecioCosto">
                 </div>
 
                 <div class="form-group">
-                    <label>% Ganancia P1:</label>
-                    <input type="number" id="productoPorcentajeGanancia1" step="0.0001" min="0">
+                    <label for="productoPorcentajeGanancia1">% Ganancia P1:</label>
+                    <input type="number" id="productoPorcentajeGanancia1" step="0.0001" min="0" name="productoPorcentajeGanancia1">
                 </div>
 
                 <div class="form-group">
-                    <label>Precio Venta P1 ($):</label>
-                    <input type="number" id="productoPrecioDolares1" step="0.01" min="0" required>
+                    <label for="productoPrecioDolares1">Precio Venta P1 ($):</label>
+                    <input type="number" id="productoPrecioDolares1" step="0.01" min="0" required name="productoPrecioDolares1">
                 </div>
 
                 <div class="form-group">
-                    <label>% Ganancia P2:</label>
-                    <input type="number" id="productoPorcentajeGanancia2" step="0.0001" min="0">
+                    <label for="productoPorcentajeGanancia2">% Ganancia P2:</label>
+                    <input type="number" id="productoPorcentajeGanancia2" step="0.0001" min="0" name="productoPorcentajeGanancia2">
                 </div>
 
                 <div class="form-group">
-                    <label>Precio Venta P2 ($):</label>
-                    <input type="number" id="productoPrecioDolares2" step="0.01" min="0" required>
+                    <label for="productoPrecioDolares2">Precio Venta P2 ($):</label>
+                    <input type="number" id="productoPrecioDolares2" step="0.01" min="0" required name="productoPrecioDolares2">
                 </div>
 
                 <div class="form-group">
-                    <label>% Ganancia P3:</label>
-                    <input type="number" id="productoPorcentajeGanancia3" step="0.0001" min="0">
+                    <label for="productoPorcentajeGanancia3">% Ganancia P3:</label>
+                    <input type="number" id="productoPorcentajeGanancia3" step="0.0001" min="0" name="productoPorcentajeGanancia3">
                 </div>
 
                 <div class="form-group">
-                    <label>Precio Venta P3 ($):</label>
-                    <input type="number" id="productoPrecioDolares3" step="0.01" min="0" required>
+                    <label for="productoPrecioDolares3">Precio Venta P3 ($):</label>
+                    <input type="number" id="productoPrecioDolares3" step="0.01" min="0" required name="productoPrecioDolares3">
                 </div>
 
                 <div class="form-group">
-                    <label>Precio en Bs:</label>
-                    <input type="number" id="productoPrecioBolivares" step="0.01" min="0">
+                    <label for="productoPrecioBolivares">Precio en Bs:</label>
+                    <input type="number" id="productoPrecioBolivares" step="0.01" min="0" name="productoPrecioBolivares">
                 </div>
 
                 <div class="form-group">
-                    <label>Redondeo:</label>
-                    <select id="productoMetodoRedondeo" onchange="calcularPrecioBolivares()">
+                    <label for="productoMetodoRedondeo">Redondeo:</label>
+                    <select id="productoMetodoRedondeo" onchange="calcularPrecioBolivares()" name="productoMetodoRedondeo">
                         <option value="none">Sin Redondeo</option>
                         <option value="no_decimals">Sin Decimales</option>
                         <option value="five_cents">Cinco céntimos (0.05)</option>
@@ -588,7 +619,7 @@
                     <div class="lista-precios-inline-grid">
                         <div class="form-group">
                             <label for="listaPreciosTipoPrecio">Precio a usar:</label>
-                            <select id="listaPreciosTipoPrecio" required>
+                            <select id="listaPreciosTipoPrecio" required name="listaPreciosTipoPrecio">
                                 <option value="1">Precio 1</option>
                                 <option value="2">Precio 2</option>
                                 <option value="3">Precio 3</option>
@@ -596,7 +627,7 @@
                         </div>
                         <div class="form-group">
                             <label for="listaPreciosFormatoSalida">Salida:</label>
-                            <select id="listaPreciosFormatoSalida" required>
+                            <select id="listaPreciosFormatoSalida" required name="listaPreciosFormatoSalida">
                                 <option value="excel">Excel</option>
                                 <option value="pdf">Vista imprimible / PDF</option>
                             </select>
@@ -605,25 +636,25 @@
                     <div class="lista-precios-inline-grid">
                         <div class="form-group">
                             <label for="listaPreciosAlcance">Productos a incluir:</label>
-                            <select id="listaPreciosAlcance">
+                            <select id="listaPreciosAlcance" name="listaPreciosAlcance">
                                 <option value="filtrado">Solo productos filtrados</option>
                                 <option value="todos">Todo el inventario</option>
                             </select>
                         </div>
                         <div class="form-group">
                             <label for="listaPreciosCantidadModo">Cantidades:</label>
-                            <select id="listaPreciosCantidadModo">
+                            <select id="listaPreciosCantidadModo" name="listaPreciosCantidadModo">
                                 <option value="blank">Dejar vacias</option>
                                 <option value="one">Colocar 1 en cada producto</option>
                             </select>
                         </div>
                         <div class="form-group">
                             <label for="listaPreciosDescuento">Descuento %:</label>
-                            <input type="number" id="listaPreciosDescuento" min="0" max="100" step="0.01" value="0">
+                            <input type="number" id="listaPreciosDescuento" min="0" max="100" step="0.01" value="0" name="listaPreciosDescuento">
                         </div>
                     </div>
                     <label class="lista-precios-checkline">
-                        <input type="checkbox" id="listaPreciosIncluirSinExistencia">
+                        <input type="checkbox" id="listaPreciosIncluirSinExistencia" name="listaPreciosIncluirSinExistencia">
                         <span>Incluir productos sin existencia</span>
                     </label>
                 </div>
@@ -636,19 +667,19 @@
                     <div class="lista-precios-form-grid-inner">
                         <div class="form-group lista-precios-span-2">
                             <label for="listaPreciosCliente">Cliente:</label>
-                            <input type="text" id="listaPreciosCliente" placeholder="Nombre o razon social">
+                            <input type="text" id="listaPreciosCliente" placeholder="Nombre o razon social" name="listaPreciosCliente">
                         </div>
                         <div class="form-group lista-precios-span-2">
                             <label for="listaPreciosDireccion">Direc:</label>
-                            <textarea id="listaPreciosDireccion" rows="2" placeholder="Direccion del cliente"></textarea>
+                            <textarea id="listaPreciosDireccion" rows="2" placeholder="Direccion del cliente" name="listaPreciosDireccion"></textarea>
                         </div>
                         <div class="form-group">
                             <label for="listaPreciosTelefono">Tel:</label>
-                            <input type="text" id="listaPreciosTelefono" placeholder="0412...">
+                            <input type="text" id="listaPreciosTelefono" placeholder="0412..." name="listaPreciosTelefono">
                         </div>
                         <div class="form-group">
                             <label for="listaPreciosRif">RIF:</label>
-                            <input type="text" id="listaPreciosRif" placeholder="J-12345678-9">
+                            <input type="text" id="listaPreciosRif" placeholder="J-12345678-9" name="listaPreciosRif">
                         </div>
                     </div>
                 </div>
@@ -742,24 +773,24 @@
                         USD/Bs:</label>
                     <input type="number" id="tasaVuelto" step="0.01"
                         style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 5px;"
-                        oninput="actualizarConversionesVuelto()">
+                        oninput="actualizarConversionesVuelto()" name="tasaVuelto">
                 </div>
 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
                     <div>
-                        <label
+                        <label for="metodoEntregaVuelto"
                             style="font-weight: bold; display: block; margin-bottom: 3px; font-size: 0.85em;">Método:</label>
                         <select id="metodoEntregaVuelto"
-                            style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 5px; font-size: 0.85em;">
+                            style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 5px; font-size: 0.85em;" name="metodoEntregaVuelto">
                             <option value="Efectivo">Efectivo</option>
                         </select>
                     </div>
                     <div>
-                        <label
+                        <label for="montoEntregaVuelto"
                             style="font-weight: bold; display: block; margin-bottom: 3px; font-size: 0.85em;">Monto:</label>
                         <input type="number" id="montoEntregaVuelto" step="0.01"
                             style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 5px; font-size: 0.85em;"
-                            placeholder="0.00" oninput="actualizarConversionesVuelto()">
+                            placeholder="0.00" oninput="actualizarConversionesVuelto()" name="montoEntregaVuelto">
                         <div id="previewConversionVuelto"
                             style="font-size: 0.75em; color: #666; margin-top: 3px; display: none;">Equivale a: <span
                                 id="valorequivaleUSD">$0.00</span></div>
@@ -832,7 +863,8 @@
                         <h4>Agregar Pago (F4)</h4>
                     </div>
                     <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px;">
-                        <select id="medioPago" required>
+                        <label for="medioPago" class="sr-only">Medio de pago</label>
+                        <select id="medioPago" name="medioPago" required>
                             <option value="">Medio de pago...</option>
                             <option value="Efectivo en Dólares">💵 Efectivo en Dólares</option>
                             <option value="Efectivo en Bolívares">💶 Efectivo en Bolívares</option>
@@ -842,7 +874,8 @@
                             <option value="Transferencia en Bs">🏦 Transferencia en Bs</option>
                             <option value="Transferencia en Dólares">🏦 Transferencia en Dólares</option>
                         </select>
-                        <input type="number" id="montoPago" step="0.01" min="0" placeholder="Monto">
+                        <label for="montoPago" class="sr-only">Monto del pago</label>
+                        <input type="number" id="montoPago" name="montoPago" step="0.01" min="0" placeholder="Monto">
                         <button type="button" id="btnAgregarPago" class="btn-success" title="F9 o Enter en pago">➕ Agregar (F9)</button>
                     </div>
                 </div>
@@ -879,7 +912,7 @@
                     <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;">
                         <strong>Saldo a favor del cliente</strong>
                         <label style="display: inline-flex; align-items: center; gap: 6px;">
-                            <input type="checkbox" id="usarSaldoFavorVenta" onchange="actualizarListaPagos()">
+                            <input type="checkbox" id="usarSaldoFavorVenta" onchange="actualizarListaPagos()" name="usarSaldoFavorVenta">
                             Aplicar manualmente
                         </label>
                     </div>
@@ -890,7 +923,8 @@
                         </div>
                         <div>
                             <small>A aplicar:</small>
-                            <input type="number" id="montoSaldoFavorVenta" step="0.01" min="0" value="0" oninput="actualizarListaPagos()">
+                            <label for="montoSaldoFavorVenta" class="sr-only">Monto a aplicar del saldo a favor</label>
+                            <input type="number" id="montoSaldoFavorVenta" name="montoSaldoFavorVenta" step="0.01" min="0" value="0" oninput="actualizarListaPagos()">
                         </div>
                     </div>
                 </div>
@@ -972,48 +1006,48 @@
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
                 <!-- Columna Izquierda: Datos Empresa -->
                 <div style="padding-right: 15px; border-right: 1px solid #eee;">
-                    <label style="font-weight: bold; display: block; margin-bottom: 10px; color: #667eea;">📋 Datos de la Empresa</label>
+                    <div style="font-weight: bold; display: block; margin-bottom: 10px; color: #667eea;">📋 Datos de la Empresa</div>
                     
                     <div style="margin-bottom: 10px;">
                         <label for="configNombreEmpresa" style="font-weight: bold; display: block; margin-bottom: 5px;">Nombre:</label>
                         <input type="text" id="configNombreEmpresa" placeholder="Mi Empresa C.A."
-                            style="width: 100%; padding: 8px; font-size: 0.95em; border: 1px solid #ccc; border-radius: 5px;">
+                            style="width: 100%; padding: 8px; font-size: 0.95em; border: 1px solid #ccc; border-radius: 5px;" name="configNombreEmpresa">
                     </div>
 
                     <div style="margin-bottom: 10px;">
                         <label for="configRifEmpresa" style="font-weight: bold; display: block; margin-bottom: 5px;">RIF:</label>
                         <input type="text" id="configRifEmpresa" placeholder="J-12345678-9"
-                            style="width: 100%; padding: 8px; font-size: 0.95em; border: 1px solid #ccc; border-radius: 5px;">
+                            style="width: 100%; padding: 8px; font-size: 0.95em; border: 1px solid #ccc; border-radius: 5px;" name="configRifEmpresa">
                     </div>
 
                     <div style="margin-bottom: 10px;">
                         <label for="configDireccionEmpresa" style="font-weight: bold; display: block; margin-bottom: 5px;">Dirección:</label>
                         <textarea id="configDireccionEmpresa" rows="2" placeholder="Av. Principal, Ciudad..."
-                            style="width: 100%; padding: 8px; font-size: 0.95em; border: 1px solid #ccc; border-radius: 5px; resize: vertical;"></textarea>
+                            style="width: 100%; padding: 8px; font-size: 0.95em; border: 1px solid #ccc; border-radius: 5px; resize: vertical;" name="configDireccionEmpresa"></textarea>
                     </div>
 
                     <div style="margin-bottom: 10px;">
                         <label for="configTelefonoEmpresa" style="font-weight: bold; display: block; margin-bottom: 5px;">Telefono:</label>
                         <input type="text" id="configTelefonoEmpresa" placeholder="0412-0000000"
-                            style="width: 100%; padding: 8px; font-size: 0.95em; border: 1px solid #ccc; border-radius: 5px;">
+                            style="width: 100%; padding: 8px; font-size: 0.95em; border: 1px solid #ccc; border-radius: 5px;" name="configTelefonoEmpresa">
                     </div>
 
                     <div style="margin-bottom: 10px;">
                         <label for="configCorreoEmpresa" style="font-weight: bold; display: block; margin-bottom: 5px;">Correo:</label>
                         <input type="email" id="configCorreoEmpresa" placeholder="empresa@correo.com"
-                            style="width: 100%; padding: 8px; font-size: 0.95em; border: 1px solid #ccc; border-radius: 5px;">
+                            style="width: 100%; padding: 8px; font-size: 0.95em; border: 1px solid #ccc; border-radius: 5px;" name="configCorreoEmpresa">
                     </div>
                 </div>
 
                 <!-- Columna Derecha: Tasas y Porcentajes -->
                 <div>
-                    <label style="font-weight: bold; display: block; margin-bottom: 10px; color: #667eea;">💰 Tasas y Porcentajes</label>
+                    <div style="font-weight: bold; display: block; margin-bottom: 10px; color: #667eea;">💰 Tasas y Porcentajes</div>
 
                     <div style="margin-bottom: 12px;">
                         <label for="configTasaDolar" style="font-weight: bold; display: block; margin-bottom: 5px;">Tasa Venta (Bs/$):</label>
                         <div style="display: flex; gap: 8px;">
                             <input type="number" id="configTasaDolar" step="0.01"
-                                style="flex: 1; padding: 8px; font-size: 0.95em; border: 1px solid #ccc; border-radius: 5px;">
+                                style="flex: 1; padding: 8px; font-size: 0.95em; border: 1px solid #ccc; border-radius: 5px;" name="configTasaDolar">
                             <button id="btnConfigActualizarBcv" type="button" onclick="if (window.ConfigCore?.actualizarTasaBCV) { window.ConfigCore.actualizarTasaBCV(event); }" class="btn-secondary" title="Actualizar desde BCV"
                                 style="padding: 0 12px; background: #e3f2fd; color: #1976d2; border-color: #bbdefb;">
                                 🔄
@@ -1024,23 +1058,23 @@
                     <div style="margin-bottom: 12px;">
                         <label for="configTasaVueltoGeneral" style="font-weight: bold; display: block; margin-bottom: 5px;">Tasa Vueltos (Bs/$):</label>
                         <input type="number" id="configTasaVueltoGeneral" step="0.01"
-                            style="width: 100%; padding: 8px; font-size: 0.95em; border: 1px solid #ccc; border-radius: 5px;">
+                            style="width: 100%; padding: 8px; font-size: 0.95em; border: 1px solid #ccc; border-radius: 5px;" name="configTasaVueltoGeneral">
                     </div>
 
                     <div style="margin-bottom: 12px;">
                         <label for="configPorcentajeDescuentoModal" style="font-weight: bold; display: block; margin-bottom: 5px;">% Desc. Pagos Divisas:</label>
                         <input type="number" id="configPorcentajeDescuentoModal" step="1" min="0" max="100"
-                            style="width: 100%; padding: 8px; font-size: 0.95em; border: 1px solid #ccc; border-radius: 5px;">
+                            style="width: 100%; padding: 8px; font-size: 0.95em; border: 1px solid #ccc; border-radius: 5px;" name="configPorcentajeDescuentoModal">
                     </div>
 
                     <div style="margin-bottom: 10px;">
                         <label for="configPorcentajeGananciaDefecto" style="font-weight: bold; display: block; margin-bottom: 5px;">% Ganancia Defecto:</label>
                         <input type="number" id="configPorcentajeGananciaDefecto" step="0.01" min="0"
-                            style="width: 100%; padding: 8px; font-size: 0.95em; border: 1px solid #ccc; border-radius: 5px;">
+                            style="width: 100%; padding: 8px; font-size: 0.95em; border: 1px solid #ccc; border-radius: 5px;" name="configPorcentajeGananciaDefecto">
                     </div>
 
                     <label for="configPrecioVentaLibre" style="display: flex; align-items: flex-start; gap: 10px; margin-top: 16px; padding: 10px 12px; border: 1px solid #dbe4f0; border-radius: 8px; background: #f8fbff; cursor: pointer;">
-                        <input type="checkbox" id="configPrecioVentaLibre" style="margin-top: 3px; transform: scale(1.1);">
+                        <input type="checkbox" id="configPrecioVentaLibre" style="margin-top: 3px; transform: scale(1.1);" name="configPrecioVentaLibre">
                         <span>
                             <strong style="display: block; margin-bottom: 3px;">Precio de venta libre</strong>
                             <span style="font-size: 0.9em; color: #5f6b7a;">Permite a cajeros y administradores cambiar el precio al momento de vender.</span>
@@ -1062,36 +1096,36 @@
             <span class="close" onclick="cerrarModalProveedor()">&times;</span>
             <h2 id="modalTituloProveedor" style="text-align: center; margin-bottom: 20px;">➕ Nuevo Proveedor</h2>
             
-            <input type="hidden" id="proveedorId" value="-1">
+            <input type="hidden" id="proveedorId" value="-1" name="proveedorId">
             
             <div style="margin-bottom: 12px;">
                 <label for="proveedorNombre" style="font-weight: bold; display: block; margin-bottom: 5px;">Nombre:</label>
                 <input type="text" id="proveedorNombre" placeholder="Nombre del proveedor"
-                    style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;">
+                    style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;" name="proveedorNombre">
             </div>
 
             <div style="margin-bottom: 12px;">
                 <label for="proveedorRif" style="font-weight: bold; display: block; margin-bottom: 5px;">RIF:</label>
                 <input type="text" id="proveedorRif" placeholder="J-12345678-9"
-                    style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;">
+                    style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;" name="proveedorRif">
             </div>
 
             <div style="margin-bottom: 12px;">
                 <label for="proveedorTelefono" style="font-weight: bold; display: block; margin-bottom: 5px;">Teléfono:</label>
                 <input type="text" id="proveedorTelefono" placeholder="0412-1234567"
-                    style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;">
+                    style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;" name="proveedorTelefono">
             </div>
 
             <div style="margin-bottom: 12px;">
                 <label for="proveedorEmail" style="font-weight: bold; display: block; margin-bottom: 5px;">Email:</label>
                 <input type="email" id="proveedorEmail" placeholder="correo@ejemplo.com"
-                    style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;">
+                    style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;" name="proveedorEmail">
             </div>
 
             <div style="margin-bottom: 15px;">
                 <label for="proveedorDireccion" style="font-weight: bold; display: block; margin-bottom: 5px;">Dirección:</label>
                 <textarea id="proveedorDireccion" rows="2" placeholder="Dirección del proveedor"
-                    style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px; resize: vertical;"></textarea>
+                    style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px; resize: vertical;" name="proveedorDireccion"></textarea>
             </div>
 
             <div style="text-align: right; border-top: 1px solid #eee; padding-top: 15px;">
@@ -1107,53 +1141,59 @@
             <span id="btnCerrarModalCliente" class="close">&times;</span>
             <h2 id="modalTituloCliente" style="text-align: center; margin-bottom: 20px;">👥 Nuevo Cliente</h2>
 
-            <input type="hidden" id="modalClienteId" value="-1">
-            <input type="hidden" id="modalClienteSeleccionarDespues" value="false">
+            <input type="hidden" id="modalClienteId" value="-1" name="modalClienteId">
+            <input type="hidden" id="modalClienteSeleccionarDespues" value="false" name="modalClienteSeleccionarDespues">
 
             <div class="cliente-form-grid">
                 <div class="form-group">
                     <label for="clienteNombreModal">Nombre:</label>
-                    <input type="text" id="clienteNombreModal" class="form-control" placeholder="Nombre del cliente">
+                    <input type="text" id="clienteNombreModal" class="form-control" placeholder="Nombre del cliente" name="clienteNombreModal">
                 </div>
 
                 <div class="form-group">
                     <label for="clienteDocumentoModal">Documento / Cédula / RIF:</label>
-                    <input type="text" id="clienteDocumentoModal" class="form-control" placeholder="V-12345678">
+                    <input type="text" id="clienteDocumentoModal" class="form-control" placeholder="V-12345678" name="clienteDocumentoModal">
                 </div>
 
                 <div class="form-group">
                     <label for="clienteTelefonoModal">Teléfono:</label>
-                    <input type="text" id="clienteTelefonoModal" class="form-control" placeholder="0412-1234567">
+                    <input type="text" id="clienteTelefonoModal" class="form-control" placeholder="0412-1234567" name="clienteTelefonoModal">
                 </div>
 
                 <div class="form-group">
                     <label for="clienteEmailModal">Email:</label>
-                    <input type="email" id="clienteEmailModal" class="form-control" placeholder="correo@ejemplo.com">
+                    <input type="email" id="clienteEmailModal" class="form-control" placeholder="correo@ejemplo.com" name="clienteEmailModal">
                 </div>
 
                 <div class="form-group cliente-form-span-2">
                     <label for="clienteDireccionModal">Dirección:</label>
-                    <textarea id="clienteDireccionModal" class="form-control" rows="2" placeholder="Dirección del cliente"></textarea>
+                    <textarea id="clienteDireccionModal" class="form-control" rows="2" placeholder="Dirección del cliente" name="clienteDireccionModal"></textarea>
                 </div>
             </div>
 
             <div class="cliente-fotos-grid cliente-form-span-2">
-                <div>
+                <div id="clientePerfilUploader">
                     <label for="clienteFotoPerfilModal">Foto de perfil:</label>
-                    <input type="file" id="clienteFotoPerfilModal" accept="image/png,image/jpeg,image/webp">
-                    <input type="hidden" id="clienteFotoPerfilEliminar" value="false">
-                    <div id="clienteFotoPerfilPreview" class="cliente-foto-preview cliente-foto-preview-empty">Sin foto de perfil</div>
+                    <input type="file" id="clienteFotoPerfilModal" accept="image/png,image/jpeg,image/webp" name="clienteFotoPerfilModal">
+                    <input type="hidden" id="clienteFotoPerfilEliminar" value="false" name="clienteFotoPerfilEliminar">
+                    <div class="sv-media-uploader-head">
+                        <span class="sv-media-uploader-badge" data-role="badge">Sin foto de perfil</span>
+                    </div>
+                    <div id="clienteFotoPerfilPreview" data-role="preview" class="cliente-foto-preview cliente-foto-preview-empty">Sin foto de perfil</div>
                     <div class="producto-foto-actions">
-                        <button id="btnLimpiarFotoClientePerfil" type="button" class="btn-secondary">Quitar foto</button>
+                        <button id="btnLimpiarFotoClientePerfil" data-role="clear" type="button" class="btn-secondary">Quitar foto</button>
                     </div>
                 </div>
-                <div>
+                <div id="clienteCedulaUploader">
                     <label for="clienteFotoCedulaModal">Foto de cédula:</label>
-                    <input type="file" id="clienteFotoCedulaModal" accept="image/png,image/jpeg,image/webp">
-                    <input type="hidden" id="clienteFotoCedulaEliminar" value="false">
-                    <div id="clienteFotoCedulaPreview" class="cliente-foto-preview cliente-foto-preview-empty">Sin foto de cédula</div>
+                    <input type="file" id="clienteFotoCedulaModal" accept="image/png,image/jpeg,image/webp" name="clienteFotoCedulaModal">
+                    <input type="hidden" id="clienteFotoCedulaEliminar" value="false" name="clienteFotoCedulaEliminar">
+                    <div class="sv-media-uploader-head">
+                        <span class="sv-media-uploader-badge" data-role="badge">Sin foto de cédula</span>
+                    </div>
+                    <div id="clienteFotoCedulaPreview" data-role="preview" class="cliente-foto-preview cliente-foto-preview-empty">Sin foto de cédula</div>
                     <div class="producto-foto-actions">
-                        <button id="btnLimpiarFotoClienteCedula" type="button" class="btn-secondary">Quitar foto</button>
+                        <button id="btnLimpiarFotoClienteCedula" data-role="clear" type="button" class="btn-secondary">Quitar foto</button>
                     </div>
                 </div>
             </div>
@@ -1199,7 +1239,7 @@
             <span id="btnCerrarModalAbonoCuenta" class="close" onclick="window.CxcFeature?.cerrarModalAbonoCuenta?.()">&times;</span>
             <h2 id="tituloModalAbonoCuenta" style="text-align: center; margin-bottom: 18px;">Registrar Abono</h2>
 
-            <input type="hidden" id="abonoCuentaId" value="">
+            <input type="hidden" id="abonoCuentaId" value="" name="abonoCuentaId">
 
             <div style="background: #f8fafc; border-radius: 10px; padding: 14px; margin-bottom: 16px;">
                 <div id="abonoCuentaResumenCliente" style="font-weight: bold; margin-bottom: 6px;">Cliente</div>
@@ -1213,7 +1253,7 @@
 
             <div style="margin-bottom: 14px;">
                 <label style="display: flex; align-items: center; gap: 8px; font-weight: bold;">
-                    <input type="checkbox" id="abonoUsarSaldoFavor" onchange="toggleModoAbonoCuenta()">
+                    <input type="checkbox" id="abonoUsarSaldoFavor" onchange="toggleModoAbonoCuenta()" name="abonoUsarSaldoFavor">
                     Aplicar saldo a favor del cliente
                 </label>
             </div>
@@ -1221,13 +1261,13 @@
             <div id="panelAbonoSaldoFavor" style="display: none; margin-bottom: 16px; background: #eefbf3; border-radius: 10px; padding: 14px;">
                 <label for="abonoMontoSaldoFavor" style="font-weight: bold; display: block; margin-bottom: 6px;">Monto a aplicar en USD:</label>
                 <input type="number" id="abonoMontoSaldoFavor" min="0" step="0.01" value="0" oninput="actualizarResumenAbonoCuenta()"
-                    style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;">
+                    style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;" name="abonoMontoSaldoFavor">
             </div>
 
             <div id="panelAbonoNormal">
                 <div style="margin-bottom: 12px;">
                     <label for="abonoMedioPago" style="font-weight: bold; display: block; margin-bottom: 5px;">Medio de pago:</label>
-                    <select id="abonoMedioPago" style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;">
+                    <select id="abonoMedioPago" style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;" name="abonoMedioPago">
                         <option value="Efectivo en Dólares">Efectivo en Dólares</option>
                         <option value="Efectivo en Bolívares">Efectivo en Bolívares</option>
                         <option value="Transferencia">Transferencia</option>
@@ -1240,7 +1280,7 @@
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
                     <div>
                         <label for="abonoMoneda" style="font-weight: bold; display: block; margin-bottom: 5px;">Moneda:</label>
-                        <select id="abonoMoneda" onchange="toggleMonedaAbonoCuenta(); actualizarResumenAbonoCuenta()" style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;">
+                        <select id="abonoMoneda" onchange="toggleMonedaAbonoCuenta(); actualizarResumenAbonoCuenta()" style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;" name="abonoMoneda">
                             <option value="USD">USD</option>
                             <option value="BS">BS</option>
                         </select>
@@ -1248,27 +1288,27 @@
                     <div>
                         <label for="abonoMonto" style="font-weight: bold; display: block; margin-bottom: 5px;">Monto:</label>
                         <input type="number" id="abonoMonto" min="0" step="0.01" value="0" oninput="actualizarResumenAbonoCuenta()"
-                            style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;">
+                            style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;" name="abonoMonto">
                     </div>
                 </div>
 
                 <div id="panelTasaAbonoCuenta" style="display: none; margin-bottom: 12px; background: #fff8e1; border-radius: 10px; padding: 14px;">
                     <div style="margin-bottom: 10px;">
                         <label style="display: flex; align-items: center; gap: 8px; font-weight: bold;">
-                            <input type="checkbox" id="abonoUsarTasaSistema" checked onchange="toggleTasaAbonoCuenta()">
+                            <input type="checkbox" id="abonoUsarTasaSistema" checked onchange="toggleTasaAbonoCuenta()" name="abonoUsarTasaSistema">
                             Usar tasa del sistema
                         </label>
                     </div>
                     <label for="abonoTasaUsada" style="font-weight: bold; display: block; margin-bottom: 5px;">Tasa usada:</label>
                     <input type="number" id="abonoTasaUsada" min="0" step="0.0001" value="0" oninput="actualizarResumenAbonoCuenta()"
-                        style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;">
+                        style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;" name="abonoTasaUsada">
                 </div>
             </div>
 
             <div style="margin-bottom: 14px;">
                 <label for="abonoObservacion" style="font-weight: bold; display: block; margin-bottom: 5px;">Observación:</label>
                 <textarea id="abonoObservacion" rows="2" placeholder="Detalle opcional del abono"
-                    style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px; resize: vertical;"></textarea>
+                    style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px; resize: vertical;" name="abonoObservacion"></textarea>
             </div>
 
             <div style="background: #f8fafc; border-radius: 10px; padding: 14px; margin-bottom: 16px;">
@@ -1289,7 +1329,7 @@
             <h2 style="text-align: center; margin-bottom: 18px;">Buscar Cliente para CxC</h2>
 
             <div style="margin-bottom: 16px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
-                <input type="text" id="buscarClienteCxcModal" class="form-control" placeholder="Buscar por nombre, documento, telefono..." oninput="renderListaBusquedaClienteCxc()" style="flex: 1; min-width: 260px;">
+                <input type="text" id="buscarClienteCxcModal" name="buscarClienteCxcModal" class="form-control" placeholder="Buscar por nombre, documento, telefono..." aria-label="Buscar cliente para cuentas por cobrar" oninput="renderListaBusquedaClienteCxc()" style="flex: 1; min-width: 260px;">
             </div>
 
             <div id="listaBusquedaClienteCxc" style="max-height: 420px; overflow-y: auto;"></div>
@@ -1306,7 +1346,7 @@
             <h2 style="text-align: center; margin-bottom: 18px;">Buscar Cliente para Venta</h2>
 
             <div style="margin-bottom: 16px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
-                <input type="text" id="buscarClienteVentaModal" class="form-control" placeholder="Buscar por nombre, documento, telefono..." oninput="renderListaBusquedaClienteVenta()" style="flex: 1; min-width: 260px;">
+                <input type="text" id="buscarClienteVentaModal" name="buscarClienteVentaModal" class="form-control" placeholder="Buscar por nombre, documento, telefono..." aria-label="Buscar cliente para venta" oninput="renderListaBusquedaClienteVenta()" style="flex: 1; min-width: 260px;">
             </div>
 
             <div id="listaBusquedaClienteVenta" style="max-height: 420px; overflow-y: auto;"></div>
@@ -1373,17 +1413,17 @@
                     <label for="compraNroFactura" style="font-weight: bold; display: block; margin-bottom: 5px;">Nro. Factura:</label>
                     <input type="text" id="compraNroFactura" 
                         placeholder="Ej: FAC-001234"
-                        style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;">
+                        style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;" name="compraNroFactura">
                 </div>
                 <div>
                     <label for="compraFecha" style="font-weight: bold; display: block; margin-bottom: 5px;">Fecha Factura:</label>
                     <input type="date" id="compraFecha" 
-                        style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;">
+                        style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;" name="compraFecha">
                 </div>
                 <div>
                     <label for="compraFechaLibro" style="font-weight: bold; display: block; margin-bottom: 5px;">Fecha Libro:</label>
                     <input type="date" id="compraFechaLibro" 
-                        style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;">
+                        style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;" name="compraFechaLibro">
                 </div>
             </div>
 
@@ -1391,12 +1431,12 @@
                 <div>
                     <label for="compraProveedor" style="font-weight: bold; display: block; margin-bottom: 5px;">Proveedor:</label>
                     <select id="compraProveedor"
-                        style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;">
+                        style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;" name="compraProveedor">
                         <option value="">Seleccionar proveedor...</option>
                     </select>
                 </div>
                 <div>
-                    <label style="font-weight: bold; display: block; margin-bottom: 5px;">Total:</label>
+                    <div style="font-weight: bold; display: block; margin-bottom: 5px;">Total:</div>
                     <div style="font-size: 1.5em; font-weight: bold; color: #667eea;">
                         $ <span id="compraTotal">0.00</span>
                     </div>
@@ -1408,7 +1448,7 @@
                 
                 <!-- Buscador de productos -->
                 <div style="position: relative;">
-                    <input type="text" id="buscarProductoCompra" class="form-control"
+                    <input type="text" id="buscarProductoCompra" name="buscarProductoCompra" class="form-control" aria-label="Buscar producto para compra"
                         placeholder="🔍 Buscar producto por nombre o código... (Ej: 5*codigo para agregar 5 unidades)"
                         autocomplete="off"
                         style="width: 100%; padding: 10px; font-size: 1em;">
@@ -1432,22 +1472,22 @@
             <span class="close" onclick="cerrarModalPreciosCompra()">&times;</span>
             <h3 style="margin-bottom: 8px;">Actualizar precios</h3>
             <p style="margin: 0 0 18px 0; color: #64748b;">Ajusta el costo y los precios de venta del producto agregado a la compra.</p>
-            <input type="hidden" id="compraPrecioIndex">
+            <input type="hidden" id="compraPrecioIndex" name="compraPrecioIndex">
             <div style="margin-bottom: 16px; padding: 12px 14px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px;">
                 <strong id="compraPrecioProductoNombre">Producto</strong>
             </div>
             <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-bottom: 16px;">
                 <div>
                     <label for="compraPrecioCostoModal" style="font-weight: bold; display: block; margin-bottom: 5px;">Costo ($):</label>
-                    <input type="number" id="compraPrecioCostoModal" step="0.01" min="0" oninput="recalcularTodosLosPreciosCompra()" style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;">
+                    <input type="number" id="compraPrecioCostoModal" step="0.01" min="0" oninput="recalcularTodosLosPreciosCompra()" style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;" name="compraPrecioCostoModal">
                 </div>
                 <div>
                     <label for="compraPrecioBolivaresModal" style="font-weight: bold; display: block; margin-bottom: 5px;">Precio en Bs:</label>
-                    <input type="number" id="compraPrecioBolivaresModal" step="0.01" min="0" oninput="calcularPrecioDolaresCompra()" style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;">
+                    <input type="number" id="compraPrecioBolivaresModal" step="0.01" min="0" oninput="calcularPrecioDolaresCompra()" style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;" name="compraPrecioBolivaresModal">
                 </div>
                 <div>
                     <label for="compraMetodoRedondeoModal" style="font-weight: bold; display: block; margin-bottom: 5px;">Redondeo:</label>
-                    <select id="compraMetodoRedondeoModal" onchange="calcularPrecioBolivaresCompra()" style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;">
+                    <select id="compraMetodoRedondeoModal" onchange="calcularPrecioBolivaresCompra()" style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;" name="compraMetodoRedondeoModal">
                         <option value="none">Sin Redondeo</option>
                         <option value="no_decimals">Sin Decimales</option>
                         <option value="five_cents">Cinco céntimos (0.05)</option>
@@ -1461,27 +1501,27 @@
             <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 18px;">
                 <div>
                     <label for="compraPorcentajeGanancia1Modal" style="font-weight: bold; display: block; margin-bottom: 5px;">% Ganancia P1:</label>
-                    <input type="number" id="compraPorcentajeGanancia1Modal" step="0.0001" min="0" oninput="recalcularPrecioCompraDesdePorcentaje(1)" style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;">
+                    <input type="number" id="compraPorcentajeGanancia1Modal" step="0.0001" min="0" oninput="recalcularPrecioCompraDesdePorcentaje(1)" style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;" name="compraPorcentajeGanancia1Modal">
                 </div>
                 <div>
                     <label for="compraPrecioDolares1Modal" style="font-weight: bold; display: block; margin-bottom: 5px;">Precio Venta P1 ($):</label>
-                    <input type="number" id="compraPrecioDolares1Modal" step="0.01" min="0" oninput="recalcularPorcentajeCompraDesdePrecio(1)" style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;">
+                    <input type="number" id="compraPrecioDolares1Modal" step="0.01" min="0" oninput="recalcularPorcentajeCompraDesdePrecio(1)" style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;" name="compraPrecioDolares1Modal">
                 </div>
                 <div>
                     <label for="compraPorcentajeGanancia2Modal" style="font-weight: bold; display: block; margin-bottom: 5px;">% Ganancia P2:</label>
-                    <input type="number" id="compraPorcentajeGanancia2Modal" step="0.0001" min="0" oninput="recalcularPrecioCompraDesdePorcentaje(2)" style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;">
+                    <input type="number" id="compraPorcentajeGanancia2Modal" step="0.0001" min="0" oninput="recalcularPrecioCompraDesdePorcentaje(2)" style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;" name="compraPorcentajeGanancia2Modal">
                 </div>
                 <div>
                     <label for="compraPrecioDolares2Modal" style="font-weight: bold; display: block; margin-bottom: 5px;">Precio Venta P2 ($):</label>
-                    <input type="number" id="compraPrecioDolares2Modal" step="0.01" min="0" oninput="recalcularPorcentajeCompraDesdePrecio(2)" style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;">
+                    <input type="number" id="compraPrecioDolares2Modal" step="0.01" min="0" oninput="recalcularPorcentajeCompraDesdePrecio(2)" style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;" name="compraPrecioDolares2Modal">
                 </div>
                 <div>
                     <label for="compraPorcentajeGanancia3Modal" style="font-weight: bold; display: block; margin-bottom: 5px;">% Ganancia P3:</label>
-                    <input type="number" id="compraPorcentajeGanancia3Modal" step="0.0001" min="0" oninput="recalcularPrecioCompraDesdePorcentaje(3)" style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;">
+                    <input type="number" id="compraPorcentajeGanancia3Modal" step="0.0001" min="0" oninput="recalcularPrecioCompraDesdePorcentaje(3)" style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;" name="compraPorcentajeGanancia3Modal">
                 </div>
                 <div>
                     <label for="compraPrecioDolares3Modal" style="font-weight: bold; display: block; margin-bottom: 5px;">Precio Venta P3 ($):</label>
-                    <input type="number" id="compraPrecioDolares3Modal" step="0.01" min="0" oninput="recalcularPorcentajeCompraDesdePrecio(3)" style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;">
+                    <input type="number" id="compraPrecioDolares3Modal" step="0.01" min="0" oninput="recalcularPorcentajeCompraDesdePrecio(3)" style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;" name="compraPrecioDolares3Modal">
                 </div>
             </div>
             <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
@@ -1525,8 +1565,8 @@
                 <h4 style="margin-bottom: 10px;">Entregas de reintegro</h4>
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 12px;">
                     <div>
-                        <label style="display: block; font-weight: bold; margin-bottom: 5px;">Método</label>
-                        <select id="devolucionMetodoReintegro" class="form-control">
+                        <label for="devolucionMetodoReintegro" style="display: block; font-weight: bold; margin-bottom: 5px;">Método</label>
+                        <select id="devolucionMetodoReintegro" class="form-control" name="devolucionMetodoReintegro">
                             <option value="Efectivo">Efectivo</option>
                             <option value="Pago móvil">Pago móvil</option>
                             <option value="Transferencia">Transferencia</option>
@@ -1534,19 +1574,19 @@
                         </select>
                     </div>
                     <div>
-                        <label style="display: block; font-weight: bold; margin-bottom: 5px;">Moneda</label>
-                        <select id="devolucionMonedaReintegro" class="form-control" onchange="sincronizarFormularioReintegro()">
+                        <label for="devolucionMonedaReintegro" style="display: block; font-weight: bold; margin-bottom: 5px;">Moneda</label>
+                        <select id="devolucionMonedaReintegro" class="form-control" onchange="sincronizarFormularioReintegro()" name="devolucionMonedaReintegro">
                             <option value="USD">USD</option>
                             <option value="BS">Bs</option>
                         </select>
                     </div>
                     <div>
-                        <label style="display: block; font-weight: bold; margin-bottom: 5px;">Tasa</label>
-                        <input type="number" id="devolucionTasaReintegro" class="form-control" min="0" step="0.01" oninput="actualizarVistaFormularioReintegro()">
+                        <label for="devolucionTasaReintegro" style="display: block; font-weight: bold; margin-bottom: 5px;">Tasa</label>
+                        <input type="number" id="devolucionTasaReintegro" class="form-control" min="0" step="0.01" oninput="actualizarVistaFormularioReintegro()" name="devolucionTasaReintegro">
                     </div>
                     <div>
-                        <label style="display: block; font-weight: bold; margin-bottom: 5px;">Monto</label>
-                        <input type="number" id="devolucionMontoReintegro" class="form-control" min="0" step="0.01" oninput="actualizarVistaFormularioReintegro()">
+                        <label for="devolucionMontoReintegro" style="display: block; font-weight: bold; margin-bottom: 5px;">Monto</label>
+                        <input type="number" id="devolucionMontoReintegro" class="form-control" min="0" step="0.01" oninput="actualizarVistaFormularioReintegro()" name="devolucionMontoReintegro">
                     </div>
                 </div>
                 <div style="display: flex; justify-content: space-between; gap: 10px; align-items: center; flex-wrap: wrap;">
@@ -1557,8 +1597,8 @@
             </div>
 
             <div style="margin-bottom: 15px;">
-                <label style="display: block; font-weight: bold; margin-bottom: 5px;">Motivo</label>
-                <textarea id="devolucionMotivo" rows="2" class="form-control" placeholder="Motivo de la devolución"></textarea>
+                <label for="devolucionMotivo" style="display: block; font-weight: bold; margin-bottom: 5px;">Motivo</label>
+                <textarea id="devolucionMotivo" rows="2" class="form-control" placeholder="Motivo de la devolución" name="devolucionMotivo"></textarea>
             </div>
 
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 15px;">
