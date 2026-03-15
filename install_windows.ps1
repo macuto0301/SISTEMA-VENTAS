@@ -2,6 +2,7 @@ param(
     [string]$RepoUrl = "https://github.com/macuto0301/SISTEMA-VENTAS.git",
     [string]$InstallDir = "$env:USERPROFILE\Documents\SISTEMA-VENTAS",
     [string]$DbName = "ventas_db",
+    [string]$DemoDbName = "ventas_demo",
     [string]$DbUser = "admin",
     [string]$DbPassword = "secret_password",
     [int]$DbPort = 5432,
@@ -167,13 +168,16 @@ function Resolve-PostgreSQL {
 }
 
 function Ensure-Database {
-    param([string]$PsqlPath)
+    param(
+        [string]$PsqlPath,
+        [string]$TargetDbName
+    )
 
-    Write-Step "Creando usuario y base de datos si no existen"
+    Write-Step "Creando usuario y base de datos $TargetDbName si no existen"
 
     $safeUser = $DbUser.Replace("'", "''")
     $safePass = $DbPassword.Replace("'", "''")
-    $safeDb = $DbName.Replace("'", "''")
+    $safeDb = $TargetDbName.Replace("'", "''")
 
     $userExists = Get-PsqlScalar -PsqlPath $PsqlPath -Sql "SELECT 1 FROM pg_roles WHERE rolname = '$safeUser';"
     if ($userExists -eq "1") {
@@ -184,7 +188,7 @@ function Ensure-Database {
 
     $dbExists = Get-PsqlScalar -PsqlPath $PsqlPath -Sql "SELECT 1 FROM pg_database WHERE datname = '$safeDb';"
     if ($dbExists -ne "1") {
-        Invoke-Psql -PsqlPath $PsqlPath -Sql "CREATE DATABASE \"$DbName\" OWNER \"$DbUser\";"
+        Invoke-Psql -PsqlPath $PsqlPath -Sql "CREATE DATABASE \"$TargetDbName\" OWNER \"$DbUser\";"
     }
 }
 
@@ -206,10 +210,14 @@ function Ensure-Repo {
 
 function Write-EnvFile {
     $envPath = Join-Path $InstallDir "backend\.env"
-    $databaseUrl = "postgresql://$($DbUser):$($DbPassword)@localhost:$($DbPort)/$($DbName)"
+    $demoDatabaseUrl = "postgresql://$($DbUser):$($DbPassword)@localhost:$($DbPort)/$($DemoDbName)"
+    $realDatabaseUrl = "postgresql://$($DbUser):$($DbPassword)@localhost:$($DbPort)/$($DbName)"
 
     $envContent = @"
-DATABASE_URL=$databaseUrl
+APP_MODE=demo
+DATABASE_URL=$demoDatabaseUrl
+DATABASE_URL_DEMO=$demoDatabaseUrl
+DATABASE_URL_REAL=$realDatabaseUrl
 PORT=5000
 DEBUG=True
 CORS_ORIGINS=http://localhost:5000,http://127.0.0.1:5000
@@ -249,13 +257,17 @@ Ensure-Repo
 Setup-Python
 
 $psqlPath = Resolve-PostgreSQL
-Ensure-Database -PsqlPath $psqlPath
+Ensure-Database -PsqlPath $psqlPath -TargetDbName $DemoDbName
+Ensure-Database -PsqlPath $psqlPath -TargetDbName $DbName
 Write-EnvFile
 
 Write-Step "Instalacion completada"
 Write-Host "Proyecto: $InstallDir" -ForegroundColor Green
 Write-Host "Backend listo en: http://localhost:5000" -ForegroundColor Green
-Write-Host "Credenciales iniciales de la app: admin / 1234" -ForegroundColor Green
+Write-Host "Modo inicial activo: demo" -ForegroundColor Green
+Write-Host "Credenciales demo: demo-admin / 1234 y demo-cajero / 1234" -ForegroundColor Green
+Write-Host "Para iniciar demo: powershell -ExecutionPolicy Bypass -File $InstallDir\start_demo.ps1" -ForegroundColor Yellow
+Write-Host "Para iniciar real: powershell -ExecutionPolicy Bypass -File $InstallDir\start_real.ps1" -ForegroundColor Yellow
 
 if ($StartApp) {
     Start-Backend

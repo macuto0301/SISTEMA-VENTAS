@@ -1,11 +1,12 @@
+import os
 from flask import Flask, jsonify, send_from_directory
 from flask_cors import CORS
-from database import db
-import os
-from dotenv import load_dotenv
-from werkzeug.security import generate_password_hash
 
-load_dotenv()
+from database import db
+from demo_seed import ensure_default_users, ensure_demo_dataset
+from runtime_config import apply_runtime_env, get_app_mode
+
+apply_runtime_env()
 
 # Ruta del frontend
 FRONTEND_PATH = os.path.join(os.path.dirname(__file__), '..', 'frontend')
@@ -42,10 +43,12 @@ def parse_env_list(env_name: str, default_items: list[str]) -> list[str]:
 
 def create_app():
     app = Flask(__name__)
+    app_mode = get_app_mode()
     app.config['UPLOAD_FOLDER'] = UPLOADS_PATH
     app.config['PRODUCTOS_UPLOAD_FOLDER'] = PRODUCTOS_UPLOADS_PATH
     app.config['CLIENTES_UPLOAD_FOLDER'] = CLIENTES_UPLOADS_PATH
     app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024
+    app.config['APP_MODE'] = app_mode
     app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY') or os.getenv('SECRET_KEY') or 'dev-change-this-jwt-secret'
     app.config['JWT_ACCESS_TOKEN_EXPIRES_MINUTES'] = int(os.getenv('JWT_ACCESS_TOKEN_EXPIRES_MINUTES', '480'))
     os.makedirs(app.config['PRODUCTOS_UPLOAD_FOLDER'], exist_ok=True)
@@ -413,36 +416,21 @@ def create_app():
                 db.session.commit()
                 print("Columna rol agregada a tabla usuario")
 
+            db.session.execute(text("ALTER TABLE usuario ALTER COLUMN password TYPE VARCHAR(255)"))
+            db.session.commit()
+
             db.session.execute(text("UPDATE usuario SET rol='admin' WHERE rol IS NULL OR rol = ''"))
             db.session.commit()
                  
         except Exception as e:
             print(f"Error verificando columnas: {e}")
         
-        # Verificar e inicializar admin si no existe
-        from models import Usuario
-        if not Usuario.query.filter_by(username='admin').first():
-            admin = Usuario()
-            admin.username = 'admin'
-            admin.password = generate_password_hash('1234')
-            admin.rol = 'admin'
-            db.session.add(admin)
-            db.session.commit()
-            print("Admin inicial creado: admin / 1234")
-
-        admin = Usuario.query.filter_by(username='admin').first()
-        if admin and admin.rol != 'admin':
-            admin.rol = 'admin'
-            db.session.commit()
-
-        if not Usuario.query.filter_by(username='cajero').first():
-            cajero = Usuario()
-            cajero.username = 'cajero'
-            cajero.password = generate_password_hash('1234')
-            cajero.rol = 'cajero'
-            db.session.add(cajero)
-            db.session.commit()
-            print("Usuario cajero inicial creado: cajero / 1234")
+        ensure_default_users(app_mode)
+        if app_mode == 'demo':
+            ensure_demo_dataset()
+            print('Aplicacion iniciada en modo demo')
+        else:
+            print('Aplicacion iniciada en modo real')
 
     return app
 

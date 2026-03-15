@@ -8,11 +8,14 @@ from dotenv import load_dotenv
 import os
 from pathlib import Path
 
+from runtime_config import apply_runtime_env, get_active_database_url
+
 # Cargar .env desde la carpeta backend
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(os.path.join(BASE_DIR, '.env'))
+apply_runtime_env()
 
-DATABASE_URL = os.getenv('DATABASE_URL', 'postgresql://admin:secret_password@localhost:5432/ventas_db')
+DATABASE_URL = get_active_database_url()
 
 app = Server("sistema-ventas-db")
 

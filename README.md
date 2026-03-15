@@ -72,7 +72,10 @@ SISTEMA-VENTAS/
 Crea `backend/.env` con una configuracion similar a esta:
 
 ```env
-DATABASE_URL=postgresql://admin:secret_password@localhost:5432/ventas_db
+APP_MODE=demo
+DATABASE_URL=postgresql://admin:secret_password@localhost:5432/ventas_demo
+DATABASE_URL_DEMO=postgresql://admin:secret_password@localhost:5432/ventas_demo
+DATABASE_URL_REAL=postgresql://admin:secret_password@localhost:5432/ventas_db
 PORT=5000
 DEBUG=True
 CORS_ORIGINS=http://localhost:5000,http://127.0.0.1:5000
@@ -94,7 +97,8 @@ Este proyecto incluye un instalador que hace todo en una sola ejecucion:
 - verifica conexion a PostgreSQL local
 - si no hay conexion, ofrece instalar PostgreSQL
 - crea usuario y base de datos
-- crea `backend/.env`
+- crea base demo y base real
+- crea `backend/.env` con el modo inicial en demo
 - crea entorno virtual e instala dependencias
 
 Ejecuta en PowerShell:
@@ -107,7 +111,7 @@ Notas:
 
 - El script no usa Docker.
 - Si PostgreSQL ya esta instalado, reutiliza el servicio local.
-- Puedes cambiar credenciales o rutas con parametros como `-InstallDir`, `-DbUser`, `-DbPassword`, `-DbName`, `-PgAdminPassword`.
+- Puedes cambiar credenciales o rutas con parametros como `-InstallDir`, `-DbUser`, `-DbPassword`, `-DbName`, `-DemoDbName`, `-PgAdminPassword`.
 
 ### 1. Levantar PostgreSQL
 
@@ -154,12 +158,62 @@ backend/.venv/bin/python backend/app.py
 - App web: `http://localhost:5000`
 - API: `http://localhost:5000/api`
 
+## Modos de operacion
+
+El sistema ahora soporta dos modos tecnicos:
+
+- `demo`: usa una base separada con datos precargados para practicar
+- `real`: usa la base operativa de la empresa y desactiva la demo del flujo normal
+
+La seleccion activa se guarda en `backend/.env` mediante `APP_MODE`.
+
 ## Credenciales iniciales
 
-Al iniciar por primera vez, el backend crea estos usuarios si no existen:
+Al iniciar por primera vez en modo demo, el backend crea estos usuarios si no existen:
+
+- `demo-admin / 1234`
+- `demo-cajero / 1234`
+
+Cuando el sistema esta en modo real, crea estos usuarios base si no existen:
 
 - `admin / 1234`
 - `cajero / 1234`
+
+## Arranque rapido
+
+En Windows puedes usar:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\start_demo.ps1
+```
+
+o:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\start_real.ps1
+```
+
+## Cambio tecnico entre demo y real
+
+La demo no se reactiva desde la interfaz normal. El cambio queda solo a nivel tecnico.
+
+Para activar demo:
+
+```powershell
+backend\.venv\Scripts\python.exe backend\manage_mode.py demo
+```
+
+Para activar real:
+
+```powershell
+backend\.venv\Scripts\python.exe backend\manage_mode.py real
+```
+
+Si necesitas actualizar la conexion real al cambiar la base de la empresa:
+
+```powershell
+backend\.venv\Scripts\python.exe backend\manage_mode.py real --database-url "postgresql://usuario:clave@localhost:5432/ventas_empresa"
+```
 
 ## Flujo de desarrollo
 

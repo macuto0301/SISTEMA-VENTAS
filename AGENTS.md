@@ -45,6 +45,12 @@ python backend/app.py
 # Or use the venv interpreter explicitly
 backend\.venv\Scripts\python.exe backend/app.py
 
+# Start directly in demo mode
+powershell -ExecutionPolicy Bypass -File .\start_demo.ps1
+
+# Start directly in real mode
+powershell -ExecutionPolicy Bypass -File .\start_real.ps1
+
 # Debug reload in PowerShell
 $env:FLASK_DEBUG="True"; python backend/app.py
 
