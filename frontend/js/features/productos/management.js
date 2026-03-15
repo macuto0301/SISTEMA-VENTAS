@@ -1,4 +1,27 @@
 const ProductosFeature = {
+    actualizarResumenPreciosProducto() {
+        const costo = parseFloat(document.getElementById('productoPrecioCosto')?.value) || 0;
+        const precio1 = parseFloat(document.getElementById('productoPrecioDolares1')?.value) || 0;
+        const precio2 = parseFloat(document.getElementById('productoPrecioDolares2')?.value) || 0;
+        const precio3 = parseFloat(document.getElementById('productoPrecioDolares3')?.value) || 0;
+        const precioBs = parseFloat(document.getElementById('productoPrecioBolivares')?.value) || 0;
+
+        const formatearDolares = monto => `$${monto.toFixed(2)}`;
+        const formatearBs = monto => `Bs ${monto.toFixed(2)}`;
+
+        const costoEl = document.getElementById('productoResumenCosto');
+        const precio1El = document.getElementById('productoResumenPrecio1');
+        const precio2El = document.getElementById('productoResumenPrecio2');
+        const precio3El = document.getElementById('productoResumenPrecio3');
+        const precioBsEl = document.getElementById('productoResumenPrecioBs');
+
+        if (costoEl) costoEl.textContent = formatearDolares(costo);
+        if (precio1El) precio1El.textContent = formatearDolares(precio1);
+        if (precio2El) precio2El.textContent = formatearDolares(precio2);
+        if (precio3El) precio3El.textContent = formatearDolares(precio3);
+        if (precioBsEl) precioBsEl.textContent = formatearBs(precioBs);
+    },
+
     obtenerPaginacion(nombre) {
         if (typeof window.obtenerPaginacion === 'function') {
             return window.obtenerPaginacion(nombre);
@@ -104,6 +127,364 @@ const ProductosFeature = {
         return {};
     },
 
+    escaparHtml(valor) {
+        return String(valor ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    },
+
+    descargarBlob(blob, nombreArchivo) {
+        const url = URL.createObjectURL(blob);
+        const enlace = document.createElement('a');
+        enlace.href = url;
+        enlace.download = nombreArchivo;
+        document.body.appendChild(enlace);
+        enlace.click();
+        document.body.removeChild(enlace);
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+    },
+
+    obtenerFechaLista() {
+        if (window.Utils?.obtenerFechaHoy) {
+            return window.Utils.obtenerFechaHoy();
+        }
+        return new Date().toLocaleDateString('es-ES');
+    },
+
+    obtenerDatosEmpresaLista() {
+        return {
+            nombre: window.AppState.nombreEmpresa || 'Mi Empresa',
+            rif: window.AppState.rifEmpresa || '',
+            direccion: window.AppState.direccionEmpresa || '',
+            telefono: window.AppState.telefonoEmpresa || '',
+            correo: window.AppState.correoEmpresa || ''
+        };
+    },
+
+    obtenerResumenListaPrecio(numeroLista) {
+        const etiquetas = {
+            1: 'Precio 1',
+            2: 'Precio 2',
+            3: 'Precio 3'
+        };
+        return etiquetas[Number(numeroLista)] || 'Precio 1';
+    },
+
+    obtenerProductosVisiblesLista() {
+        return Array.isArray(window.AppState.productosVista) && window.AppState.productosVista.length
+            ? window.AppState.productosVista
+            : (window.productos || []);
+    },
+
+    obtenerBusquedaActualLista() {
+        return String(document.getElementById('buscarProductoGestion')?.value || window.AppState.productosQuery?.search || '').trim();
+    },
+
+    incluirSinExistenciaLista() {
+        return Boolean(document.getElementById('listaPreciosIncluirSinExistencia')?.checked);
+    },
+
+    obtenerAlcanceLista() {
+        return document.getElementById('listaPreciosAlcance')?.value || 'filtrado';
+    },
+
+    construirFiltrosLista() {
+        const filtros = { ...(window.AppState.productosQuery?.filters || {}) };
+        if (!this.incluirSinExistenciaLista()) {
+            filtros.in_stock = 'true';
+        } else {
+            delete filtros.in_stock;
+        }
+        return filtros;
+    },
+
+    abrirModalListaPrecios() {
+        const modal = document.getElementById('modalListaPrecios');
+        const form = document.getElementById('formListaPrecios');
+        if (!modal || !form) return;
+
+        form.reset();
+        const descuentoInput = document.getElementById('listaPreciosDescuento');
+        const tipoPrecio = document.getElementById('listaPreciosTipoPrecio');
+        const formatoSalida = document.getElementById('listaPreciosFormatoSalida');
+        const alcanceLista = document.getElementById('listaPreciosAlcance');
+        const cantidadModo = document.getElementById('listaPreciosCantidadModo');
+
+        if (descuentoInput) descuentoInput.value = '0';
+        if (tipoPrecio) tipoPrecio.value = '1';
+        if (formatoSalida) formatoSalida.value = 'excel';
+        if (alcanceLista) alcanceLista.value = 'filtrado';
+        if (cantidadModo) cantidadModo.value = 'blank';
+        const incluirSinExistencia = document.getElementById('listaPreciosIncluirSinExistencia');
+        if (incluirSinExistencia) incluirSinExistencia.checked = false;
+        modal.style.display = 'block';
+    },
+
+    cerrarModalListaPrecios() {
+        const modal = document.getElementById('modalListaPrecios');
+        if (modal) {
+            modal.style.display = 'none';
+        }
+    },
+
+    async cargarProductosParaLista() {
+        const alcance = this.obtenerAlcanceLista();
+        const search = alcance === 'filtrado' ? this.obtenerBusquedaActualLista() : '';
+        const filters = this.construirFiltrosLista();
+        const paginacion = this.obtenerPaginacion('productos');
+        const acumulados = [];
+        const vistos = new Set();
+        let page = 1;
+        const pageSize = 200;
+
+        while (true) {
+            const response = await window.ApiService.cargarProductos({ page, pageSize, search, filters });
+            const items = (response.items || []).map(item => this.normalizarProductoPrecios(item));
+            items.forEach(item => {
+                const key = String(item.id || item.codigo || `${item.nombre}-${acumulados.length}`);
+                if (vistos.has(key)) return;
+                vistos.add(key);
+                acumulados.push(item);
+            });
+
+            if (!response.pagination?.has_next) {
+                break;
+            }
+            page += 1;
+        }
+
+        if (!acumulados.length && !search && !(paginacion.total || 0)) {
+            return [];
+        }
+
+        return acumulados;
+    },
+
+    construirFilasLista(productos, numeroLista, modoCantidad) {
+        return productos.map(producto => {
+            const precio = this.obtenerPrecioProducto(producto, numeroLista);
+            const cantidad = modoCantidad === 'one' ? 1 : '';
+            const total = modoCantidad === 'one' ? precio : 0;
+            return {
+                codigo: producto.codigo || '',
+                nombre: producto.nombre || '',
+                precio,
+                cantidad,
+                total
+            };
+        });
+    },
+
+    construirDocumentoListaPrecios(datos) {
+        const empresa = datos.empresa;
+        const cliente = datos.cliente;
+        const primeraFilaDatos = 8;
+        const filasHtml = datos.filas.map((fila, index) => {
+            const filaExcel = primeraFilaDatos + index;
+            const formulaTotal = `=C${filaExcel}*D${filaExcel}`;
+            return `
+            <tr>
+                <td class="lp-code">${this.escaparHtml(fila.codigo || `ITEM-${index + 1}`)}</td>
+                <td class="lp-name">${this.escaparHtml(fila.nombre)}</td>
+                <td class="lp-money" x:num="${fila.precio.toFixed(2)}">${fila.precio.toFixed(2)}</td>
+                <td class="lp-qty" x:num="${fila.cantidad === '' ? 0 : fila.cantidad}">${fila.cantidad === '' ? '&nbsp;' : fila.cantidad}</td>
+                <td class="lp-money" x:fmla="${formulaTotal}" x:num="${fila.total.toFixed(2)}">${fila.total.toFixed(2)}</td>
+            </tr>
+        `;
+        }).join('');
+
+        const ultimaFilaDatos = primeraFilaDatos + Math.max(datos.filas.length - 1, 0);
+        const filaSubtotal = ultimaFilaDatos + 1;
+        const filaDescuento = filaSubtotal + 1;
+        const filaTotal = filaDescuento + 1;
+        const formulaSubtotal = `=SUM(E${primeraFilaDatos}:E${ultimaFilaDatos})`;
+        const formulaDescuento = `=E${filaSubtotal}*${(datos.descuento / 100).toFixed(4)}`;
+        const formulaTotalFinal = `=E${filaSubtotal}-E${filaDescuento}`;
+
+        return `<!DOCTYPE html>
+<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+<head>
+    <meta charset="UTF-8">
+    <title>${this.escaparHtml(datos.tituloDocumento)}</title>
+    <style>
+        body { font-family: Georgia, 'Times New Roman', serif; margin: 0; padding: 18px; color: #10233a; background: #ffffff; }
+        .lp-sheet { width: 100%; border-collapse: collapse; table-layout: fixed; }
+        .lp-sheet td, .lp-sheet th { border: 1px solid #7c8ea3; padding: 6px 8px; vertical-align: middle; }
+        .lp-clean { border: none !important; }
+        .lp-company { font-size: 28px; font-weight: 700; text-align: center; border: none !important; padding: 4px 0 10px; }
+        .lp-contact { border: none !important; font-size: 13px; font-weight: 700; color: #183b64; padding-bottom: 10px; }
+        .lp-contact-right { border: none !important; font-size: 13px; text-align: right; color: #183b64; padding-bottom: 10px; }
+        .lp-doc-title { border: none !important; color: #b32020; font-size: 15px; font-weight: 700; padding-bottom: 8px; }
+        .lp-label { width: 90px; font-weight: 700; background: #f4f6f9; text-transform: uppercase; }
+        .lp-client-value { font-weight: 700; }
+        .lp-head { background: #d9e6f2; text-transform: uppercase; font-weight: 700; text-align: center; }
+        .lp-code { width: 90px; font-weight: 700; }
+        .lp-name { width: auto; font-weight: 700; }
+        .lp-qty { width: 90px; text-align: center; }
+        .lp-money { width: 120px; text-align: right; font-weight: 700; }
+        .lp-summary-label { font-weight: 700; text-transform: uppercase; background: #fff08a; }
+        .lp-summary-value { text-align: right; font-weight: 700; background: #edd1ef; }
+        .lp-summary-total-label { font-size: 18px; font-weight: 700; text-transform: uppercase; background: #edd1ef; }
+        .lp-summary-total-value { font-size: 22px; text-align: right; font-weight: 700; background: #edd1ef; }
+        .lp-muted { color: #50657d; font-size: 12px; }
+        @media print {
+            body { padding: 10mm; }
+            @page { size: auto; margin: 10mm; }
+        }
+    </style>
+</head>
+<body>
+    <table class="lp-sheet">
+        <colgroup>
+            <col style="width: 70px;">
+            <col>
+            <col style="width: 120px;">
+            <col style="width: 90px;">
+            <col style="width: 130px;">
+        </colgroup>
+        <tr>
+            <td colspan="5" class="lp-company">${this.escaparHtml(empresa.nombre)}</td>
+        </tr>
+        <tr>
+            <td colspan="3" class="lp-contact">CORREO ${this.escaparHtml(empresa.correo || '-')}</td>
+            <td colspan="2" class="lp-contact-right">TEL ${this.escaparHtml(empresa.telefono || '-')}</td>
+        </tr>
+        <tr>
+            <td colspan="3" class="lp-doc-title">LISTA DE PRECIOS - ${this.escaparHtml(datos.etiquetaPrecio)}</td>
+            <td colspan="2" class="lp-contact-right">FECHA ${this.escaparHtml(datos.fecha)}</td>
+        </tr>
+        <tr>
+            <td class="lp-label">CLIENTE</td>
+            <td colspan="4" class="lp-client-value">${this.escaparHtml(cliente.nombre || '')}</td>
+        </tr>
+        <tr>
+            <td class="lp-label">DIREC</td>
+            <td colspan="4" class="lp-client-value">${this.escaparHtml(cliente.direccion || '')}</td>
+        </tr>
+        <tr>
+            <td class="lp-label">TEL</td>
+            <td colspan="2" class="lp-client-value">${this.escaparHtml(cliente.telefono || '')}</td>
+            <td class="lp-label">RIF</td>
+            <td class="lp-client-value">${this.escaparHtml(cliente.rif || '')}</td>
+        </tr>
+        <tr>
+            <th class="lp-head">Codigo</th>
+            <th class="lp-head">Producto</th>
+            <th class="lp-head">Precio</th>
+            <th class="lp-head">Cantidad</th>
+            <th class="lp-head">Total</th>
+        </tr>
+        ${filasHtml}
+        <tr>
+            <td colspan="3" class="lp-clean"></td>
+            <td class="lp-summary-label">Subtotal</td>
+            <td class="lp-summary-value" x:fmla="${formulaSubtotal}" x:num="${datos.subtotal.toFixed(2)}">${datos.subtotal.toFixed(2)}</td>
+        </tr>
+        <tr>
+            <td colspan="3" class="lp-clean"></td>
+            <td class="lp-summary-label">Descuento ${datos.descuento.toFixed(2)}%</td>
+            <td class="lp-summary-value" x:fmla="${formulaDescuento}" x:num="${datos.montoDescuento.toFixed(2)}">${datos.montoDescuento.toFixed(2)}</td>
+        </tr>
+        <tr>
+            <td colspan="3" class="lp-clean"></td>
+            <td class="lp-summary-total-label">Total</td>
+            <td class="lp-summary-total-value" x:fmla="${formulaTotalFinal}" x:num="${datos.total.toFixed(2)}">${datos.total.toFixed(2)}</td>
+        </tr>
+        <tr>
+            <td colspan="5" class="lp-clean lp-muted">${this.escaparHtml(empresa.direccion || '')}${empresa.rif ? ` | RIF ${this.escaparHtml(empresa.rif)}` : ''}</td>
+        </tr>
+    </table>
+</body>
+</html>`;
+    },
+
+    exportarListaPreciosExcel(html, nombreArchivo) {
+        this.descargarBlob(new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8;' }), nombreArchivo);
+    },
+
+    abrirVistaImprimibleListaPrecios(html, titulo) {
+        const ventana = window.open('', '_blank', 'width=1200,height=800');
+        if (!ventana) {
+            window.mostrarNotificacion?.('⚠️ El navegador bloqueo la ventana de impresion');
+            return;
+        }
+        ventana.document.write(html);
+        ventana.document.close();
+        ventana.focus();
+        setTimeout(() => ventana.print(), 500);
+    },
+
+    async generarListaPrecios(event) {
+        if (event) event.preventDefault();
+
+        const tipoPrecio = Number(document.getElementById('listaPreciosTipoPrecio')?.value || 1);
+        const formatoSalida = document.getElementById('listaPreciosFormatoSalida')?.value || 'excel';
+        const modoCantidad = document.getElementById('listaPreciosCantidadModo')?.value || 'blank';
+        const descuento = Math.max(0, Math.min(100, parseFloat(document.getElementById('listaPreciosDescuento')?.value || '0') || 0));
+        const btnGenerar = document.getElementById('btnGenerarListaPrecios');
+        const textoOriginal = btnGenerar?.textContent || 'Generar lista';
+
+        try {
+            if (btnGenerar) {
+                btnGenerar.disabled = true;
+                btnGenerar.textContent = 'Generando...';
+            }
+
+            const productos = await this.cargarProductosParaLista();
+            if (!productos.length) {
+                window.mostrarNotificacion?.('⚠️ No hay productos para generar la lista');
+                return;
+            }
+
+            const filas = this.construirFilasLista(productos, tipoPrecio, modoCantidad);
+            const subtotal = filas.reduce((acum, fila) => acum + fila.total, 0);
+            const montoDescuento = subtotal * (descuento / 100);
+            const total = subtotal - montoDescuento;
+            const etiquetaPrecio = this.obtenerResumenListaPrecio(tipoPrecio);
+            const cliente = {
+                nombre: document.getElementById('listaPreciosCliente')?.value.trim() || '',
+                direccion: document.getElementById('listaPreciosDireccion')?.value.trim() || '',
+                telefono: document.getElementById('listaPreciosTelefono')?.value.trim() || '',
+                rif: document.getElementById('listaPreciosRif')?.value.trim() || ''
+            };
+            const fecha = this.obtenerFechaLista();
+            const html = this.construirDocumentoListaPrecios({
+                tituloDocumento: `Lista de precios ${etiquetaPrecio}`,
+                etiquetaPrecio,
+                fecha,
+                empresa: this.obtenerDatosEmpresaLista(),
+                cliente,
+                filas,
+                subtotal,
+                descuento,
+                montoDescuento,
+                total
+            });
+            const fechaArchivo = new Date().toISOString().slice(0, 10);
+            const nombreArchivo = `lista-precios-${tipoPrecio}-${fechaArchivo}.xls`;
+
+            if (formatoSalida === 'pdf') {
+                this.abrirVistaImprimibleListaPrecios(html, `Lista de precios ${etiquetaPrecio}`);
+            } else {
+                this.exportarListaPreciosExcel(html, nombreArchivo);
+            }
+
+            this.cerrarModalListaPrecios();
+            window.mostrarNotificacion?.('✅ Lista de precios generada');
+        } catch (error) {
+            console.error('Error generando lista de precios:', error);
+            window.mostrarNotificacion?.('⚠️ No se pudo generar la lista de precios');
+        } finally {
+            if (btnGenerar) {
+                btnGenerar.disabled = false;
+                btnGenerar.textContent = textoOriginal;
+            }
+        }
+    },
+
     async cargarProductos(options = {}) {
         const paginacionActual = this.obtenerPaginacion('productos');
         const append = options.append === true;
@@ -154,8 +535,44 @@ const ProductosFeature = {
         })).filter(item => item.index >= 0);
     },
 
+    construirFilasTablaProductos(lista) {
+        return lista.map((producto, index) => {
+            const cacheIndex = window.productos.findIndex(item => item.id === producto.id || item.codigo === producto.codigo);
+            const fotosProductoUrls = this.obtenerUrlsGaleriaProducto(producto);
+            const fotoPrincipalUrl = fotosProductoUrls[0] || this.construirUrlFotoProducto(producto.foto_url);
+
+            return {
+                ...producto,
+                __rowId: producto.id || producto.codigo || `producto-${index}`,
+                __cacheIndex: cacheIndex,
+                __fotoPrincipalUrl: fotoPrincipalUrl,
+                __detalleTecnico: [producto.marca, producto.modelo].filter(Boolean).join(' '),
+                __detalleInventario: [
+                    producto.unidad ? `Unidad: ${producto.unidad}` : '',
+                    producto.ubicacion ? `Ubicacion: ${producto.ubicacion}` : ''
+                ].filter(Boolean).join(' | '),
+                __precio1: this.obtenerPrecioProducto(producto, 1),
+                __precio2: this.obtenerPrecioProducto(producto, 2),
+                __precio3: this.obtenerPrecioProducto(producto, 3),
+                __precioBs: this.aplicarRedondeoBs(this.obtenerPrecioProducto(producto, 1) * window.tasaDolar, producto.metodo_redondeo || 'none')
+            };
+        });
+    },
+
+    sincronizarBusquedaGestion(valor) {
+        const input = document.getElementById('buscarProductoGestion');
+        if (input && input.value !== valor) {
+            input.value = valor;
+        }
+    },
+
     async guardarProducto(e) {
         if (e) e.preventDefault();
+        const formProducto = document.getElementById('formProducto');
+        if (formProducto && !formProducto.reportValidity()) {
+            return;
+        }
+
         const idServidor = document.getElementById('productoId').getAttribute('data-server-id');
 
         const codigoInput = document.getElementById('productoCodigo');
@@ -170,9 +587,19 @@ const ProductosFeature = {
         const precioDolares2 = parseFloat(document.getElementById('productoPrecioDolares2').value) || 0;
         const precioDolares3 = parseFloat(document.getElementById('productoPrecioDolares3').value) || 0;
         const categoria = document.getElementById('productoCategoria').value;
+        const ubicacion = document.getElementById('productoUbicacion').value;
+        const marca = document.getElementById('productoMarca').value;
+        const modelo = document.getElementById('productoModelo').value;
+        const unidad = document.getElementById('productoUnidad').value;
         const metodoRedondeo = document.getElementById('productoMetodoRedondeo').value;
         const fotos = (window.ProductosMediaFeature?.productoFotosSeleccionadas || []).map(item => item.file);
         const removePhoto = document.getElementById('productoFotoEliminar').value === 'true';
+
+        if (precioDolares1 <= 0 || precioDolares2 <= 0 || precioDolares3 <= 0) {
+            this.abrirModalPreciosProducto();
+            window.mostrarNotificacion('⚠️ Ajusta los precios P1, P2 y P3 antes de guardar');
+            return;
+        }
 
         const formData = new FormData();
         formData.append('codigo', codigo);
@@ -189,6 +616,10 @@ const ProductosFeature = {
         formData.append('precio_3_dolares', String(precioDolares3));
         formData.append('cantidad', '0');
         formData.append('categoria', categoria);
+        formData.append('ubicacion', ubicacion);
+        formData.append('marca', marca);
+        formData.append('modelo', modelo);
+        formData.append('unidad', unidad);
         formData.append('metodo_redondeo', metodoRedondeo);
         formData.append('remove_photo', removePhoto ? 'true' : 'false');
 
@@ -255,97 +686,178 @@ const ProductosFeature = {
         if (!grid) return;
         const lista = productosAMostrar || window.AppState.productosVista || window.productos;
         const paginacion = this.obtenerPaginacion('productos');
-        const busquedaActiva = Boolean(document.getElementById('buscarProductoGestion')?.value.trim());
-
-        if (lista.length === 0) {
-            const mensaje = window.productos.length === 0
+        const searchActual = String(window.AppState.productosQuery?.search || document.getElementById('buscarProductoGestion')?.value || '').trim();
+        const mensajeVacio = lista.length === 0
+            ? (window.productos.length === 0
                 ? '📦 No hay productos registrados'
-                : `🔍 No se encontraron coincidencias${paginacion.has_next ? '. Carga mas productos para seguir buscando.' : ''}`;
-            grid.innerHTML = '<div class="mensaje-vacio" style="grid-column: 1/-1; text-align: center; padding: 40px; color: #666;">' +
-                mensaje +
-                (paginacion.has_next ? '<div style="margin-top: 16px;"><button class="btn-secondary" onclick="cargarMasProductos()">Cargar mas productos</button></div>' : '') +
-                '</div>';
+                : `🔍 No se encontraron coincidencias${paginacion.has_next ? '. Carga mas productos para seguir buscando.' : ''}`)
+            : 'No hay productos para mostrar';
+
+        grid.classList.add('productos-grid-tabla');
+
+        if (!window.SVTable) {
+            grid.innerHTML = '<div class="mensaje-vacio" style="text-align: center; padding: 40px; color: #666;">⚠️ El componente de tabla no esta disponible</div>';
             return;
         }
 
-        const cards = lista.map((producto) => {
-            const originalIndex = window.productos.findIndex(p => p.codigo === producto.codigo);
-            const precioPrincipal = this.obtenerPrecioProducto(producto, 1);
-            const precioSecundario = this.obtenerPrecioProducto(producto, 2);
-            const precioTerciario = this.obtenerPrecioProducto(producto, 3);
-            const precioBsDinamico = this.aplicarRedondeoBs(precioPrincipal * window.tasaDolar, producto.metodo_redondeo || 'none');
-            const fotosProductoUrls = this.obtenerUrlsGaleriaProducto(producto);
-            const fotoPrincipalUrl = fotosProductoUrls[0] || this.construirUrlFotoProducto(producto.foto_url);
+        grid.innerHTML = '<div id="tablaProductosGestion"></div>';
 
-            let htmlPromo = '';
-            if (window.porcentajeDescuentoDolares > 0) {
-                const precioPromo = precioPrincipal * (1 - (window.porcentajeDescuentoDolares / 100));
-                htmlPromo = `
-                    <div class="precio-promo" style="color: #28a745; font-weight: bold; font-size: 0.95em; margin-top: 5px; background: #e8f5e9; padding: 4px 8px; border-radius: 4px; display: inline-block;">
-                        🏷️ Promo $: $${precioPromo.toFixed(2)}
-                    </div>
-                `;
-            }
+        const filas = this.construirFilasTablaProductos(lista);
+        const instanciaExistente = window.SVTable.getInstance?.('tabla-productos-gestion');
+        if (instanciaExistente) {
+            instanciaExistente.state.search = searchActual;
+            instanciaExistente.state.draftSearch = searchActual;
+            instanciaExistente.state.page = Number(paginacion.page || 1);
+        }
 
-            return `
-                <div class="producto-card">
-                    <button
-                        type="button"
-                        class="producto-card-media producto-card-media-button${fotoPrincipalUrl ? '' : ' producto-card-media-empty'}"
-                        ${fotoPrincipalUrl ? `onclick="abrirGaleriaProductoPorIndice(${originalIndex}, 0)"` : 'disabled'}
-                    >
-                        ${fotoPrincipalUrl
-                            ? `<img src="${fotoPrincipalUrl}" alt="${producto.nombre}" loading="lazy">`
-                            : '<span>Sin foto</span>'}
-                        ${fotosProductoUrls.length > 1 ? `<span class="producto-card-media-count">${fotosProductoUrls.length} fotos</span>` : ''}
-                    </button>
-                    <div class="producto-header">
-                        <h3>${producto.nombre}</h3>
-                        <span class="producto-codigo">${producto.codigo}</span>
-                    </div>
-                    <div class="producto-descripcion">${producto.descripcion}</div>
-                    <div class="producto-precios">
-                        <div style="display: flex; flex-direction: column; gap: 4px;">
-                            <span class="precio-dolar">💵 P1: $${precioPrincipal.toFixed(2)}</span>
-                            <span class="precio-dolar">💵 P2: $${precioSecundario.toFixed(2)}</span>
-                            <span class="precio-dolar">💵 P3: $${precioTerciario.toFixed(2)}</span>
-                            <span class="precio-bolivar">💶 Bs ${precioBsDinamico.toFixed(2)}</span>
-                            ${htmlPromo}
+        window.SVTable.mount({
+            id: 'tabla-productos-gestion',
+            container: 'tablaProductosGestion',
+            title: 'Gestion de Productos',
+            ariaLabel: 'Tabla de gestion de productos',
+            rows: filas,
+            rowId: row => row.__rowId,
+            exportFileName: 'productos',
+            searchPlaceholder: 'Buscar productos por nombre, codigo o descripcion',
+            emptyState: mensajeVacio,
+            pageSize: paginacion.page_size || 20,
+            remotePagination: {
+                enabled: true,
+                page: paginacion.page || 1,
+                pageSize: paginacion.page_size || 20,
+                total: paginacion.total || lista.length,
+                totalPages: paginacion.total_pages || 1,
+                onPageChange: ({ page, pageSize, search, filters }) => this.cargarProductos({ page, pageSize, search, filters }),
+                onPageSizeChange: ({ page, pageSize, search, filters }) => this.cargarProductos({ page, pageSize, search, filters }),
+                onQueryChange: ({ page, pageSize, search, filters }) => {
+                    this.sincronizarBusquedaGestion(search || '');
+                    this.cargarProductos({ page, pageSize, search, filters });
+                }
+            },
+            columns: [
+                {
+                    id: 'codigo',
+                    label: 'Codigo',
+                    key: 'codigo',
+                    filterable: true
+                },
+                {
+                    id: 'producto',
+                    label: 'Producto',
+                    key: 'nombre',
+                    filterable: true,
+                    render: row => {
+                        const nombre = this.escaparHtml(row.nombre || 'Sin nombre');
+                        const detalle = this.escaparHtml(row.__detalleTecnico || row.__detalleInventario || 'Sin detalles');
+                        const imagen = row.__fotoPrincipalUrl && row.__cacheIndex >= 0
+                            ? `<button type="button" onclick="abrirGaleriaProductoPorIndice(${row.__cacheIndex}, 0)" style="width: 36px; height: 36px; border: 0; border-radius: 10px; overflow: hidden; padding: 0; cursor: pointer; background: #f3f4f6; flex-shrink: 0;"><img src="${this.escaparHtml(row.__fotoPrincipalUrl)}" alt="${nombre}" loading="lazy" style="width: 100%; height: 100%; object-fit: cover;"></button>`
+                            : '<div style="width: 36px; height: 36px; border-radius: 10px; background: #f3f4f6; display: flex; align-items: center; justify-content: center; color: #6b7280; font-size: 9px; flex-shrink: 0;">Foto</div>';
+                        return `
+                            <div style="display: flex; gap: 8px; align-items: center; min-width: 220px;">
+                                ${imagen}
+                                <div class="sv-table-stack sv-table-stack--dense" style="min-width: 0;">
+                                    <strong style="line-height: 1.2;">${nombre}</strong>
+                                    <small style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${detalle}</small>
+                                </div>
+                            </div>
+                        `;
+                    },
+                    allowHtml: true,
+                    searchValue: row => `${row.nombre || ''} ${row.descripcion || ''} ${row.__detalleTecnico || ''} ${row.__detalleInventario || ''}`
+                },
+                {
+                    id: 'categoria',
+                    label: 'Categoria',
+                    key: 'categoria',
+                    filterable: true,
+                    filterType: 'select',
+                    render: row => row.categoria || 'Sin categoria'
+                },
+                {
+                    id: 'ubicacion',
+                    label: 'Ubicacion',
+                    key: 'ubicacion',
+                    filterable: true,
+                    render: row => row.ubicacion || '-'
+                },
+                {
+                    id: 'stock',
+                    label: 'Stock',
+                    key: 'cantidad',
+                    align: 'center',
+                    filterable: true,
+                    type: 'badge',
+                    badgeTone: row => Number(row.cantidad || 0) <= 0 ? 'danger' : Number(row.cantidad || 0) < 5 ? 'warning' : 'success',
+                    render: row => Number(row.cantidad || 0)
+                },
+                {
+                    id: 'precio1',
+                    label: 'P1',
+                    key: '__precio1',
+                    type: 'money',
+                    currency: '$',
+                    align: 'right',
+                    filterable: true
+                },
+                {
+                    id: 'precio2',
+                    label: 'P2',
+                    key: '__precio2',
+                    type: 'money',
+                    currency: '$',
+                    align: 'right',
+                    filterable: true
+                },
+                {
+                    id: 'precio3',
+                    label: 'P3',
+                    key: '__precio3',
+                    type: 'money',
+                    currency: '$',
+                    align: 'right',
+                    filterable: true
+                },
+                {
+                    id: 'precioBs',
+                    label: 'Bs',
+                    key: '__precioBs',
+                    type: 'money',
+                    currency: 'Bs',
+                    align: 'right',
+                    filterable: true
+                },
+                {
+                    id: 'acciones',
+                    label: 'Acciones',
+                    type: 'actions',
+                    sortable: false,
+                    searchable: false,
+                    hideable: false,
+                    align: 'center',
+                    render: row => row.__cacheIndex < 0 ? '-' : `
+                        <div style="display: flex; align-items: center; justify-content: center; gap: 6px; flex-wrap: nowrap;">
+                            <button onclick="agregarAlCarrito(${row.__cacheIndex})" class="btn-small" style="background: #2563eb; color: white; min-height: 30px; padding: 4px 8px; font-size: 12px; border-radius: 10px;" title="Agregar al carrito">🛒</button>
+                            <button onclick="editarProducto(${row.__cacheIndex})" class="btn-small" style="background: #f59e0b; color: white; min-height: 30px; padding: 4px 8px; font-size: 12px; border-radius: 10px;" title="Editar producto">✏️</button>
+                            <button onclick="eliminarProducto(${row.__cacheIndex})" class="btn-small" style="background: #dc2626; color: white; min-height: 30px; padding: 4px 8px; font-size: 12px; border-radius: 10px;" title="Eliminar producto">🗑️</button>
                         </div>
-                    </div>
-                    <div class="producto-stock">
-                        <span>📦 Stock: ${producto.cantidad}</span>
-                        ${producto.cantidad < 5 ? '<span class="stock-bajo">⚠️ Stock bajo</span>' : ''}
-                    </div>
-                    <div class="producto-categoria">📂 ${producto.categoria}</div>
-                    <div class="producto-acciones">
-                        <button class="btn-agregar-carrito" onclick="agregarAlCarrito(${originalIndex})">
-                            🛒 Agregar al carrito
-                        </button>
-                        <button class="btn-editar" onclick="editarProducto(${originalIndex})">
-                            ✏️ Editar
-                        </button>
-                        <button class="btn-eliminar" onclick="eliminarProducto(${originalIndex})">
-                            🗑️ Eliminar
-                        </button>
-                    </div>
-                </div>
-            `;
-        }).join('');
-
-        const resumen = `
-            <div class="mensaje-vacio" style="grid-column: 1/-1; text-align: center; padding: 8px 0 0; color: #666;">
-                Mostrando ${lista.length}${busquedaActiva ? ' coincidencias cargadas' : ' productos cargados'} de ${paginacion.total || lista.length}
-            </div>
-        `;
-
-        const loadMore = paginacion.has_next ? `
-            <div style="grid-column: 1/-1; display: flex; justify-content: center; padding: 10px 0 24px;">
-                <button class="btn-secondary" onclick="cargarMasProductos()">Cargar mas productos</button>
-            </div>
-        ` : '';
-
-        grid.innerHTML = `${cards}${resumen}${loadMore}`;
+                    `,
+                    allowHtml: true,
+                    exportable: false
+                }
+            ],
+            bulkActions: [
+                {
+                    id: 'export-selected-csv',
+                    label: 'Exportar seleccion CSV',
+                    handler: () => window.SVTable.exportSelected('tabla-productos-gestion', 'csv')
+                },
+                {
+                    id: 'clear-selection',
+                    label: 'Limpiar seleccion',
+                    handler: () => window.SVTable.clearSelection('tabla-productos-gestion')
+                }
+            ]
+        });
     },
 
     filtrarProductosGestion() {
@@ -375,6 +887,7 @@ const ProductosFeature = {
         document.getElementById('productoCodigo').disabled = false;
         document.getElementById('productoPrecioBolivares').value = '';
         this.resetearEstadoFotoProducto([]);
+        this.actualizarResumenPreciosProducto();
         document.getElementById('modalProducto').style.display = 'block';
     },
 
@@ -388,6 +901,7 @@ const ProductosFeature = {
             if (lista === 1) {
                 this.calcularPrecioBolivares();
             }
+            this.actualizarResumenPreciosProducto();
         }
     },
 
@@ -400,6 +914,7 @@ const ProductosFeature = {
         const metodo = document.getElementById('productoMetodoRedondeo').value;
         const precioBs = window.aplicarRedondeoBs(precioDolares * window.tasaDolar, metodo);
         document.getElementById('productoPrecioBolivares').value = precioBs ? precioBs.toFixed(2) : '';
+        this.actualizarResumenPreciosProducto();
     },
 
     recalcularPorcentajeGanancia(lista = 1) {
@@ -410,6 +925,7 @@ const ProductosFeature = {
             const porcentaje = ((precioVenta / costo) - 1) * 100;
             document.getElementById(`productoPorcentajeGanancia${lista}`).value = porcentaje.toFixed(4);
         }
+        this.actualizarResumenPreciosProducto();
     },
 
     calcularPrecioDolares() {
@@ -417,6 +933,16 @@ const ProductosFeature = {
         const precioDolares = precioBs / window.tasaDolar;
         document.getElementById('productoPrecioDolares1').value = precioDolares ? precioDolares.toFixed(2) : '';
         this.recalcularPorcentajeGanancia(1);
+        this.actualizarResumenPreciosProducto();
+    },
+
+    abrirModalPreciosProducto() {
+        document.getElementById('modalProductoPrecios').style.display = 'block';
+    },
+
+    cerrarModalPreciosProducto() {
+        document.getElementById('modalProductoPrecios').style.display = 'none';
+        this.actualizarResumenPreciosProducto();
     },
 
     editarProducto(index) {
@@ -447,17 +973,23 @@ const ProductosFeature = {
         this.calcularPrecioBolivares();
         document.getElementById('productoCantidad').value = producto.cantidad;
         document.getElementById('productoCategoria').value = producto.categoria;
+        document.getElementById('productoUbicacion').value = producto.ubicacion || '';
+        document.getElementById('productoMarca').value = producto.marca || '';
+        document.getElementById('productoModelo').value = producto.modelo || '';
+        document.getElementById('productoUnidad').value = producto.unidad || '';
         this.resetearEstadoFotoProducto(fotosProducto.map((path, photoIndex) => ({
             path,
             url: fotosProductoUrls[photoIndex] || this.construirUrlFotoProducto(path)
         })));
 
+        this.actualizarResumenPreciosProducto();
         document.getElementById('modalProducto').style.display = 'block';
     },
 
     cerrarModalProducto() {
         this.resetearEstadoFotoProducto([]);
         document.getElementById('modalProducto').style.display = 'none';
+        this.cerrarModalPreciosProducto();
     }
 };
 

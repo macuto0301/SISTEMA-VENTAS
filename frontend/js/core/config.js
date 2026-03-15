@@ -12,6 +12,8 @@ const ConfigCore = {
             window.AppState.nombreEmpresa = config.nombreEmpresa || '';
             window.AppState.rifEmpresa = config.rifEmpresa || '';
             window.AppState.direccionEmpresa = config.direccionEmpresa || '';
+            window.AppState.telefonoEmpresa = config.telefonoEmpresa || '';
+            window.AppState.correoEmpresa = config.correoEmpresa || '';
 
             window.tasaDolar = window.AppState.tasaDolar;
             window.tasaVuelto = window.AppState.tasaVuelto;
@@ -47,6 +49,8 @@ const ConfigCore = {
         document.getElementById('configNombreEmpresa').value = window.AppState.nombreEmpresa || '';
         document.getElementById('configRifEmpresa').value = window.AppState.rifEmpresa || '';
         document.getElementById('configDireccionEmpresa').value = window.AppState.direccionEmpresa || '';
+        document.getElementById('configTelefonoEmpresa').value = window.AppState.telefonoEmpresa || '';
+        document.getElementById('configCorreoEmpresa').value = window.AppState.correoEmpresa || '';
 
         document.getElementById('modalConfiguracion').style.display = 'block';
     },
@@ -65,6 +69,8 @@ const ConfigCore = {
         const nombreEmpresa = document.getElementById('configNombreEmpresa').value;
         const rifEmpresa = document.getElementById('configRifEmpresa').value;
         const direccionEmpresa = document.getElementById('configDireccionEmpresa').value;
+        const telefonoEmpresa = document.getElementById('configTelefonoEmpresa').value;
+        const correoEmpresa = document.getElementById('configCorreoEmpresa').value;
 
         const nuevaConfig = {
             tasaDolar: nuevaTasa,
@@ -74,7 +80,9 @@ const ConfigCore = {
             precioVentaLibre: nuevoPrecioVentaLibre,
             nombreEmpresa,
             rifEmpresa,
-            direccionEmpresa
+            direccionEmpresa,
+            telefonoEmpresa,
+            correoEmpresa
         };
 
         const guardado = await window.ApiService.guardarConfiguracion(nuevaConfig);
@@ -100,6 +108,8 @@ const ConfigCore = {
         window.AppState.nombreEmpresa = nombreEmpresa;
         window.AppState.rifEmpresa = rifEmpresa;
         window.AppState.direccionEmpresa = direccionEmpresa;
+        window.AppState.telefonoEmpresa = telefonoEmpresa;
+        window.AppState.correoEmpresa = correoEmpresa;
 
         this.actualizarInfoTasaHeader();
         this.actualizarEmpresaDisplay();

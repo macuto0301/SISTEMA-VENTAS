@@ -163,6 +163,7 @@ const VentasCheckoutFeature = {
         };
 
         if (excedenteTotalUSD > 0.01) {
+            cerrarModalTotalizacion();
             if (clienteSeleccionado) {
                 if (typeof window.abrirModalExcedenteTotalizacion === 'function') {
                     window.abrirModalExcedenteTotalizacion(ventaEnProgreso);
@@ -199,6 +200,18 @@ const VentasCheckoutFeature = {
         this.actualizarUIGestionVuelto();
         this.sugerirMontoVuelto();
         document.getElementById('modalGestionVuelto').style.display = 'block';
+        setTimeout(() => window.enfocarCampoVentas?.('montoEntregaVuelto'), 60);
+    },
+
+    volverATotalizacionDesdeGestionVuelto() {
+        const modal = document.getElementById('modalGestionVuelto');
+        if (modal) {
+            modal.style.display = 'none';
+        }
+
+        if (ventaEnProgreso) {
+            window.abrirModalTotalizacion?.();
+        }
     },
 
     sugerirMontoVuelto() {
@@ -353,25 +366,55 @@ const VentasCheckoutFeature = {
         }
     },
 
-    finalizarVentaSinVuelto() {
-        if (confirm('¿Está seguro de finalizar la venta sin entregar el vuelto excedente?')) {
-            if (ventaEnProgreso?.cliente_id && ventaEnProgreso?.excedenteTotalUSD > 0.01) {
-                ventaEnProgreso.saldo_a_favor_generado_usd = ventaEnProgreso.excedenteTotalUSD;
-                ventaEnProgreso.excedenteTotalUSD = 0;
-                ventaEnProgreso.excedenteReconocido = 0;
-                ventaEnProgreso.excedenteUSD = 0;
-                ventaEnProgreso.excedenteBS = 0;
+    async finalizarVentaSinVuelto() {
+        const excedentePendiente = ventaEnProgreso?.excedenteTotalUSD || 0;
+        const confirmarModal = window.Utils?.confirmarModal?.bind(window.Utils)
+            || ((mensaje) => Promise.resolve(confirm(mensaje)));
+        const confirmado = await confirmarModal(
+            '¿Está seguro de finalizar la venta sin entregar el vuelto excedente?',
+            {
+                titulo: 'Finalizar sin entregar vuelto',
+                detalle: excedentePendiente > 0.01
+                    ? `Quedara un excedente pendiente de $${excedentePendiente.toFixed(2)}.${ventaEnProgreso?.cliente_id ? ' Se registrara como saldo a favor del cliente.' : ''}`
+                    : '',
+                confirmarTexto: 'Finalizar venta',
+                cancelarTexto: 'Seguir revisando',
+                variante: 'warning'
             }
-            document.getElementById('modalGestionVuelto').style.display = 'none';
-            this.terminarProcesoVenta(ventaEnProgreso, 'Venta finalizada sin vuelto entregado');
+        );
+
+        if (!confirmado) return;
+
+        if (ventaEnProgreso?.cliente_id && ventaEnProgreso?.excedenteTotalUSD > 0.01) {
+            ventaEnProgreso.saldo_a_favor_generado_usd = ventaEnProgreso.excedenteTotalUSD;
+            ventaEnProgreso.excedenteTotalUSD = 0;
+            ventaEnProgreso.excedenteReconocido = 0;
+            ventaEnProgreso.excedenteUSD = 0;
+            ventaEnProgreso.excedenteBS = 0;
         }
+
+        document.getElementById('modalGestionVuelto').style.display = 'none';
+        this.terminarProcesoVenta(ventaEnProgreso, 'Venta finalizada sin vuelto entregado');
     },
 
-    confirmarVuelto() {
+    async confirmarVuelto() {
         const totalExcedente = ventaEnProgreso.excedenteReconocido;
+        const confirmarModal = window.Utils?.confirmarModal?.bind(window.Utils)
+            || ((mensaje) => Promise.resolve(confirm(mensaje)));
 
         if (vueltosAgregados.length === 0 && totalExcedente > 0.01) {
-            if (!confirm('No ha registrado ninguna entrega de vuelto. ¿Desea finalizar la venta de todas formas?')) {
+            const confirmado = await confirmarModal(
+                'No ha registrado ninguna entrega de vuelto. ¿Desea finalizar la venta de todas formas?',
+                {
+                    titulo: 'Vuelto sin registrar',
+                    detalle: `Aun queda pendiente un vuelto de $${totalExcedente.toFixed(2)} en esta venta.`,
+                    confirmarTexto: 'Finalizar de todas formas',
+                    cancelarTexto: 'Volver',
+                    variante: 'warning'
+                }
+            );
+
+            if (!confirmado) {
                 return;
             }
         }
@@ -477,6 +520,7 @@ const VentasCheckoutFeature = {
             `;
             infoVuelto.innerHTML = contenido;
             document.getElementById('modalVuelto').style.display = 'block';
+            window.VentasPostventaFeature?.enfocarAccionPrincipalVentaProcesada?.();
         }
 
         this.reiniciarVenta();
@@ -492,7 +536,7 @@ const VentasCheckoutFeature = {
         indiceCarritoSeleccionado = -1;
 
         const elCliente = document.getElementById('cliente');
-        if (elCliente) elCliente.value = '';
+        if (elCliente) elCliente.value = 'Cliente General / Contado';
         const elClienteId = document.getElementById('clienteId');
         if (elClienteId) elClienteId.value = '';
         const elUsarSaldo = document.getElementById('usarSaldoFavorVenta');

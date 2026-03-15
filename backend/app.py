@@ -254,6 +254,26 @@ def create_app():
                 db.session.commit()
                 print("Columna porcentaje_ganancia_3 agregada a tabla producto")
 
+            if columnas_producto and 'ubicacion' not in columnas_producto:
+                db.session.execute(text("ALTER TABLE producto ADD COLUMN ubicacion VARCHAR(100)"))
+                db.session.commit()
+                print("Columna ubicacion agregada a tabla producto")
+
+            if columnas_producto and 'marca' not in columnas_producto:
+                db.session.execute(text("ALTER TABLE producto ADD COLUMN marca VARCHAR(100)"))
+                db.session.commit()
+                print("Columna marca agregada a tabla producto")
+
+            if columnas_producto and 'modelo' not in columnas_producto:
+                db.session.execute(text("ALTER TABLE producto ADD COLUMN modelo VARCHAR(100)"))
+                db.session.commit()
+                print("Columna modelo agregada a tabla producto")
+
+            if columnas_producto and 'unidad' not in columnas_producto:
+                db.session.execute(text("ALTER TABLE producto ADD COLUMN unidad VARCHAR(50)"))
+                db.session.commit()
+                print("Columna unidad agregada a tabla producto")
+
             if columnas_producto:
                 db.session.execute(text("UPDATE producto SET fotos_json = CONCAT('[\"', foto_path, '\"]') WHERE foto_path IS NOT NULL AND foto_path <> '' AND (fotos_json IS NULL OR fotos_json = '')"))
                 db.session.execute(text("UPDATE producto SET precio_1_dolares = precio_dolares WHERE precio_1_dolares IS NULL OR precio_1_dolares = 0"))

@@ -16,11 +16,14 @@ function obtenerFuncionGlobal(nombre) {
         actualizarFecha: () => window.ConfigCore?.actualizarFecha?.bind(window.ConfigCore),
         cargarProductos: () => window.ProductosFeature?.cargarProductos?.bind(window.ProductosFeature),
         guardarProducto: () => window.ProductosFeature?.guardarProducto?.bind(window.ProductosFeature),
+        actualizarResumenPreciosProducto: () => window.ProductosFeature?.actualizarResumenPreciosProducto?.bind(window.ProductosFeature),
         recalcularPreciosProducto: () => window.ProductosFeature?.recalcularPreciosProducto?.bind(window.ProductosFeature),
         calcularPrecioVenta: () => window.ProductosFeature?.calcularPrecioVenta?.bind(window.ProductosFeature),
         calcularPrecioBolivares: () => window.ProductosFeature?.calcularPrecioBolivares?.bind(window.ProductosFeature),
         recalcularPorcentajeGanancia: () => window.ProductosFeature?.recalcularPorcentajeGanancia?.bind(window.ProductosFeature),
         calcularPrecioDolares: () => window.ProductosFeature?.calcularPrecioDolares?.bind(window.ProductosFeature),
+        abrirModalPreciosProducto: () => window.ProductosFeature?.abrirModalPreciosProducto?.bind(window.ProductosFeature),
+        cerrarModalPreciosProducto: () => window.ProductosFeature?.cerrarModalPreciosProducto?.bind(window.ProductosFeature),
         cargarDatosVentas: () => window.VentasDataFeature?.cargarDatosVentas?.bind(window.VentasDataFeature),
         mostrarVentas: () => window.VentasPostventaFeature?.mostrarVentas?.bind(window.VentasPostventaFeature),
         cargarClientes: () => window.ClientesFeature?.cargarClientes?.bind(window.ClientesFeature),
@@ -57,6 +60,7 @@ function registrarEventoElemento(id, tipoEvento, handler) {
 
 function registrarEventosGeneralesApp() {
     registrarEventoElemento('productoPrecioCosto', 'input', obtenerFuncionGlobal('recalcularPreciosProducto'));
+    registrarEventoElemento('productoPrecioCosto', 'input', obtenerFuncionGlobal('actualizarResumenPreciosProducto'));
     registrarEventoElemento('productoPorcentajeGanancia1', 'input', () => obtenerFuncionGlobal('calcularPrecioVenta')?.(1));
     registrarEventoElemento('productoPorcentajeGanancia2', 'input', () => obtenerFuncionGlobal('calcularPrecioVenta')?.(2));
     registrarEventoElemento('productoPorcentajeGanancia3', 'input', () => obtenerFuncionGlobal('calcularPrecioVenta')?.(3));
@@ -67,6 +71,7 @@ function registrarEventosGeneralesApp() {
     });
     registrarEventoElemento('productoPrecioDolares2', 'input', () => obtenerFuncionGlobal('recalcularPorcentajeGanancia')?.(2));
     registrarEventoElemento('productoPrecioDolares3', 'input', () => obtenerFuncionGlobal('recalcularPorcentajeGanancia')?.(3));
+    registrarEventoElemento('productoMetodoRedondeo', 'change', obtenerFuncionGlobal('actualizarResumenPreciosProducto'));
 
     registrarEventoElemento('productoPrecioBolivares', 'input', () => {
         obtenerFuncionGlobal('calcularPrecioDolares')?.();
@@ -99,9 +104,16 @@ function registrarEventosGeneralesApp() {
     registrarEventoElemento('btnConfigCancelar', 'click', () => window.ConfigCore?.cerrarModalConfiguracion?.());
     registrarEventoElemento('btnConfigGuardar', 'click', () => window.ConfigCore?.guardarConfiguracion?.());
     registrarEventoElemento('btnConfigActualizarBcv', 'click', event => window.ConfigCore?.actualizarTasaBCV?.(event));
+    registrarEventoElemento('btnListaPrecios', 'click', () => window.ProductosFeature?.abrirModalListaPrecios?.());
     registrarEventoElemento('btnNuevoProducto', 'click', () => window.ProductosFeature?.mostrarFormularioProducto?.());
     registrarEventoElemento('btnCerrarModalProducto', 'click', () => window.ProductosFeature?.cerrarModalProducto?.());
     registrarEventoElemento('btnCancelarProducto', 'click', () => window.ProductosFeature?.cerrarModalProducto?.());
+    registrarEventoElemento('btnAbrirPreciosProducto', 'click', () => window.ProductosFeature?.abrirModalPreciosProducto?.());
+    registrarEventoElemento('btnCerrarModalPreciosProducto', 'click', () => window.ProductosFeature?.cerrarModalPreciosProducto?.());
+    registrarEventoElemento('btnCerrarPreciosProducto', 'click', () => window.ProductosFeature?.cerrarModalPreciosProducto?.());
+    registrarEventoElemento('btnCerrarModalListaPrecios', 'click', () => window.ProductosFeature?.cerrarModalListaPrecios?.());
+    registrarEventoElemento('btnCancelarListaPrecios', 'click', () => window.ProductosFeature?.cerrarModalListaPrecios?.());
+    registrarEventoElemento('formListaPrecios', 'submit', event => window.ProductosFeature?.generarListaPrecios?.(event));
     registrarEventoElemento('btnLimpiarFotosProducto', 'click', () => window.ProductosMediaFeature?.limpiarFotoProductoSeleccionada?.());
     registrarEventoElemento('buscarProductoGestion', 'input', () => window.ProductosFeature?.filtrarProductosGestion?.());
     registrarEventoElemento('buscarCliente', 'input', () => window.ClientesFeature?.cargarClientes?.());
@@ -111,6 +123,9 @@ function registrarEventosGeneralesApp() {
     registrarEventoElemento('btnGuardarCliente', 'click', () => window.ClientesFeature?.guardarClienteDesdeModal?.());
     registrarEventoElemento('btnLimpiarFotoClientePerfil', 'click', () => window.ClientesMediaFeature?.limpiarFotoCliente?.('perfil'));
     registrarEventoElemento('btnLimpiarFotoClienteCedula', 'click', () => window.ClientesMediaFeature?.limpiarFotoCliente?.('cedula'));
+    registrarEventoElemento('btnBuscarClienteVenta', 'click', () => window.ClientesFeature?.abrirModalBuscarClienteVenta?.());
+    registrarEventoElemento('btnLimpiarClienteVenta', 'click', () => window.ClientesFeature?.limpiarClienteVenta?.());
+    registrarEventoElemento('buscarClienteVentaModal', 'input', () => window.ClientesFeature?.renderListaBusquedaClienteVenta?.());
     registrarEventoElemento('btnBuscarClienteCxc', 'click', () => window.CxcFeature?.abrirModalBuscarClienteCxc?.());
     registrarEventoElemento('btnLimpiarClienteCxc', 'click', () => window.CxcFeature?.limpiarClienteCxc?.());
     registrarEventoElemento('buscarClienteCxcModal', 'input', () => window.CxcFeature?.renderListaBusquedaClienteCxc?.());

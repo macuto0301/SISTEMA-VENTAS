@@ -23,6 +23,167 @@ function mapearFiltrosCompras(filters = {}) {
     };
 }
 
+function redondearMontoCompra(valor) {
+    return Math.round((parseFloat(valor) || 0) * 100) / 100;
+}
+
+function construirItemCompra(producto, cantidad = 1) {
+    const precioCosto = redondearMontoCompra(producto.precio_costo);
+    const porcentaje1 = parseFloat(producto.porcentaje_ganancia_1 ?? producto.porcentaje_ganancia) || 0;
+    const porcentaje2 = parseFloat(producto.porcentaje_ganancia_2 ?? porcentaje1) || 0;
+    const porcentaje3 = parseFloat(producto.porcentaje_ganancia_3 ?? porcentaje1) || 0;
+    const precio1 = redondearMontoCompra(producto.precio_1_dolares ?? producto.precio_dolares);
+    const precio2 = redondearMontoCompra(producto.precio_2_dolares ?? precio1);
+    const precio3 = redondearMontoCompra(producto.precio_3_dolares ?? precio1);
+
+    return {
+        producto_id: producto.id,
+        producto_nombre: producto.nombre,
+        cantidad,
+        precio_unitario: precioCosto,
+        subtotal: redondearMontoCompra(cantidad * precioCosto),
+        metodo_redondeo: producto.metodo_redondeo || window.metodoRedondeoBs || 'none',
+        precio_1_dolares: precio1,
+        precio_2_dolares: precio2,
+        precio_3_dolares: precio3,
+        porcentaje_ganancia_1: porcentaje1,
+        porcentaje_ganancia_2: porcentaje2,
+        porcentaje_ganancia_3: porcentaje3
+    };
+}
+
+function recalcularSubtotalCompra(item) {
+    item.subtotal = redondearMontoCompra((parseInt(item.cantidad, 10) || 0) * (parseFloat(item.precio_unitario) || 0));
+}
+
+function recalcularPrecioCompraDesdePorcentaje(lista = 1) {
+    const costo = parseFloat(document.getElementById('compraPrecioCostoModal')?.value) || 0;
+    const porcentajeInput = document.getElementById(`compraPorcentajeGanancia${lista}Modal`);
+    const precioInput = document.getElementById(`compraPrecioDolares${lista}Modal`);
+    if (!porcentajeInput || !precioInput) return;
+
+    const porcentaje = parseFloat(porcentajeInput.value) || 0;
+    precioInput.value = costo > 0 ? redondearMontoCompra(costo * (1 + (porcentaje / 100))).toFixed(2) : '0.00';
+}
+
+function recalcularPorcentajeCompraDesdePrecio(lista = 1) {
+    const costo = parseFloat(document.getElementById('compraPrecioCostoModal')?.value) || 0;
+    const porcentajeInput = document.getElementById(`compraPorcentajeGanancia${lista}Modal`);
+    const precioInput = document.getElementById(`compraPrecioDolares${lista}Modal`);
+    if (!porcentajeInput || !precioInput) return;
+
+    const precio = parseFloat(precioInput.value) || 0;
+    porcentajeInput.value = costo > 0 ? ((((precio / costo) - 1) * 100) || 0).toFixed(4) : '0.0000';
+}
+
+function recalcularTodosLosPreciosCompra() {
+    [1, 2, 3].forEach(recalcularPrecioCompraDesdePorcentaje);
+    calcularPrecioBolivaresCompra();
+}
+
+function calcularPrecioBolivaresCompra() {
+    const precioDolares = parseFloat(document.getElementById('compraPrecioDolares1Modal')?.value) || 0;
+    const metodo = document.getElementById('compraMetodoRedondeoModal')?.value || 'none';
+    const precioBs = window.aplicarRedondeoBs(precioDolares * window.tasaDolar, metodo);
+    const inputBs = document.getElementById('compraPrecioBolivaresModal');
+    if (inputBs) {
+        inputBs.value = precioBs ? precioBs.toFixed(2) : '';
+    }
+}
+
+function calcularPrecioDolaresCompra() {
+    const precioBs = parseFloat(document.getElementById('compraPrecioBolivaresModal')?.value) || 0;
+    const precioDolares = precioBs / window.tasaDolar;
+    const inputPrecio = document.getElementById('compraPrecioDolares1Modal');
+    if (inputPrecio) {
+        inputPrecio.value = precioDolares ? precioDolares.toFixed(2) : '';
+    }
+    recalcularPorcentajeCompraDesdePrecio(1);
+}
+
+function abrirModalPreciosCompra(index) {
+    const item = ComprasModule.productosCompra[index];
+    const modal = document.getElementById('modalCompraPrecios');
+    if (!item || !modal) return;
+
+    document.getElementById('compraPrecioIndex').value = index;
+    document.getElementById('compraPrecioProductoNombre').textContent = item.producto_nombre;
+    document.getElementById('compraPrecioCostoModal').value = redondearMontoCompra(item.precio_unitario).toFixed(2);
+    document.getElementById('compraPorcentajeGanancia1Modal').value = (parseFloat(item.porcentaje_ganancia_1) || 0).toFixed(4);
+    document.getElementById('compraPorcentajeGanancia2Modal').value = (parseFloat(item.porcentaje_ganancia_2) || 0).toFixed(4);
+    document.getElementById('compraPorcentajeGanancia3Modal').value = (parseFloat(item.porcentaje_ganancia_3) || 0).toFixed(4);
+    document.getElementById('compraPrecioDolares1Modal').value = redondearMontoCompra(item.precio_1_dolares).toFixed(2);
+    document.getElementById('compraPrecioDolares2Modal').value = redondearMontoCompra(item.precio_2_dolares).toFixed(2);
+    document.getElementById('compraPrecioDolares3Modal').value = redondearMontoCompra(item.precio_3_dolares).toFixed(2);
+    document.getElementById('compraMetodoRedondeoModal').value = item.metodo_redondeo || window.metodoRedondeoBs || 'none';
+    calcularPrecioBolivaresCompra();
+    modal.style.display = 'block';
+}
+
+function cerrarModalPreciosCompra() {
+    const modal = document.getElementById('modalCompraPrecios');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+}
+
+function limpiarErrorProveedorCompra() {
+    const selectProveedor = document.getElementById('compraProveedor');
+    if (!selectProveedor) return;
+    selectProveedor.style.borderColor = '#ccc';
+    selectProveedor.style.boxShadow = 'none';
+    selectProveedor.removeAttribute('aria-invalid');
+}
+
+function marcarErrorProveedorCompra() {
+    const selectProveedor = document.getElementById('compraProveedor');
+    if (!selectProveedor) return;
+    selectProveedor.style.borderColor = '#dc3545';
+    selectProveedor.style.boxShadow = '0 0 0 3px rgba(220, 53, 69, 0.15)';
+    selectProveedor.setAttribute('aria-invalid', 'true');
+    selectProveedor.focus();
+}
+
+function limpiarErrorFacturaCompra() {
+    const inputFactura = document.getElementById('compraNroFactura');
+    if (!inputFactura) return;
+    inputFactura.style.borderColor = '#ccc';
+    inputFactura.style.boxShadow = 'none';
+    inputFactura.removeAttribute('aria-invalid');
+}
+
+function marcarErrorFacturaCompra() {
+    const inputFactura = document.getElementById('compraNroFactura');
+    if (!inputFactura) return;
+    inputFactura.style.borderColor = '#dc3545';
+    inputFactura.style.boxShadow = '0 0 0 3px rgba(220, 53, 69, 0.15)';
+    inputFactura.setAttribute('aria-invalid', 'true');
+    inputFactura.focus();
+}
+
+function guardarPreciosCompra() {
+    const index = parseInt(document.getElementById('compraPrecioIndex')?.value, 10);
+    const item = ComprasModule.productosCompra[index];
+    if (!item) {
+        cerrarModalPreciosCompra();
+        return;
+    }
+
+    item.precio_unitario = redondearMontoCompra(document.getElementById('compraPrecioCostoModal').value);
+    item.porcentaje_ganancia_1 = parseFloat(document.getElementById('compraPorcentajeGanancia1Modal').value) || 0;
+    item.porcentaje_ganancia_2 = parseFloat(document.getElementById('compraPorcentajeGanancia2Modal').value) || 0;
+    item.porcentaje_ganancia_3 = parseFloat(document.getElementById('compraPorcentajeGanancia3Modal').value) || 0;
+    item.precio_1_dolares = redondearMontoCompra(document.getElementById('compraPrecioDolares1Modal').value);
+    item.precio_2_dolares = redondearMontoCompra(document.getElementById('compraPrecioDolares2Modal').value);
+    item.precio_3_dolares = redondearMontoCompra(document.getElementById('compraPrecioDolares3Modal').value);
+    item.metodo_redondeo = document.getElementById('compraMetodoRedondeoModal').value || 'none';
+    recalcularSubtotalCompra(item);
+
+    mostrarProductosCompra();
+    cerrarModalPreciosCompra();
+    mostrarNotificacion(`✅ Precios preparados para ${item.producto_nombre}`);
+}
+
 const ProveedoresModule = {
     async init() {
         await this.cargarProveedores();
@@ -474,6 +635,9 @@ function abrirModalCompra() {
             opt.textContent = p.nombre;
             selectProveedor.appendChild(opt);
         });
+        selectProveedor.value = '';
+        selectProveedor.onchange = limpiarErrorProveedorCompra;
+        limpiarErrorProveedorCompra();
     }
     
     // Set default dates to today
@@ -484,7 +648,11 @@ function abrirModalCompra() {
     
     if (inputFecha) inputFecha.value = today;
     if (inputFechaLibro) inputFechaLibro.value = today;
-    if (inputNroFactura) inputNroFactura.value = '';
+    if (inputNroFactura) {
+        inputNroFactura.value = '';
+        inputNroFactura.oninput = limpiarErrorFacturaCompra;
+        limpiarErrorFacturaCompra();
+    }
     
     const inputBusqueda = document.getElementById('buscarProductoCompra');
     if (inputBusqueda) {
@@ -500,6 +668,13 @@ function abrirModalCompra() {
     if (totalSpan) {
         totalSpan.textContent = '0.00';
     }
+
+    const precioIndex = document.getElementById('compraPrecioIndex');
+    if (precioIndex) {
+        precioIndex.value = '';
+    }
+
+    cerrarModalPreciosCompra();
     
     const modal = document.getElementById('modalCompra');
     if (modal) {
@@ -508,6 +683,7 @@ function abrirModalCompra() {
 }
 
 function cerrarModalCompra() {
+    cerrarModalPreciosCompra();
     document.getElementById('modalCompra').style.display = 'none';
 }
 
@@ -560,21 +736,19 @@ async function filtrarProductosCompra(e) {
 
 function agregarProductoRapido(producto, cantidad) {
     const existente = ComprasModule.productosCompra.find(p => p.producto_id === producto.id);
+    let index = -1;
     
     if (existente) {
         existente.cantidad += cantidad;
-        existente.subtotal = existente.cantidad * existente.precio_unitario;
+        recalcularSubtotalCompra(existente);
+        index = ComprasModule.productosCompra.findIndex(p => p.producto_id === producto.id);
     } else {
-        ComprasModule.productosCompra.push({
-            producto_id: producto.id,
-            producto_nombre: producto.nombre,
-            cantidad: cantidad,
-            precio_unitario: producto.precio_costo,
-            subtotal: cantidad * producto.precio_costo
-        });
+        ComprasModule.productosCompra.push(construirItemCompra(producto, cantidad));
+        index = ComprasModule.productosCompra.length - 1;
     }
     
     mostrarProductosCompra();
+    abrirModalPreciosCompra(index);
     mostrarNotificacion(`✅ Agregado: ${cantidad}x ${producto.nombre}`);
 }
 
@@ -583,18 +757,15 @@ function seleccionarProductoCompra(productoId, cantidad = 1) {
     if (!producto) return;
     
     const existente = ComprasModule.productosCompra.find(p => p.producto_id === producto.id);
+    let index = -1;
     
     if (existente) {
         existente.cantidad += cantidad;
-        existente.subtotal = existente.cantidad * existente.precio_unitario;
+        recalcularSubtotalCompra(existente);
+        index = ComprasModule.productosCompra.findIndex(p => p.producto_id === producto.id);
     } else {
-        ComprasModule.productosCompra.push({
-            producto_id: producto.id,
-            producto_nombre: producto.nombre,
-            cantidad: cantidad,
-            precio_unitario: producto.precio_costo,
-            subtotal: cantidad * producto.precio_costo
-        });
+        ComprasModule.productosCompra.push(construirItemCompra(producto, cantidad));
+        index = ComprasModule.productosCompra.length - 1;
     }
     
     document.getElementById('buscarProductoCompra').value = '';
@@ -602,6 +773,7 @@ function seleccionarProductoCompra(productoId, cantidad = 1) {
     if (sugerencias) sugerencias.style.display = 'none';
     
     mostrarProductosCompra();
+    abrirModalPreciosCompra(index);
     mostrarNotificacion(`✅ Agregado: ${cantidad}x ${producto.nombre}`);
 }
 
@@ -644,7 +816,10 @@ function mostrarProductosCompra() {
                                 onchange="actualizarProductoCompra(${idx}, 'costo', this.value)"
                                 style="width: 90px; padding: 5px; text-align: center; border: 1px solid #ddd; border-radius: 4px;">
                         </td>
-                        <td style="padding: 10px; text-align: right; font-weight: bold;">$${p.subtotal.toFixed(2)}</td>
+                        <td style="padding: 10px; text-align: right; font-weight: bold;">
+                            <div>$${p.subtotal.toFixed(2)}</div>
+                            <button type="button" onclick="abrirModalPreciosCompra(${idx})" style="margin-top: 6px; border: none; background: #eef2ff; color: #4338ca; border-radius: 999px; padding: 4px 10px; cursor: pointer; font-size: 0.8rem;">Precios</button>
+                        </td>
                         <td style="padding: 10px; text-align: center;">
                             <button onclick="eliminarProductoCompra(${idx})" style="background: #dc3545; color: white; border: none; border-radius: 4px; padding: 4px 8px; cursor: pointer;">✕</button>
                         </td>
@@ -659,10 +834,10 @@ function actualizarProductoCompra(index, campo, valor) {
     if (campo === 'cantidad') {
         ComprasModule.productosCompra[index].cantidad = parseInt(valor) || 1;
     } else if (campo === 'costo') {
-        ComprasModule.productosCompra[index].precio_unitario = parseFloat(valor) || 0;
+        ComprasModule.productosCompra[index].precio_unitario = redondearMontoCompra(valor);
     }
     const p = ComprasModule.productosCompra[index];
-    p.subtotal = p.cantidad * p.precio_unitario;
+    recalcularSubtotalCompra(p);
     mostrarProductosCompra();
 }
 
@@ -678,10 +853,19 @@ async function guardarCompra() {
     const fechaLibro = document.getElementById('compraFechaLibro').value;
     
     if (!proveedorId) {
-        alert('Seleccione un proveedor');
+        marcarErrorProveedorCompra();
         return;
     }
-    
+
+    limpiarErrorProveedorCompra();
+
+    if (!nroFactura) {
+        marcarErrorFacturaCompra();
+        return;
+    }
+
+    limpiarErrorFacturaCompra();
+
     if (ComprasModule.productosCompra.length === 0) {
         alert('Agregue al menos un producto');
         return;

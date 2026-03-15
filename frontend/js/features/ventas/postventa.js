@@ -10,6 +10,11 @@ const VentasPostventaFeature = {
         }
     },
 
+    enfocarAccionPrincipalVentaProcesada() {
+        const boton = document.querySelector('#modalVuelto .btn-primary');
+        boton?.focus();
+    },
+
     obtenerVentaPorId(ventaId) {
         return ventas.find(v => v.id === ventaId);
     },
@@ -759,11 +764,11 @@ const VentasPostventaFeature = {
                 </div>
                 
                 <div style="display: flex; gap: 8px; justify-content: center; margin-top: 15px;">
-                    <button onclick="imprimirTicket()" style="padding: 10px 20px; background: #ff9800; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 0.9em;">
+                    <button onclick="imprimirTicket()" title="F9" style="padding: 10px 20px; background: #ff9800; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 0.9em;">
                         🖨️ Imprimir
                     </button>
-                    <button onclick="cerrarReciboCompleto()" style="padding: 10px 20px; background: #6c757d; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 0.9em;">
-                        Cerrar
+                    <button onclick="cerrarReciboCompleto()" title="F10 o Enter" style="padding: 10px 20px; background: #6c757d; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 0.9em;">
+                        Cerrar (F10)
                     </button>
                 </div>
             </div>
@@ -771,6 +776,7 @@ const VentasPostventaFeature = {
 
         const modal = document.createElement('div');
         modal.id = 'modalReciboCompleto';
+        modal.className = 'modal';
         modal.style.cssText = `
             position: fixed;
             top: 0;
@@ -791,6 +797,8 @@ const VentasPostventaFeature = {
         };
 
         document.body.appendChild(modal);
+        const botonCerrar = modal.querySelector('button[onclick="cerrarReciboCompleto()"]');
+        botonCerrar?.focus();
     },
 
     cerrarReciboCompleto() {

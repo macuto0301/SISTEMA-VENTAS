@@ -60,6 +60,10 @@ def serialize_producto(producto: Producto) -> dict:
         'codigo': producto.codigo,
         'nombre': producto.nombre,
         'descripcion': producto.descripcion,
+        'ubicacion': producto.ubicacion,
+        'marca': producto.marca,
+        'modelo': producto.modelo,
+        'unidad': producto.unidad,
         'precio_costo': producto.precio_costo,
         'porcentaje_ganancia': producto.porcentaje_ganancia,
         'precio_dolares': producto.precio_dolares,
@@ -245,6 +249,10 @@ def get_productos():
     nombre = (request.args.get('nombre') or '').strip()
     descripcion = (request.args.get('descripcion') or '').strip()
     categoria = (request.args.get('categoria') or '').strip()
+    ubicacion = (request.args.get('ubicacion') or '').strip()
+    marca = (request.args.get('marca') or '').strip()
+    modelo = (request.args.get('modelo') or '').strip()
+    unidad = (request.args.get('unidad') or '').strip()
     in_stock = (request.args.get('in_stock') or '').strip().lower()
 
     if busqueda:
@@ -254,6 +262,10 @@ def get_productos():
             Producto.nombre.ilike(termino),
             Producto.descripcion.ilike(termino),
             Producto.categoria.ilike(termino),
+            Producto.ubicacion.ilike(termino),
+            Producto.marca.ilike(termino),
+            Producto.modelo.ilike(termino),
+            Producto.unidad.ilike(termino),
         ))
 
     if codigo:
@@ -264,6 +276,14 @@ def get_productos():
         query = query.filter(Producto.descripcion.ilike(f'%{descripcion}%'))
     if categoria:
         query = query.filter(Producto.categoria.ilike(f'%{categoria}%'))
+    if ubicacion:
+        query = query.filter(Producto.ubicacion.ilike(f'%{ubicacion}%'))
+    if marca:
+        query = query.filter(Producto.marca.ilike(f'%{marca}%'))
+    if modelo:
+        query = query.filter(Producto.modelo.ilike(f'%{modelo}%'))
+    if unidad:
+        query = query.filter(Producto.unidad.ilike(f'%{unidad}%'))
     if in_stock in ('true', '1', 'si', 'yes'):
         query = query.filter(Producto.cantidad > 0)
 
@@ -299,6 +319,10 @@ def crear_producto():
         nuevo.codigo = data.get('codigo')
         nuevo.nombre = data['nombre']
         nuevo.descripcion = data.get('descripcion')
+        nuevo.ubicacion = data.get('ubicacion')
+        nuevo.marca = data.get('marca')
+        nuevo.modelo = data.get('modelo')
+        nuevo.unidad = data.get('unidad')
         nuevo.precio_costo = parse_float(data.get('precio_costo'), 0)
         price_values = extract_price_values(data)
         nuevo.porcentaje_ganancia = price_values['porcentaje_ganancia']
@@ -343,6 +367,10 @@ def editar_producto(id):
         prod.nombre = data.get('nombre', prod.nombre)
         prod.codigo = data.get('codigo', prod.codigo)
         prod.descripcion = data.get('descripcion', prod.descripcion)
+        prod.ubicacion = data.get('ubicacion', prod.ubicacion)
+        prod.marca = data.get('marca', prod.marca)
+        prod.modelo = data.get('modelo', prod.modelo)
+        prod.unidad = data.get('unidad', prod.unidad)
         prod.precio_costo = parse_float(data.get('precio_costo'), prod.precio_costo)
         prod.porcentaje_ganancia = price_values['porcentaje_ganancia']
         prod.precio_dolares = price_values['precio_dolares']

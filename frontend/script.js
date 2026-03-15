@@ -315,6 +315,36 @@ function actualizarInfoClienteSeleccionado() {
     return window.ClientesFeature?.actualizarInfoClienteSeleccionado();
 }
 
+function abrirModalResumenVenta() {
+    const modal = document.getElementById('modalResumenVenta');
+    if (modal) modal.style.display = 'block';
+}
+
+function cerrarModalResumenVenta() {
+    const modal = document.getElementById('modalResumenVenta');
+    if (modal) modal.style.display = 'none';
+}
+
+async function abrirModalBuscarClienteVenta() {
+    return window.ClientesFeature?.abrirModalBuscarClienteVenta();
+}
+
+function cerrarModalBuscarClienteVenta() {
+    return window.ClientesFeature?.cerrarModalBuscarClienteVenta();
+}
+
+function renderListaBusquedaClienteVenta() {
+    return window.ClientesFeature?.renderListaBusquedaClienteVenta();
+}
+
+function seleccionarClienteVenta(clienteId) {
+    return window.ClientesFeature?.seleccionarClienteVenta(clienteId);
+}
+
+function limpiarClienteVenta() {
+    return window.ClientesFeature?.limpiarClienteVenta();
+}
+
 function renderClientes() {
     return window.ClientesFeature?.renderClientes();
 }
@@ -451,6 +481,10 @@ function cerrarModalExcedenteTotalizacion() {
     return window.VentasPaymentsFeature?.cerrarModalExcedenteTotalizacion();
 }
 
+function volverATotalizacionDesdeExcedente() {
+    return window.VentasPaymentsFeature?.volverATotalizacionDesdeExcedente();
+}
+
 function aceptarExcedenteComoSaldoFavor() {
     return window.VentasPaymentsFeature?.aceptarExcedenteComoSaldoFavor();
 }
@@ -570,6 +604,10 @@ function procesarVenta() {
 
 function abrirModalGestionVuelto(venta, monedaSugerida = 'USD') {
     return window.VentasCheckoutFeature?.abrirModalGestionVuelto(venta, monedaSugerida);
+}
+
+function volverATotalizacionDesdeGestionVuelto() {
+    return window.VentasCheckoutFeature?.volverATotalizacionDesdeGestionVuelto();
 }
 
 function sugerirMontoVuelto() {

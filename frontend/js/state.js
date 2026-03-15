@@ -56,6 +56,8 @@ const AppState = {
     nombreEmpresa: '',
     rifEmpresa: '',
     direccionEmpresa: '',
+    telefonoEmpresa: '',
+    correoEmpresa: '',
     
     // UI State
     indiceSeleccionado: -1,

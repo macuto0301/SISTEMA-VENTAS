@@ -55,8 +55,8 @@ const API = {
             }
 
             const res = await fetch(url, {
-                headers,
-                ...options
+                ...options,
+                headers
             });
             if (!res.ok) {
                 let mensaje = `HTTP ${res.status}`;
@@ -175,7 +175,9 @@ const ApiService = {
                     precioVentaLibre: Boolean(data.precioVentaLibre),
                     nombreEmpresa: data.nombreEmpresa || '',
                     rifEmpresa: data.rifEmpresa || '',
-                    direccionEmpresa: data.direccionEmpresa || ''
+                    direccionEmpresa: data.direccionEmpresa || '',
+                    telefonoEmpresa: data.telefonoEmpresa || '',
+                    correoEmpresa: data.correoEmpresa || ''
                 };
             }
         } catch (e) {

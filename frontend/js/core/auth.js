@@ -1,4 +1,6 @@
 const AuthCore = {
+    logoutConfirmacionActiva: false,
+
     obtenerSesionPersistida() {
         return localStorage.getItem('sesion_ventas') || sessionStorage.getItem('sesion_ventas');
     },
@@ -186,14 +188,55 @@ const AuthCore = {
         }
     },
 
-    cerrarSesion() {
-        if (confirm('¿Desea cerrar la sesión?')) {
-            this.limpiarSesionPersistida();
-            window.usuarioLogueado = null;
-            window.AppState.usuarioLogueado = null;
-            window.location.reload();
+    abrirModalCerrarSesion() {
+        const modal = document.getElementById('modalCerrarSesion');
+
+        if (!modal) {
+            this.cerrarSesionConfirmada();
+            return;
         }
+
+        const usuario = document.getElementById('modalCerrarSesionUsuario');
+        this.logoutConfirmacionActiva = true;
+        if (usuario) {
+            usuario.textContent = window.usuarioLogueado?.username || 'este usuario';
+        }
+        modal.style.display = 'block';
+        document.body.classList.add('modal-open');
+
+        const btnConfirmar = document.getElementById('btnConfirmarCerrarSesion');
+        btnConfirmar?.focus();
+    },
+
+    cerrarModalCerrarSesion() {
+        const modal = document.getElementById('modalCerrarSesion');
+
+        if (!modal) {
+            return;
+        }
+
+        this.logoutConfirmacionActiva = false;
+        modal.style.display = 'none';
+        document.body.classList.remove('modal-open');
+    },
+
+    cerrarSesionConfirmada() {
+        this.cerrarModalCerrarSesion();
+        this.limpiarSesionPersistida();
+        window.usuarioLogueado = null;
+        window.AppState.usuarioLogueado = null;
+        window.location.reload();
+    },
+
+    cerrarSesion() {
+        this.abrirModalCerrarSesion();
     }
 };
+
+document.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && AuthCore.logoutConfirmacionActiva) {
+        AuthCore.cerrarModalCerrarSesion();
+    }
+});
 
 window.AuthCore = AuthCore;

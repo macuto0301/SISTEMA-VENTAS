@@ -55,9 +55,29 @@ const VentasCartFeature = {
         console.warn(mensaje);
     },
 
+    mostrarAlertaSegura(mensaje, opciones = {}) {
+        if (typeof window.Utils?.alertaModal === 'function') {
+            return window.Utils.alertaModal(mensaje, opciones);
+        }
+        return this.mostrarNotificacionSegura(mensaje);
+    },
+
     obtenerListaPrecioVentaSeleccionada() {
         const lista = parseInt(document.getElementById('listaPrecioVenta')?.value || '1', 10);
         return this.obtenerListasPrecioDisponibles().includes(lista) ? lista : 1;
+    },
+
+    actualizarEstadoListaPrecioVenta() {
+        const selectListaPrecio = document.getElementById('listaPrecioVenta');
+        if (!selectListaPrecio) return;
+
+        const precioVentaLibreActivo = Boolean(window.AppState?.precioVentaLibre ?? window.precioVentaLibre);
+        const debeBloquearse = carrito.length > 0 && !precioVentaLibreActivo;
+
+        selectListaPrecio.disabled = debeBloquearse;
+        selectListaPrecio.title = debeBloquearse
+            ? 'La lista de precio se bloquea cuando ya hay productos en el carrito y el precio libre esta desactivado'
+            : '';
     },
 
     obtenerPrecioCarritoDesdeProducto(producto, lista = 1) {
@@ -219,6 +239,18 @@ const VentasCartFeature = {
         this.actualizarSeleccionCarritoVisual();
     },
 
+    enfocarCantidadItemSeleccionado() {
+        if (indiceCarritoSeleccionado < 0 || !carrito[indiceCarritoSeleccionado]) return false;
+
+        const fila = document.querySelector(`#carritoBody tr[data-carrito-index="${indiceCarritoSeleccionado}"]`);
+        const inputCantidad = fila?.querySelector('input[type="number"]');
+        if (!inputCantidad) return false;
+
+        inputCantidad.focus();
+        inputCantidad.select?.();
+        return true;
+    },
+
     moverSeleccionCarrito(direccion) {
         if (carrito.length === 0) return;
         this.normalizarIndiceCarrito();
@@ -250,7 +282,10 @@ const VentasCartFeature = {
         const indiceExistente = carrito.findIndex(item => item.productoIndex === productoIndex && item.lista_precio === listaPrecio);
 
         if (producto.cantidad <= 0) {
-            alert('❌ Producto sin stock disponible');
+            this.mostrarAlertaSegura('Producto sin stock disponible', {
+                titulo: 'Sin stock',
+                variante: 'warning'
+            });
             return;
         }
 
@@ -261,7 +296,11 @@ const VentasCartFeature = {
                 existente.cantidad++;
                 existente.subtotal_dolares = existente.precio_dolares * existente.cantidad;
             } else {
-                alert('❌ No hay suficiente stock');
+                this.mostrarAlertaSegura('No hay suficiente stock para agregar otra unidad.', {
+                    titulo: 'Stock insuficiente',
+                    variante: 'warning',
+                    detalle: `Disponibles: ${producto.cantidad}`
+                });
                 return;
             }
         } else {
@@ -291,38 +330,37 @@ const VentasCartFeature = {
         let totalDolares = 0;
 
         if (carrito.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 20px;">🛒 Carrito vacío</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 20px;">🛒 Carrito vacío</td></tr>';
             indiceCarritoSeleccionado = -1;
         } else {
             this.normalizarIndiceCarrito();
             tbody.innerHTML = carrito.map((item, index) => {
                 totalDolares += item.subtotal_dolares;
                 const prodOriginal = productos[item.productoIndex];
-                const metodo = prodOriginal?.metodo_redondeo || 'none';
-
-                const precioBs = this.aplicarRedondeoBsSeguro(item.precio_dolares * tasaDolar, metodo);
-                const subtotalBs = this.aplicarRedondeoBsSeguro(item.subtotal_dolares * tasaDolar, metodo);
                 const precioEditable = this.puedeEditarPrecioVentaSeguro();
+                const codigo = prodOriginal?.codigo || '-';
 
                 return `
                     <tr data-carrito-index="${index}" class="${index === indiceCarritoSeleccionado ? 'carrito-seleccionado' : ''}" onclick="seleccionarFilaCarrito(${index})">
-                        <td>${item.nombre}<br><small style="color:#64748b;">${item.lista_precio_nombre || this.obtenerEtiquetaListaPrecioSegura(item.lista_precio || 1)}</small></td>
-                        <td>
+                        <td class="carrito-col-codigo">${codigo}</td>
+                        <td class="carrito-col-producto">
+                            <div class="carrito-producto-info">
+                                <span class="carrito-producto-nombre">${item.nombre}</span>
+                                <small class="carrito-producto-lista">${item.lista_precio_nombre || this.obtenerEtiquetaListaPrecioSegura(item.lista_precio || 1)}</small>
+                            </div>
+                            <button class="btn-eliminar-item" onclick="event.stopPropagation(); eliminarDelCarrito(${index})" aria-label="Eliminar producto">x</button>
+                        </td>
+                        <td class="carrito-col-cantidad">
+                            <input type="number" min="1" max="${productos[item.productoIndex].cantidad}" 
+                                   value="${item.cantidad}" onchange="actualizarCantidadCarrito(${index}, this.value)" onclick="event.stopPropagation()"
+                                   class="carrito-cantidad-input">
+                        </td>
+                        <td class="carrito-col-precio">
                             ${precioEditable
                                 ? `<button type="button" class="btn-selector-precio-carrito" onclick="event.stopPropagation(); abrirSelectorPrecioCarrito(${index})">$${item.precio_dolares.toFixed(2)}</button>`
                                 : `$${item.precio_dolares.toFixed(2)}`}
                         </td>
-                        <td>Bs ${precioBs.toFixed(2)}</td>
-                        <td>
-                            <input type="number" min="1" max="${productos[item.productoIndex].cantidad}" 
-                                   value="${item.cantidad}" onchange="actualizarCantidadCarrito(${index}, this.value)" onclick="event.stopPropagation()"
-                                   style="width: 60px; padding: 5px;">
-                        </td>
-                        <td style="font-weight: bold;">$${item.subtotal_dolares.toFixed(2)}</td>
-                        <td style="font-weight: bold; color: #007bff;">Bs ${subtotalBs.toFixed(2)}</td>
-                        <td>
-                            <button class="btn-eliminar-item" onclick="eliminarDelCarrito(${index})">🗑️</button>
-                        </td>
+                        <td class="carrito-col-total">$${item.subtotal_dolares.toFixed(2)}</td>
                     </tr>
                 `;
             }).join('');
@@ -334,8 +372,6 @@ const VentasCartFeature = {
         }, 0);
 
         document.getElementById('totalDolares').textContent = `$${totalDolares.toFixed(2)}`;
-        document.getElementById('totalBolivares').textContent = `Bs ${totalBs.toFixed(2)}`;
-
         if (itemsResumen) itemsResumen.textContent = String(carrito.length);
         if (dolaresResumen) dolaresResumen.textContent = `$${totalDolares.toFixed(2)}`;
         if (bolivaresResumen) bolivaresResumen.textContent = `Bs ${totalBs.toFixed(2)}`;
@@ -345,6 +381,7 @@ const VentasCartFeature = {
         } else {
             window.VentasPaymentsFeature?.actualizarResumenPagos?.(totalDolares, totalBs);
         }
+        this.actualizarEstadoListaPrecioVenta();
         this.actualizarSeleccionCarritoVisual();
     },
 
@@ -353,7 +390,10 @@ const VentasCartFeature = {
         const producto = productos[carrito[index].productoIndex];
 
         if (cantidad > producto.cantidad) {
-            alert(`❌ Solo hay ${producto.cantidad} unidades disponibles`);
+            this.mostrarAlertaSegura(`Solo hay ${producto.cantidad} unidades disponibles.`, {
+                titulo: 'Stock insuficiente',
+                variante: 'warning'
+            });
             cantidad = producto.cantidad;
         }
 

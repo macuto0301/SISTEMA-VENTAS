@@ -55,6 +55,13 @@ const VentasPaymentsFeature = {
         modal.style.display = 'none';
     },
 
+    volverATotalizacionDesdeExcedente() {
+        this.cerrarModalExcedenteTotalizacion();
+        if (ventaEnProgreso) {
+            this.abrirModalTotalizacion();
+        }
+    },
+
     aceptarExcedenteComoSaldoFavor() {
         if (!ventaEnProgreso) return;
 

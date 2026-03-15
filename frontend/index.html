@@ -5,6 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sistema de Ventas - Productos en $ y Bs</title>
+    <link rel="icon" type="image/x-icon" href="assets/favicon.ico">
     <link rel="stylesheet" href="styles.css">
     <!-- Flatpickr para forzar formato de fecha -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
@@ -63,8 +64,8 @@
             </section>
 
             <section class="login-panel" aria-labelledby="loginTitle">
-                <div class="login-brand-mark" aria-hidden="true">
-                    <span>SV</span>
+                <div class="login-brand-mark">
+                    <img src="assets/logo-sistema-ventas.webp" alt="Logo Sistema de Ventas" class="login-brand-logo">
                 </div>
                 <div class="login-panel-copy">
                     <span class="login-panel-kicker">Acceso interno</span>
@@ -97,8 +98,7 @@
         <header class="dashboard-header">
             <div class="header-top-row">
                 <div class="brand-block">
-                    <span class="brand-kicker">Centro de operaciones</span>
-                    <h1>Sistema de Gestión de Ventas</h1>
+                    <img src="assets/logo-sistema-ventas.webp" alt="Logo Sistema de Ventas" class="header-brand-logo">
                 </div>
                 <div class="header-right-group">
                     <div id="infoEmpresa" class="empresa-info">
@@ -156,7 +156,10 @@
                         placeholder="🔍 Buscar por nombre, código o descripción..."
                         style="width: 100%; padding: 10px 15px; border-radius: 8px; border: 1px solid #ddd; font-size: 0.9em;">
                 </div>
-                <button id="btnNuevoProducto" type="button" class="btn-primary" onclick="window.ProductosFeature?.mostrarFormularioProducto?.()">➕ Nuevo Producto</button>
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <button id="btnListaPrecios" type="button" class="btn-secondary">📄 Lista de precios</button>
+                    <button id="btnNuevoProducto" type="button" class="btn-primary" onclick="window.ProductosFeature?.mostrarFormularioProducto?.()">➕ Nuevo Producto</button>
+                </div>
             </div>
 
             <div class="productos-grid" id="productosGrid">
@@ -167,32 +170,56 @@
         <!-- Panel de Ventas -->
         <div id="panelVentas" class="tab-panel">
             <div class="panel-header panel-header-surface panel-header-ventas">
-                <div class="pos-title-block">
-                    <span class="section-kicker">Caja</span>
-                    <h2 class="panel-title-compact">Registrar Venta</h2>
-                    <p class="pos-section-copy">Busca un producto, confirma el carrito y abre el cobro sin salir del flujo.</p>
+                <div style="display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(320px, 0.95fr); gap: 16px; align-items: start; width: 100%;">
+                    <div style="display: grid; gap: 10px; align-content: start;">
+                        <div style="display: grid; grid-template-columns: 70px minmax(0, 1fr) auto auto auto; gap: 8px; align-items: center;">
+                            <strong style="font-size: 0.95em;">Clientes :</strong>
+                            <input type="hidden" id="clienteId">
+                            <input type="text" id="cliente" class="form-control" value="Cliente General / Contado" placeholder="Seleccione un cliente..." readonly onclick="abrirModalBuscarClienteVenta()" style="background: #fff; cursor: pointer; min-width: 0;">
+                            <button type="button" id="btnBuscarClienteVenta" class="btn-primary" onclick="abrirModalBuscarClienteVenta()">🔎 Buscar</button>
+                            <button type="button" id="btnLimpiarClienteVenta" class="btn-secondary" onclick="limpiarClienteVenta()">Contado</button>
+                            <button type="button" class="btn-secondary" onclick="crearClienteRapidoDesdeVenta()">Nuevo</button>
+                        </div>
+                        <div style="display: grid; grid-template-columns: 70px minmax(180px, 220px); gap: 8px; align-items: center;">
+                            <strong style="font-size: 0.95em;">Precio :</strong>
+                            <select id="listaPrecioVenta" class="form-control">
+                                <option value="1">Precio 1</option>
+                                <option value="2">Precio 2</option>
+                                <option value="3">Precio 3</option>
+                            </select>
+                        </div>
+                        <div style="display: grid; grid-template-columns: 70px minmax(0, 1fr); gap: 8px; align-items: start;">
+                            <strong style="font-size: 0.95em;">Buscar :</strong>
+                            <div>
+                                <div style="font-weight: 700; margin-bottom: 6px;">Seleccionar Productos (F2)</div>
+                                <div style="position: relative;">
+                                    <input type="text" id="buscarProducto" class="producto-select"
+                                        placeholder="🔍 Buscar producto por nombre o código..." autocomplete="off">
+                                    <div id="sugerenciasProductos" class="sugerencias-productos"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div style="justify-self: end; width: 100%; max-width: 360px;">
+                        <div style="width: 100%; background: #fff; border: 1px solid #cfd8e3; border-radius: 12px; padding: 14px 16px; box-shadow: inset 0 -2px 0 rgba(15, 23, 42, 0.08);">
+                        <div style="display: grid; grid-template-columns: 1fr auto; gap: 8px 18px; align-items: center; font-size: 0.95em;">
+                            <span style="color: #5b6470;">Items</span>
+                            <strong id="posItemsCount">0</strong>
+                            <span style="color: #5b6470;">Total USD</span>
+                            <strong id="posResumenDolares">$0.00</strong>
+                            <span style="color: #5b6470;">Total Bs</span>
+                            <strong id="posResumenBolivares">Bs 0.00</strong>
+                        </div>
+                        </div>
+                        <div style="margin-top: 12px; display: flex; justify-content: flex-end;">
+                            <button type="button" id="btnToggleResumenVenta" class="btn-secondary" onclick="abrirModalResumenVenta()" title="F1">Ver Atajos (F1)</button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <div class="venta-container">
+            <div id="ventaContainer" class="venta-container venta-container-resumen-oculto">
                 <div class="seleccion-productos sales-panel-card">
-                    <h3>Seleccionar Productos (F2)</h3>
-                    <p class="venta-search-hint">Escribe nombre o codigo, usa las flechas para moverte y presiona Enter para agregar rapido.</p>
-                    <div style="position: relative;">
-                        <input type="text" id="buscarProducto" class="producto-select"
-                            placeholder="🔍 Buscar producto por nombre o código..." autocomplete="off">
-                        <div id="sugerenciasProductos" class="sugerencias-productos"></div>
-                    </div>
-
-                    <div style="margin-top: 12px; max-width: 320px;">
-                        <label for="listaPrecioVenta" style="display:block; margin-bottom: 6px; font-weight: 600;">Lista de precio activa:</label>
-                        <select id="listaPrecioVenta" class="form-control">
-                            <option value="1">Precio 1</option>
-                            <option value="2">Precio 2</option>
-                            <option value="3">Precio 3</option>
-                        </select>
-                    </div>
-
                     <div class="carrito-shell">
                         <div class="carrito" id="carrito">
                             <div class="carrito-header-inline">
@@ -204,21 +231,18 @@
                             <table id="tablaCarrito">
                                 <thead>
                                     <tr>
+                                        <th>Codigo</th>
                                         <th>Producto</th>
-                                        <th>Precio $</th>
-                                        <th>Precio Bs</th>
                                         <th>Cantidad</th>
-                                        <th>Subtotal $</th>
-                                        <th>Subtotal Bs</th>
-                                        <th>Accion</th>
+                                        <th>Precio</th>
+                                        <th>Total</th>
                                     </tr>
                                 </thead>
                                 <tbody id="carritoBody"></tbody>
                                 <tfoot>
                                     <tr>
-                                        <td colspan="3"><strong>Total:</strong></td>
+                                        <td colspan="4"><strong>Total:</strong></td>
                                         <td><strong id="totalDolares">$0.00</strong></td>
-                                        <td><strong id="totalBolivares">Bs 0.00</strong></td>
                                     </tr>
                                 </tfoot>
                             </table>
@@ -232,57 +256,6 @@
                     </div>
                 </div>
 
-                <div class="sales-panel-card sales-panel-accent venta-resumen-rapido">
-                    <div class="pos-summary-stack">
-                        <span class="pos-badge">Caja activa</span>
-                        <h3>Cobro</h3>
-                        <p>Valida rapidamente el estado de la venta y abre el modal de cobro cuando el carrito este listo.</p>
-                    </div>
-
-                    <div class="pos-metrics">
-                        <div class="pos-metric">
-                            <span>Items</span>
-                            <strong id="posItemsCount">0</strong>
-                        </div>
-                        <div class="pos-metric">
-                            <span>Total USD</span>
-                            <strong id="posResumenDolares">$0.00</strong>
-                        </div>
-                        <div class="pos-metric">
-                            <span>Total Bs</span>
-                            <strong id="posResumenBolivares">Bs 0.00</strong>
-                        </div>
-                    </div>
-
-                    <div class="pos-flow">
-                        <div class="pos-flow-step"><strong>1</strong><span>Busca el producto y agregalo al carrito.</span></div>
-                        <div class="pos-flow-step"><strong>2</strong><span>Ajusta cantidades o elimina items desde el teclado.</span></div>
-                        <div class="pos-flow-step"><strong>3</strong><span>Abre el cobro con F10 o Ctrl + Enter.</span></div>
-                    </div>
-
-                    <div class="atajos-panel atajos-panel-compacto">
-                        <div class="atajos-panel-header">
-                            <strong>Atajos del POS</strong>
-                            <span>Comandos rapidos de caja</span>
-                        </div>
-                        <div class="atajos-grid">
-                            <div><kbd>F2</kbd><span>Buscar producto</span></div>
-                            <div><kbd>F3</kbd><span>Ir a cliente</span></div>
-                            <div><kbd>F4</kbd><span>Ir a medio de pago</span></div>
-                            <div><kbd>F8</kbd><span>Ir a monto</span></div>
-                            <div><kbd>F9</kbd><span>Agregar pago</span></div>
-                            <div><kbd>F10</kbd><span>Abrir cobro</span></div>
-                            <div><kbd>Ctrl + Enter</kbd><span>Abrir cobro</span></div>
-                            <div><kbd>Esc</kbd><span>Cerrar modal</span></div>
-                            <div><kbd>↑ / ↓</kbd><span>Moverse en carrito</span></div>
-                            <div><kbd>+</kbd><span>Subir cantidad</span></div>
-                            <div><kbd>-</kbd><span>Bajar cantidad</span></div>
-                            <div><kbd>Supr</kbd><span>Eliminar producto</span></div>
-                            <div><kbd>Ctrl + Supr</kbd><span>Limpiar venta</span></div>
-                            <div><kbd>Enter</kbd><span>Agregar producto o pago</span></div>
-                        </div>
-                    </div>
-                </div>
             </div>
         </div>
 
@@ -439,24 +412,54 @@
     </div>
 
     <!-- Modal para crear/editar productos -->
-    <div id="modalProducto" class="modal">
+    <div id="modalProducto" class="modal" onclick="if (event.target === this) { window.ProductosFeature?.cerrarModalProducto?.(); }">
         <div class="modal-content">
             <span id="btnCerrarModalProducto" class="close" onclick="if (window.ProductosFeature?.cerrarModalProducto) { window.ProductosFeature.cerrarModalProducto(); }">&times;</span>
             <h2 id="modalTitulo">Nuevo Producto</h2>
             <form id="formProducto" class="producto-form-grid">
                 <input type="hidden" id="productoId" value="-1">
 
+                <div class="form-group">
+                    <label>Código (opcional):</label>
+                    <input type="text" id="productoCodigo" placeholder="Dejar vacío para auto-generar">
+                </div>
+
                 <div class="form-group producto-form-span-2">
                     <label>Nombre del Producto:</label>
                     <input type="text" id="productoNombre" required>
                 </div>
 
-                <div class="form-group producto-form-span-2">
+                <div class="form-group producto-form-panel">
                     <label>Descripción:</label>
                     <textarea id="productoDescripcion" rows="2" required></textarea>
                 </div>
 
-                <div class="form-group producto-form-span-2">
+                <div class="form-group">
+                    <label>Categoría:</label>
+                    <input type="text" id="productoCategoria" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Ubicación:</label>
+                    <input type="text" id="productoUbicacion" placeholder="Ej: Pasillo A, estante 3">
+                </div>
+
+                <div class="form-group">
+                    <label>Marca:</label>
+                    <input type="text" id="productoMarca" placeholder="Ej: Samsung">
+                </div>
+
+                <div class="form-group">
+                    <label>Modelo:</label>
+                    <input type="text" id="productoModelo" placeholder="Ej: A15">
+                </div>
+
+                <div class="form-group">
+                    <label>Unidad:</label>
+                    <input type="text" id="productoUnidad" placeholder="Ej: unidad, caja, paquete">
+                </div>
+
+                <div class="form-group producto-form-panel producto-form-fotos-panel">
                     <label>Fotos del Producto:</label>
                     <input type="file" id="productoFoto" accept="image/png,image/jpeg,image/webp" multiple>
                     <small style="display: block; margin-top: 4px; color: #666;">Puedes cargar hasta 5 fotos. Cada una se comprime automaticamente y se ajusta a un formato estandar de 800 x 800.</small>
@@ -468,6 +471,52 @@
                 </div>
 
                 <div class="form-group">
+                    <label>Cantidad en Stock:</label>
+                    <input type="number" id="productoCantidad" min="0" value="0" readonly disabled>
+                    <small style="display: block; margin-top: 4px; color: #666;">El stock se actualiza solo desde compras.</small>
+                </div>
+
+                <div class="form-group producto-precios-resumen-box">
+                    <label>Precios:</label>
+                    <button id="btnAbrirPreciosProducto" type="button" class="btn-secondary producto-precios-trigger">Ajustar precios</button>
+                    <div id="productoResumenPrecios" class="producto-precios-resumen-grid">
+                        <div class="producto-precio-chip">
+                            <strong>Costo</strong>
+                            <span id="productoResumenCosto">$0.00</span>
+                        </div>
+                        <div class="producto-precio-chip">
+                            <strong>P1</strong>
+                            <span id="productoResumenPrecio1">$0.00</span>
+                        </div>
+                        <div class="producto-precio-chip">
+                            <strong>P2</strong>
+                            <span id="productoResumenPrecio2">$0.00</span>
+                        </div>
+                        <div class="producto-precio-chip">
+                            <strong>P3</strong>
+                            <span id="productoResumenPrecio3">$0.00</span>
+                        </div>
+                        <div class="producto-precio-chip producto-precio-chip-wide">
+                            <strong>Bs</strong>
+                            <span id="productoResumenPrecioBs">Bs 0.00</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-actions producto-form-span-2">
+                    <button type="submit" class="btn-success">💾 Guardar Producto</button>
+                        <button id="btnCancelarProducto" type="button" class="btn-secondary">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="modalProductoPrecios" class="modal" onclick="if (event.target === this) { window.ProductosFeature?.cerrarModalPreciosProducto?.(); }">
+        <div class="modal-content modal-producto-precios-content">
+            <span id="btnCerrarModalPreciosProducto" class="close" onclick="if (window.ProductosFeature?.cerrarModalPreciosProducto) { window.ProductosFeature.cerrarModalPreciosProducto(); }">&times;</span>
+            <h3>Precios del producto</h3>
+            <div class="producto-precios-modal-grid">
+                <div class="form-group producto-form-span-2 producto-precios-modal-highlight">
                     <label>Precio Costo ($):</label>
                     <input type="number" id="productoPrecioCosto" step="0.01" min="0">
                 </div>
@@ -519,26 +568,94 @@
                         <option value="hundred_up">Centena Superior (100.00)</option>
                     </select>
                 </div>
+            </div>
+            <div class="form-actions producto-precios-modal-actions">
+                <button id="btnCerrarPreciosProducto" type="button" class="btn-primary">Listo</button>
+            </div>
+        </div>
+    </div>
 
-                <div class="form-group">
-                    <label>Cantidad en Stock:</label>
-                    <input type="number" id="productoCantidad" min="0" value="0" readonly disabled>
-                    <small style="display: block; margin-top: 4px; color: #666;">El stock se actualiza solo desde compras.</small>
+    <div id="modalListaPrecios" class="modal" onclick="if (event.target === this) { window.ProductosFeature?.cerrarModalListaPrecios?.(); }">
+        <div class="modal-content modal-lista-precios-content">
+            <span id="btnCerrarModalListaPrecios" class="close">&times;</span>
+            <h3>Lista de precios</h3>
+            <form id="formListaPrecios" class="lista-precios-form-grid">
+                <div class="lista-precios-panel lista-precios-panel-accent">
+                    <div class="lista-precios-panel-header">
+                        <strong>Formato</strong>
+                        <span>Selecciona como quieres generar la lista.</span>
+                    </div>
+                    <div class="lista-precios-inline-grid">
+                        <div class="form-group">
+                            <label for="listaPreciosTipoPrecio">Precio a usar:</label>
+                            <select id="listaPreciosTipoPrecio" required>
+                                <option value="1">Precio 1</option>
+                                <option value="2">Precio 2</option>
+                                <option value="3">Precio 3</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="listaPreciosFormatoSalida">Salida:</label>
+                            <select id="listaPreciosFormatoSalida" required>
+                                <option value="excel">Excel</option>
+                                <option value="pdf">Vista imprimible / PDF</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="lista-precios-inline-grid">
+                        <div class="form-group">
+                            <label for="listaPreciosAlcance">Productos a incluir:</label>
+                            <select id="listaPreciosAlcance">
+                                <option value="filtrado">Solo productos filtrados</option>
+                                <option value="todos">Todo el inventario</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="listaPreciosCantidadModo">Cantidades:</label>
+                            <select id="listaPreciosCantidadModo">
+                                <option value="blank">Dejar vacias</option>
+                                <option value="one">Colocar 1 en cada producto</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="listaPreciosDescuento">Descuento %:</label>
+                            <input type="number" id="listaPreciosDescuento" min="0" max="100" step="0.01" value="0">
+                        </div>
+                    </div>
+                    <label class="lista-precios-checkline">
+                        <input type="checkbox" id="listaPreciosIncluirSinExistencia">
+                        <span>Incluir productos sin existencia</span>
+                    </label>
                 </div>
 
-                <div class="form-group">
-                    <label>Categoría:</label>
-                    <input type="text" id="productoCategoria" required>
+                <div class="lista-precios-panel">
+                    <div class="lista-precios-panel-header">
+                        <strong>Datos del cliente</strong>
+                        <span>Se imprimen en la cabecera de la lista.</span>
+                    </div>
+                    <div class="lista-precios-form-grid-inner">
+                        <div class="form-group lista-precios-span-2">
+                            <label for="listaPreciosCliente">Cliente:</label>
+                            <input type="text" id="listaPreciosCliente" placeholder="Nombre o razon social">
+                        </div>
+                        <div class="form-group lista-precios-span-2">
+                            <label for="listaPreciosDireccion">Direc:</label>
+                            <textarea id="listaPreciosDireccion" rows="2" placeholder="Direccion del cliente"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="listaPreciosTelefono">Tel:</label>
+                            <input type="text" id="listaPreciosTelefono" placeholder="0412...">
+                        </div>
+                        <div class="form-group">
+                            <label for="listaPreciosRif">RIF:</label>
+                            <input type="text" id="listaPreciosRif" placeholder="J-12345678-9">
+                        </div>
+                    </div>
                 </div>
 
-                <div class="form-group">
-                    <label>Código (opcional):</label>
-                    <input type="text" id="productoCodigo" placeholder="Dejar vacío para auto-generar">
-                </div>
-
-                <div class="form-actions producto-form-span-2">
-                    <button type="submit" class="btn-success">💾 Guardar Producto</button>
-                        <button id="btnCancelarProducto" type="button" class="btn-secondary">Cancelar</button>
+                <div class="form-actions lista-precios-span-2">
+                    <button id="btnGenerarListaPrecios" type="submit" class="btn-success">Generar lista</button>
+                    <button id="btnCancelarListaPrecios" type="button" class="btn-secondary">Cancelar</button>
                 </div>
             </form>
         </div>
@@ -600,7 +717,7 @@
                 style="background: #f8f9fa; padding: 15px; border-radius: 10px; border: 1px solid #eee; margin-bottom: 20px;">
                 <h4
                     style="margin-top: 0; margin-bottom: 15px; font-size: 0.95em; border-bottom: 1px solid #ddd; padding-bottom: 5px;">
-                    Añadir Entrega</h4>
+                    Añadir Entrega (F9)</h4>
 
                 <div style="margin-bottom: 12px;">
                     <label
@@ -649,7 +766,7 @@
                     </div>
                 </div>
 
-                <button onclick="agregarVueltoALista()" class="btn-primary"
+                <button onclick="agregarVueltoALista()" class="btn-primary" title="F9 o Enter en campos de vuelto"
                     style="width: 100%; padding: 10px; font-size: 0.9em;">➕ Agregar a la lista</button>
             </div>
 
@@ -665,7 +782,7 @@
             <div
                 style="text-align: right; border-top: 1px solid #eee; padding-top: 15px; display: flex; gap: 10px; justify-content: flex-end;">
                 <button class="btn-secondary" onclick="finalizarVentaSinVuelto()">No entregar vuelto</button>
-                <button class="btn-success" onclick="confirmarVuelto()">✅ Finalizar Venta</button>
+                <button class="btn-success" onclick="confirmarVuelto()" title="F10 o Ctrl+Enter">✅ Finalizar Venta (F10)</button>
             </div>
         </div>
     </div>
@@ -675,8 +792,8 @@
             <span class="close" onclick="cerrarModalVuelto()">&times;</span>
             <h2>✅ Venta Procesada</h2>
             <div id="vueltoInfo" class="vuelto-info"></div>
-            <button onclick="cerrarModalVuelto()" class="btn-primary"
-                style="width: 100%; padding: 12px; font-size: 1.1em;">Aceptar</button>
+            <button onclick="cerrarModalVuelto()" class="btn-primary" title="F10 o Enter"
+                style="width: 100%; padding: 12px; font-size: 1.1em;">Aceptar (F10)</button>
         </div>
     </div>
 
@@ -758,19 +875,6 @@
                     </div>
                 </div>
 
-                <div class="form-group">
-                    <label for="cliente">Cliente (opcional):</label>
-                    <input type="hidden" id="clienteId">
-                    <div style="display: grid; grid-template-columns: 2fr auto; gap: 10px; align-items: start;">
-                        <select id="cliente" onchange="manejarCambioClienteVenta()">
-                            <option value="">Cliente General / Contado</option>
-                        </select>
-                        <button type="button" class="btn-secondary" onclick="crearClienteRapidoDesdeVenta()">Nuevo</button>
-                    </div>
-                    <div id="clienteSeleccionadoCard" class="cliente-seleccionado-card"></div>
-                    <small id="clienteSaldoInfo" style="display: block; margin-top: 6px; color: #666;">Sin saldo a favor disponible.</small>
-                </div>
-
                 <div id="panelSaldoFavorCliente" class="sales-subcard" style="background: #fff8e1; padding: 12px; border-radius: 10px; margin-bottom: 20px; display: none;">
                     <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;">
                         <strong>Saldo a favor del cliente</strong>
@@ -840,6 +944,25 @@
         </div>
     </div>
 
+    <div id="modalCerrarSesion" class="modal"
+        onclick="if (event.target === this) window.AuthCore?.cerrarModalCerrarSesion?.()">
+        <div class="modal-content modal-small modal-cerrar-sesion">
+            <span class="close" onclick="window.AuthCore?.cerrarModalCerrarSesion?.()">&times;</span>
+            <div class="modal-cerrar-sesion-badge">Sesion activa</div>
+            <h2>Cerrar sesion</h2>
+            <p class="modal-cerrar-sesion-texto">
+                Va a salir de la sesion actual de <strong id="modalCerrarSesionUsuario">este usuario</strong>.
+            </p>
+            <p class="modal-cerrar-sesion-ayuda">
+                Confirme solo si ya termino sus operaciones en el sistema.
+            </p>
+            <div class="modal-cerrar-sesion-acciones">
+                <button id="btnCancelarCerrarSesion" type="button" class="btn-secondary" onclick="window.AuthCore?.cerrarModalCerrarSesion?.()">Continuar en el sistema</button>
+                <button id="btnConfirmarCerrarSesion" type="button" class="btn-primary" onclick="window.AuthCore?.cerrarSesionConfirmada?.()">Si, cerrar sesion</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal Configuración -->
     <div id="modalConfiguracion" class="modal">
         <div class="modal-content" style="max-width: 600px;">
@@ -867,6 +990,18 @@
                         <label for="configDireccionEmpresa" style="font-weight: bold; display: block; margin-bottom: 5px;">Dirección:</label>
                         <textarea id="configDireccionEmpresa" rows="2" placeholder="Av. Principal, Ciudad..."
                             style="width: 100%; padding: 8px; font-size: 0.95em; border: 1px solid #ccc; border-radius: 5px; resize: vertical;"></textarea>
+                    </div>
+
+                    <div style="margin-bottom: 10px;">
+                        <label for="configTelefonoEmpresa" style="font-weight: bold; display: block; margin-bottom: 5px;">Telefono:</label>
+                        <input type="text" id="configTelefonoEmpresa" placeholder="0412-0000000"
+                            style="width: 100%; padding: 8px; font-size: 0.95em; border: 1px solid #ccc; border-radius: 5px;">
+                    </div>
+
+                    <div style="margin-bottom: 10px;">
+                        <label for="configCorreoEmpresa" style="font-weight: bold; display: block; margin-bottom: 5px;">Correo:</label>
+                        <input type="email" id="configCorreoEmpresa" placeholder="empresa@correo.com"
+                            style="width: 100%; padding: 8px; font-size: 0.95em; border: 1px solid #ccc; border-radius: 5px;">
                     </div>
                 </div>
 
@@ -1165,9 +1300,71 @@
         </div>
     </div>
 
+    <div id="modalBuscarClienteVenta" class="modal">
+        <div class="modal-content" style="max-width: 680px;">
+            <span class="close" onclick="cerrarModalBuscarClienteVenta()">&times;</span>
+            <h2 style="text-align: center; margin-bottom: 18px;">Buscar Cliente para Venta</h2>
+
+            <div style="margin-bottom: 16px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+                <input type="text" id="buscarClienteVentaModal" class="form-control" placeholder="Buscar por nombre, documento, telefono..." oninput="renderListaBusquedaClienteVenta()" style="flex: 1; min-width: 260px;">
+            </div>
+
+            <div id="listaBusquedaClienteVenta" style="max-height: 420px; overflow-y: auto;"></div>
+
+            <div style="text-align: right; border-top: 1px solid #eee; padding-top: 15px; margin-top: 15px; display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap;">
+                <button class="btn-secondary" onclick="limpiarClienteVenta(); cerrarModalBuscarClienteVenta();">Usar contado</button>
+                <button class="btn-secondary" onclick="cerrarModalBuscarClienteVenta()">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modalResumenVenta" class="modal">
+        <div class="modal-content sales-panel-card sales-panel-accent venta-resumen-rapido" style="max-width: 680px; border-radius: 12px; max-height: 85vh; overflow-y: auto;">
+            <span class="close" onclick="cerrarModalResumenVenta()">&times;</span>
+            <div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; align-items: start; margin-top: 10px;">
+                <div>
+                    <div class="pos-summary-stack">
+                        <span class="pos-badge">Caja activa</span>
+                        <h3>Cobro</h3>
+                        <p>Valida rapidamente el estado de la venta y abre el modal de cobro cuando el carrito este listo.</p>
+                    </div>
+
+                    <div class="pos-flow">
+                        <div class="pos-flow-step"><strong>1</strong><span>Busca el producto y agregalo al carrito.</span></div>
+                        <div class="pos-flow-step"><strong>2</strong><span>Ajusta cantidades o elimina items desde el teclado.</span></div>
+                        <div class="pos-flow-step"><strong>3</strong><span>Abre el cobro con F10 o Ctrl + Enter.</span></div>
+                    </div>
+                </div>
+
+                <div class="atajos-panel atajos-panel-compacto" style="margin-top: 0;">
+                    <div class="atajos-panel-header">
+                        <strong>Atajos del POS</strong>
+                        <span>Comandos rapidos de caja</span>
+                    </div>
+                    <div class="atajos-grid">
+                        <div><kbd>F2</kbd><span>Buscar producto</span></div>
+                        <div><kbd>F3</kbd><span>Ir a cliente</span></div>
+                        <div><kbd>F4</kbd><span>Ir a medio de pago</span></div>
+                        <div><kbd>F8</kbd><span>Ir a monto</span></div>
+                        <div><kbd>F9</kbd><span>Agregar pago</span></div>
+                        <div><kbd>F10</kbd><span>Abrir cobro</span></div>
+                        <div><kbd>Ctrl + Enter</kbd><span>Abrir cobro</span></div>
+                        <div><kbd>Esc</kbd><span>Cerrar modal</span></div>
+                        <div><kbd>↑ / ↓</kbd><span>Moverse en carrito</span></div>
+                        <div><kbd>+</kbd><span>Subir cantidad</span></div>
+                        <div><kbd>-</kbd><span>Bajar cantidad</span></div>
+                        <div><kbd>Supr</kbd><span>Eliminar producto</span></div>
+                        <div><kbd>Ctrl + Supr</kbd><span>Limpiar venta</span></div>
+                        <div><kbd>Enter</kbd><span>Agregar producto o pago</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal Compra -->
     <div id="modalCompra" class="modal">
-        <div class="modal-content" style="max-width: 700px;">
+        <div class="modal-content">
             <span class="close" onclick="cerrarModalCompra()">&times;</span>
             <h2 style="text-align: center; margin-bottom: 20px;">🛒 Nueva Compra</h2>
             
@@ -1226,6 +1423,70 @@
             <div style="text-align: right; border-top: 1px solid #eee; padding-top: 15px;">
                 <button class="btn-secondary" onclick="cerrarModalCompra()">Cancelar</button>
                 <button class="btn-primary" onclick="guardarCompra()">💾 Registrar Compra</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modalCompraPrecios" class="modal">
+        <div class="modal-content" style="max-width: 720px;">
+            <span class="close" onclick="cerrarModalPreciosCompra()">&times;</span>
+            <h3 style="margin-bottom: 8px;">Actualizar precios</h3>
+            <p style="margin: 0 0 18px 0; color: #64748b;">Ajusta el costo y los precios de venta del producto agregado a la compra.</p>
+            <input type="hidden" id="compraPrecioIndex">
+            <div style="margin-bottom: 16px; padding: 12px 14px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px;">
+                <strong id="compraPrecioProductoNombre">Producto</strong>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-bottom: 16px;">
+                <div>
+                    <label for="compraPrecioCostoModal" style="font-weight: bold; display: block; margin-bottom: 5px;">Costo ($):</label>
+                    <input type="number" id="compraPrecioCostoModal" step="0.01" min="0" oninput="recalcularTodosLosPreciosCompra()" style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;">
+                </div>
+                <div>
+                    <label for="compraPrecioBolivaresModal" style="font-weight: bold; display: block; margin-bottom: 5px;">Precio en Bs:</label>
+                    <input type="number" id="compraPrecioBolivaresModal" step="0.01" min="0" oninput="calcularPrecioDolaresCompra()" style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;">
+                </div>
+                <div>
+                    <label for="compraMetodoRedondeoModal" style="font-weight: bold; display: block; margin-bottom: 5px;">Redondeo:</label>
+                    <select id="compraMetodoRedondeoModal" onchange="calcularPrecioBolivaresCompra()" style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;">
+                        <option value="none">Sin Redondeo</option>
+                        <option value="no_decimals">Sin Decimales</option>
+                        <option value="five_cents">Cinco céntimos (0.05)</option>
+                        <option value="unit_up">Unidad Superior</option>
+                        <option value="five_units">Cinco Unidades (5.00)</option>
+                        <option value="ten_up">Decena Superior (10.00)</option>
+                        <option value="hundred_up">Centena Superior (100.00)</option>
+                    </select>
+                </div>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 18px;">
+                <div>
+                    <label for="compraPorcentajeGanancia1Modal" style="font-weight: bold; display: block; margin-bottom: 5px;">% Ganancia P1:</label>
+                    <input type="number" id="compraPorcentajeGanancia1Modal" step="0.0001" min="0" oninput="recalcularPrecioCompraDesdePorcentaje(1)" style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;">
+                </div>
+                <div>
+                    <label for="compraPrecioDolares1Modal" style="font-weight: bold; display: block; margin-bottom: 5px;">Precio Venta P1 ($):</label>
+                    <input type="number" id="compraPrecioDolares1Modal" step="0.01" min="0" oninput="recalcularPorcentajeCompraDesdePrecio(1)" style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;">
+                </div>
+                <div>
+                    <label for="compraPorcentajeGanancia2Modal" style="font-weight: bold; display: block; margin-bottom: 5px;">% Ganancia P2:</label>
+                    <input type="number" id="compraPorcentajeGanancia2Modal" step="0.0001" min="0" oninput="recalcularPrecioCompraDesdePorcentaje(2)" style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;">
+                </div>
+                <div>
+                    <label for="compraPrecioDolares2Modal" style="font-weight: bold; display: block; margin-bottom: 5px;">Precio Venta P2 ($):</label>
+                    <input type="number" id="compraPrecioDolares2Modal" step="0.01" min="0" oninput="recalcularPorcentajeCompraDesdePrecio(2)" style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;">
+                </div>
+                <div>
+                    <label for="compraPorcentajeGanancia3Modal" style="font-weight: bold; display: block; margin-bottom: 5px;">% Ganancia P3:</label>
+                    <input type="number" id="compraPorcentajeGanancia3Modal" step="0.0001" min="0" oninput="recalcularPrecioCompraDesdePorcentaje(3)" style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;">
+                </div>
+                <div>
+                    <label for="compraPrecioDolares3Modal" style="font-weight: bold; display: block; margin-bottom: 5px;">Precio Venta P3 ($):</label>
+                    <input type="number" id="compraPrecioDolares3Modal" step="0.01" min="0" oninput="recalcularPorcentajeCompraDesdePrecio(3)" style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;">
+                </div>
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+                <button type="button" class="btn-secondary" onclick="cerrarModalPreciosCompra()">Cancelar</button>
+                <button type="button" class="btn-primary" onclick="guardarPreciosCompra()">Aplicar precios</button>
             </div>
         </div>
     </div>

@@ -45,6 +45,30 @@ const ClientesFeature = {
         window.StateCacheCore?.actualizarPaginacion?.(nombre, pagination);
     },
 
+    escaparHtml(valor) {
+        return String(valor ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    },
+
+    sincronizarBusquedaClientes(valor) {
+        const input = document.getElementById('buscarCliente');
+        if (input && input.value !== valor) {
+            input.value = valor;
+        }
+    },
+
+    construirFilasTablaClientes() {
+        return (window.clientes || []).map((cliente, index) => ({
+            ...cliente,
+            __rowId: cliente.id || `cliente-${index}`,
+            __contacto: [cliente.telefono, cliente.email].filter(Boolean).join(' | ')
+        }));
+    },
+
     async cargarClientes(options = {}) {
         const paginacionActual = this.obtenerPaginacion('clientes');
         const page = options.page || paginacionActual.page || 1;
@@ -63,16 +87,17 @@ const ClientesFeature = {
     },
 
     renderSelectClientesVenta() {
-        const select = document.getElementById('cliente');
-        if (!select) return;
-
         const valorActual = document.getElementById('clienteId')?.value || '';
-        select.innerHTML = '<option value="">Cliente General / Contado</option>' + window.clientes.map(cliente => `
-            <option value="${cliente.id}">${cliente.nombre}${cliente.documento ? ` - ${cliente.documento}` : ''}</option>
-        `).join('');
-
-        if (valorActual) {
-            select.value = valorActual;
+        const input = document.getElementById('cliente');
+        if (input) {
+            if (valorActual) {
+                const cliente = window.clientes.find(item => String(item.id) === String(valorActual));
+                input.value = cliente
+                    ? `${cliente.nombre}${cliente.documento ? ` - ${cliente.documento}` : ''}`
+                    : 'Cliente General / Contado';
+            } else {
+                input.value = 'Cliente General / Contado';
+            }
         }
 
         this.actualizarInfoClienteSeleccionado();
@@ -85,11 +110,94 @@ const ClientesFeature = {
     },
 
     manejarCambioClienteVenta() {
-        const select = document.getElementById('cliente');
         const hidden = document.getElementById('clienteId');
-        if (hidden) hidden.value = select?.value || '';
+        if (!hidden) return;
         this.actualizarInfoClienteSeleccionado();
         window.actualizarListaPagos();
+    },
+
+    async abrirModalBuscarClienteVenta() {
+        const modal = document.getElementById('modalBuscarClienteVenta');
+        const input = document.getElementById('buscarClienteVentaModal');
+        if (input) input.value = '';
+
+        try {
+            const response = await window.ApiService.cargarClientes({ page: 1, pageSize: 200, search: '' });
+            window.AppState.clientesVentaBusqueda = response.items || [];
+        } catch (e) {
+            window.AppState.clientesVentaBusqueda = [...window.clientes];
+        }
+
+        this.renderListaBusquedaClienteVenta();
+        if (modal) modal.style.display = 'block';
+        if (input) setTimeout(() => input.focus(), 60);
+    },
+
+    cerrarModalBuscarClienteVenta() {
+        const modal = document.getElementById('modalBuscarClienteVenta');
+        if (modal) modal.style.display = 'none';
+    },
+
+    renderListaBusquedaClienteVenta() {
+        const contenedor = document.getElementById('listaBusquedaClienteVenta');
+        const termino = (document.getElementById('buscarClienteVentaModal')?.value || '').trim().toLowerCase();
+        if (!contenedor) return;
+
+        const listaBase = (window.AppState.clientesVentaBusqueda && window.AppState.clientesVentaBusqueda.length)
+            ? window.AppState.clientesVentaBusqueda
+            : window.clientes;
+
+        const lista = listaBase.filter(cliente => {
+            if (!termino) return true;
+            return [cliente.nombre, cliente.documento, cliente.telefono, cliente.email]
+                .some(valor => String(valor || '').toLowerCase().includes(termino));
+        });
+
+        if (!lista.length) {
+            contenedor.innerHTML = '<div class="mensaje-vacio">No hay clientes para mostrar.</div>';
+            return;
+        }
+
+        contenedor.innerHTML = lista.map(cliente => `
+            <button type="button" onclick="window.ClientesFeature?.seleccionarClienteVenta?.(${cliente.id})" style="width: 100%; text-align: left; border: 1px solid #e6e6e6; background: white; border-radius: 10px; padding: 14px; margin-bottom: 10px; cursor: pointer;">
+                <div style="display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:6px;">
+                    <strong>${cliente.nombre}</strong>
+                    <span style="color:#5b6470;">${cliente.documento || 'Sin documento'}</span>
+                </div>
+                <div style="display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap:10px; font-size:0.92em; color:#334155;">
+                    <div>Por cobrar: <strong>$${(cliente.saldo_por_cobrar_usd || 0).toFixed(2)}</strong></div>
+                    <div>Saldo a favor: <strong>$${(cliente.saldo_a_favor_usd || 0).toFixed(2)}</strong></div>
+                </div>
+            </button>
+        `).join('');
+    },
+
+    seleccionarClienteVenta(clienteId) {
+        const cliente = window.clientes.find(item => Number(item.id) === Number(clienteId))
+            || window.AppState.clientesVentaBusqueda?.find(item => Number(item.id) === Number(clienteId))
+            || null;
+        const hidden = document.getElementById('clienteId');
+        const input = document.getElementById('cliente');
+
+        if (hidden) hidden.value = cliente ? String(cliente.id) : '';
+        if (input) {
+            input.value = cliente
+                ? `${cliente.nombre}${cliente.documento ? ` - ${cliente.documento}` : ''}`
+                : 'Cliente General / Contado';
+        }
+
+        this.cerrarModalBuscarClienteVenta();
+        this.actualizarInfoClienteSeleccionado();
+        window.actualizarListaPagos?.();
+    },
+
+    limpiarClienteVenta() {
+        const hidden = document.getElementById('clienteId');
+        const input = document.getElementById('cliente');
+        if (hidden) hidden.value = '';
+        if (input) input.value = 'Cliente General / Contado';
+        this.actualizarInfoClienteSeleccionado();
+        window.actualizarListaPagos?.();
     },
 
     actualizarInfoClienteSeleccionado() {
@@ -146,36 +254,130 @@ const ClientesFeature = {
         const contenedor = document.getElementById('listaClientes');
         if (!contenedor) return;
 
-        if (!window.clientes.length) {
-            contenedor.innerHTML = '<div class="mensaje-vacio">No hay clientes registrados</div>';
+        if (!window.SVTable) {
+            contenedor.innerHTML = '<div class="mensaje-vacio">El componente de tabla no esta disponible</div>';
             return;
         }
 
-        contenedor.innerHTML = window.clientes.map(cliente => `
-            <div class="producto-card" style="margin-bottom: 12px;">
-                <div class="cliente-card-header">
-                    ${this.renderAvatarCliente(cliente)}
-                    <div style="flex: 1; min-width: 0;">
-                        <div class="producto-header" style="margin-bottom: 0;">
-                            <h3>${cliente.nombre}</h3>
-                            <span class="producto-codigo">${cliente.documento || 'Sin documento'}</span>
+        const paginacion = this.obtenerPaginacion('clientes');
+        const busquedaActual = String(document.getElementById('buscarCliente')?.value || '').trim();
+        const filas = this.construirFilasTablaClientes();
+
+        contenedor.innerHTML = '<div id="tablaClientesGestion"></div>';
+
+        const instanciaExistente = window.SVTable.getInstance?.('tabla-clientes-gestion');
+        if (instanciaExistente) {
+            instanciaExistente.state.search = busquedaActual;
+            instanciaExistente.state.draftSearch = busquedaActual;
+            instanciaExistente.state.page = Number(paginacion.page || 1);
+        }
+
+        window.SVTable.mount({
+            id: 'tabla-clientes-gestion',
+            container: 'tablaClientesGestion',
+            title: 'Clientes',
+            ariaLabel: 'Tabla de clientes',
+            rows: filas,
+            rowId: row => row.__rowId,
+            exportFileName: 'clientes',
+            searchPlaceholder: 'Buscar clientes por nombre, documento, telefono o correo',
+            emptyState: 'No hay clientes registrados',
+            pageSize: paginacion.page_size || 10,
+            remotePagination: {
+                enabled: true,
+                page: paginacion.page || 1,
+                pageSize: paginacion.page_size || 10,
+                total: paginacion.total || filas.length,
+                totalPages: paginacion.total_pages || 1,
+                onPageChange: ({ page, pageSize, search }) => this.cargarClientes({ page, pageSize, search }),
+                onPageSizeChange: ({ page, pageSize, search }) => this.cargarClientes({ page, pageSize, search }),
+                onQueryChange: ({ page, pageSize, search }) => {
+                    this.sincronizarBusquedaClientes(search || '');
+                    this.cargarClientes({ page, pageSize, search });
+                }
+            },
+            columns: [
+                {
+                    id: 'cliente',
+                    label: 'Cliente',
+                    key: 'nombre',
+                    filterable: true,
+                    render: row => `
+                        <div style="display:flex; align-items:center; gap:8px; min-width:220px;">
+                            ${this.renderAvatarCliente(row, 'cliente-card-avatar')}
+                            <div class="sv-table-stack sv-table-stack--dense" style="min-width:0;">
+                                <strong style="line-height:1.2;">${this.escaparHtml(row.nombre || 'Sin nombre')}</strong>
+                                <small style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${this.escaparHtml(row.documento || 'Sin documento')}</small>
+                            </div>
                         </div>
-                    </div>
-                </div>
-                <div class="producto-descripcion">${cliente.telefono || 'Sin telefono'}${cliente.email ? ` | ${cliente.email}` : ''}</div>
-                <div class="producto-precios">
-                    <div style="display: flex; flex-direction: column; gap: 6px;">
-                        <span class="precio-dolar">Saldo a favor: $${(cliente.saldo_a_favor_usd || 0).toFixed(2)}</span>
-                        <span class="precio-bolivar" style="color: #b45309;">Por cobrar: $${(cliente.saldo_por_cobrar_usd || 0).toFixed(2)}</span>
-                    </div>
-                </div>
-                <div class="producto-categoria">${cliente.direccion || 'Sin direccion'}</div>
-                <div class="producto-acciones">
-                    <button class="btn-editar" onclick="window.ClientesFeature?.editarCliente?.(${cliente.id})">✏️ Editar</button>
-                    <button class="btn-secondary" onclick="window.ClientesFeature?.verEstadoCuentaCliente?.(${cliente.id})">📄 Estado de Cuenta</button>
-                </div>
-            </div>
-        `).join('');
+                    `,
+                    allowHtml: true,
+                    searchValue: row => `${row.nombre || ''} ${row.documento || ''}`
+                },
+                {
+                    id: 'contacto',
+                    label: 'Contacto',
+                    key: '__contacto',
+                    filterable: true,
+                    render: row => row.__contacto || 'Sin contacto',
+                    searchValue: row => `${row.telefono || ''} ${row.email || ''}`
+                },
+                {
+                    id: 'direccion',
+                    label: 'Direccion',
+                    key: 'direccion',
+                    filterable: true,
+                    render: row => row.direccion || 'Sin direccion'
+                },
+                {
+                    id: 'favor',
+                    label: 'Saldo a favor',
+                    key: 'saldo_a_favor_usd',
+                    type: 'money',
+                    currency: '$',
+                    align: 'right',
+                    filterable: true
+                },
+                {
+                    id: 'cobrar',
+                    label: 'Por cobrar',
+                    key: 'saldo_por_cobrar_usd',
+                    type: 'money',
+                    currency: '$',
+                    align: 'right',
+                    filterable: true
+                },
+                {
+                    id: 'acciones',
+                    label: 'Acciones',
+                    type: 'actions',
+                    sortable: false,
+                    searchable: false,
+                    hideable: false,
+                    align: 'center',
+                    render: row => `
+                        <div style="display:flex; align-items:center; justify-content:center; gap:6px; flex-wrap:nowrap;">
+                            <button onclick="window.ClientesFeature?.editarCliente?.(${row.id})" class="btn-small" style="background:#f59e0b; color:white; min-height:30px; padding:4px 8px; font-size:12px; border-radius:10px;" title="Editar cliente">✏️</button>
+                            <button onclick="window.ClientesFeature?.verEstadoCuentaCliente?.(${row.id})" class="btn-small" style="background:#2563eb; color:white; min-height:30px; padding:4px 8px; font-size:12px; border-radius:10px;" title="Estado de cuenta">📄</button>
+                        </div>
+                    `,
+                    allowHtml: true,
+                    exportable: false
+                }
+            ],
+            bulkActions: [
+                {
+                    id: 'export-selected-csv',
+                    label: 'Exportar seleccion CSV',
+                    handler: () => window.SVTable.exportSelected('tabla-clientes-gestion', 'csv')
+                },
+                {
+                    id: 'clear-selection',
+                    label: 'Limpiar seleccion',
+                    handler: () => window.SVTable.clearSelection('tabla-clientes-gestion')
+                }
+            ]
+        });
     },
 
     abrirModalCliente(clienteId = null, seleccionarDespues = false) {
@@ -238,10 +440,7 @@ const ClientesFeature = {
 
             const clienteGuardadoId = respuesta?.cliente?.id || id;
             if (seleccionarDespues && clienteGuardadoId) {
-                document.getElementById('cliente').value = String(clienteGuardadoId);
-                document.getElementById('clienteId').value = String(clienteGuardadoId);
-                this.actualizarInfoClienteSeleccionado();
-                window.actualizarListaPagos();
+                this.seleccionarClienteVenta(clienteGuardadoId);
             }
 
             this.cerrarModalCliente();

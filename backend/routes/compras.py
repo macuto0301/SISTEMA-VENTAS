@@ -8,6 +8,26 @@ from pagination import build_paginated_response, get_pagination_params, has_pagi
 
 compras_bp = Blueprint('compras', __name__)
 
+PRICE_FIELDS = (
+    ('precio_1_dolares', 'porcentaje_ganancia_1', 'precio_1'),
+    ('precio_2_dolares', 'porcentaje_ganancia_2', 'precio_2'),
+    ('precio_3_dolares', 'porcentaje_ganancia_3', 'precio_3'),
+)
+
+
+def registrar_historial_precios_compra(producto: Producto, valores_anteriores: dict) -> None:
+    for precio_field, _, tipo_precio in PRICE_FIELDS:
+        precio_anterior = round(float(valores_anteriores.get(precio_field) or 0.0), 2)
+        precio_nuevo = round(float(getattr(producto, precio_field, 0.0) or 0.0), 2)
+        if abs(precio_anterior - precio_nuevo) > 0.0001:
+            db.session.add(HistorialPrecio(
+                producto_id=producto.id,
+                precio_anterior=precio_anterior,
+                precio_nuevo=precio_nuevo,
+                tipo_precio=tipo_precio,
+                motivo='compra'
+            ))
+
 @compras_bp.route('/', methods=['GET'])
 def get_compras():
     try:
@@ -85,6 +105,10 @@ def get_compras():
 def crear_compra():
     data = request.get_json()
     try:
+        nro_factura = (data.get('nro_factura') or '').strip()
+        if not nro_factura:
+            return jsonify({'error': 'El numero de factura es obligatorio'}), 400
+
         # Verificar que el proveedor existe
         from models import Proveedor
         proveedor_id = data.get('proveedor_id')
@@ -96,7 +120,7 @@ def crear_compra():
         
         nueva = Compra(
             proveedor_id=proveedor_id,
-            nro_factura=data.get('nro_factura'),
+            nro_factura=nro_factura,
             fecha=datetime.strptime(data['fecha'], '%Y-%m-%d').date() if data.get('fecha') else datetime.utcnow().date(),
             fecha_libro=datetime.strptime(data['fecha_libro'], '%Y-%m-%d').date() if data.get('fecha_libro') else None,
             total_dolares=data['total_dolares'],
@@ -120,9 +144,26 @@ def crear_compra():
 
             producto = Producto.query.get(item.get('producto_id'))
             if producto:
+                precios_anteriores = {
+                    'precio_1_dolares': producto.precio_1_dolares,
+                    'precio_2_dolares': producto.precio_2_dolares,
+                    'precio_3_dolares': producto.precio_3_dolares,
+                }
                 precio_anterior = producto.precio_costo
                 producto.cantidad += item['cantidad']
                 producto.precio_costo = item['precio_unitario']
+
+                for precio_field, porcentaje_field, _ in PRICE_FIELDS:
+                    if item.get(precio_field) is not None:
+                        setattr(producto, precio_field, float(item.get(precio_field) or 0))
+                    if item.get(porcentaje_field) is not None:
+                        setattr(producto, porcentaje_field, float(item.get(porcentaje_field) or 0))
+
+                if item.get('metodo_redondeo') is not None:
+                    producto.metodo_redondeo = item.get('metodo_redondeo') or 'none'
+
+                producto.precio_dolares = producto.precio_1_dolares
+                producto.porcentaje_ganancia = producto.porcentaje_ganancia_1
                 
                 if precio_anterior != item['precio_unitario']:
                     historial = HistorialPrecio(
@@ -133,6 +174,8 @@ def crear_compra():
                         motivo='compra'
                     )
                     db.session.add(historial)
+
+                registrar_historial_precios_compra(producto, precios_anteriores)
 
         db.session.commit()
         return jsonify({

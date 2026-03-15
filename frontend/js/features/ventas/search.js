@@ -42,6 +42,14 @@ const VentasSearchFeature = {
     },
 
     manejarTecladoBusqueda(e) {
+        if (e.key === 'Tab') {
+            const movioFoco = window.VentasCartFeature?.enfocarCantidadItemSeleccionado?.();
+            if (movioFoco) {
+                e.preventDefault();
+            }
+            return;
+        }
+
         if (resultadosBusqueda.length === 0) return;
 
         if (e.key === 'ArrowDown') {
@@ -90,7 +98,7 @@ const VentasSearchFeature = {
             return;
         }
 
-        resultadosBusqueda = await this.buscarProductosRemotosSeguros(texto, { in_stock: 'true' }, 20);
+        resultadosBusqueda = await this.buscarProductosRemotosSeguros(texto, {}, 20);
 
         if (resultadosBusqueda.length > 0) {
             const listaPrecio = this.obtenerListaPrecioVentaSeleccionadaSegura();
@@ -99,7 +107,7 @@ const VentasSearchFeature = {
                     <strong>${item.producto.nombre}</strong> <small>(${item.producto.codigo})</small>
                     <div style="display: flex; justify-content: space-between; margin-top: 5px;">
                         <span style="color: #28a745;">${this.obtenerEtiquetaListaPrecioSegura(listaPrecio)}: $${this.obtenerPrecioProductoSeguro(item.producto, listaPrecio).toFixed(2)}</span>
-                        <span style="color: #6c757d;">Stock: ${item.producto.cantidad}</span>
+                        <span style="color: ${item.producto.cantidad > 0 ? '#6c757d' : '#c05621'};">${item.producto.cantidad > 0 ? `Stock: ${item.producto.cantidad}` : 'Sin stock'}</span>
                     </div>
                 </div>
             `).join('');
@@ -124,27 +132,14 @@ const VentasSearchFeature = {
 
         if (texto === '') return;
 
-        const indexPorCodigo = productos.findIndex(p => p.codigo.toLowerCase() === texto && p.cantidad > 0);
+        const indexPorCodigo = productos.findIndex(p => String(p.codigo || '').toLowerCase() === texto);
 
         if (indexPorCodigo !== -1) {
             this.seleccionarProducto(indexPorCodigo);
             return;
         }
 
-        const resultados = productos.map((producto, index) => ({ producto, index }))
-            .filter(item =>
-                item.producto.cantidad > 0 && (
-                    item.producto.nombre.toLowerCase().includes(texto) ||
-                    item.producto.codigo.toLowerCase().includes(texto) ||
-                    item.producto.descripcion.toLowerCase().includes(texto)
-                )
-            );
-
-        if (resultados.length > 0) {
-            this.seleccionarProducto(resultados[0].index);
-        } else {
-            this.mostrarNotificacionSegura('❌ Producto no encontrado o sin stock');
-        }
+        this.mostrarNotificacionSegura('❌ Presione Enter solo para un codigo exacto o seleccione un producto de la lista');
     }
 };
 
