@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from flask import Blueprint, jsonify, request
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 from auth_utils import get_current_user, require_roles
 from cuenta_corriente_utils import obtener_saldos_a_favor_disponibles
 
@@ -462,6 +462,13 @@ def get_ventas():
     page = 1
     page_size = 20
     paginacion = None
+    summary = {
+        'total_ventas': 0,
+        'total_dolares': 0.0,
+        'total_bolivares': 0.0,
+        'promedio_dolares': 0.0,
+        'promedio_bolivares': 0.0,
+    }
 
     busqueda = (request.args.get('q') or '').strip()
     fecha = (request.args.get('fecha') or '').strip()
@@ -497,6 +504,23 @@ def get_ventas():
         query = query.filter(Venta.fecha >= datetime.strptime(fecha_inicio, '%Y-%m-%d'))
     if fecha_fin:
         query = query.filter(Venta.fecha < datetime.strptime(fecha_fin, '%Y-%m-%d').replace(hour=23, minute=59, second=59))
+
+    total_ventas, total_dolares, total_bolivares = query.with_entities(
+        func.count(Venta.id),
+        func.coalesce(func.sum(Venta.total_dolares), 0.0),
+        func.coalesce(func.sum(Venta.total_bolivares), 0.0),
+    ).first()
+
+    total_ventas = int(total_ventas or 0)
+    total_dolares = float(total_dolares or 0.0)
+    total_bolivares = float(total_bolivares or 0.0)
+    summary = {
+        'total_ventas': total_ventas,
+        'total_dolares': round(total_dolares, 2),
+        'total_bolivares': round(total_bolivares, 2),
+        'promedio_dolares': round((total_dolares / total_ventas) if total_ventas else 0.0, 2),
+        'promedio_bolivares': round((total_bolivares / total_ventas) if total_ventas else 0.0, 2),
+    }
 
     query = query.order_by(Venta.fecha.desc())
     if has_pagination_args():
@@ -553,6 +577,8 @@ def get_ventas():
 
     if has_pagination_args():
         total = paginacion.total if paginacion else len(res)
-        return jsonify(build_paginated_response(res, total, page, page_size))
+        response = build_paginated_response(res, total, page, page_size)
+        response['summary'] = summary
+        return jsonify(response)
 
     return jsonify(res)

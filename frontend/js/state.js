@@ -13,6 +13,7 @@ const AppState = {
     
     // Ventas
     ventas: [],
+    ventasResumen: null,
 
     // Clientes
     clientes: [],

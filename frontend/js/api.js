@@ -153,7 +153,8 @@ const ApiService = {
                     total_pages: data.length > 0 ? 1 : 0,
                     has_next: false,
                     has_prev: false
-                }
+                },
+                summary: null
             };
         }
 
@@ -166,7 +167,8 @@ const ApiService = {
                 total_pages: data?.pagination?.total_pages || 0,
                 has_next: Boolean(data?.pagination?.has_next),
                 has_prev: Boolean(data?.pagination?.has_prev)
-            }
+            },
+            summary: data?.summary || null
         };
     },
 

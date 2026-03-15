@@ -76,6 +76,38 @@ const InformesService = {
         return this.obtenerAppState().ventas || [];
     },
 
+    normalizarNumero(value) {
+        const numero = Number(value);
+        return Number.isFinite(numero) ? numero : 0;
+    },
+
+    obtenerResumenVentasGlobal(ventasLista) {
+        const resumenBackend = this.obtenerAppState().ventasResumen;
+        if (resumenBackend && typeof resumenBackend === 'object') {
+            const totalVentas = Math.max(0, Math.trunc(this.normalizarNumero(resumenBackend.total_ventas)));
+            const totalDolares = this.normalizarNumero(resumenBackend.total_dolares);
+            const totalBs = this.normalizarNumero(resumenBackend.total_bolivares);
+            return {
+                totalVentas,
+                totalDolares,
+                totalBs,
+                promedioDolares: totalVentas > 0 ? totalDolares / totalVentas : 0,
+                promedioBs: totalVentas > 0 ? totalBs / totalVentas : 0
+            };
+        }
+
+        const totalDolares = ventasLista.reduce((sum, v) => sum + this.normalizarNumero(v.total_dolares), 0);
+        const totalBs = ventasLista.reduce((sum, v) => sum + this.normalizarNumero(v.total_bolivares), 0);
+        const totalVentas = ventasLista.length;
+        return {
+            totalVentas,
+            totalDolares,
+            totalBs,
+            promedioDolares: totalVentas > 0 ? totalDolares / totalVentas : 0,
+            promedioBs: totalVentas > 0 ? totalBs / totalVentas : 0
+        };
+    },
+
     actualizarOpcionesUsuarios() {
         const selectUsuario = document.getElementById('filtroUsuarioInforme');
         if (!selectUsuario) return;
@@ -172,12 +204,7 @@ const InformesService = {
         const resumenDiv = document.getElementById('resumenVentas');
 
         const ventasLista = Array.isArray(ventasFiltradas) ? ventasFiltradas : [];
-
-        const totalDolares = ventasLista.reduce((sum, v) => sum + (v.total_dolares || 0), 0);
-        const totalBs = ventasLista.reduce((sum, v) => sum + (v.total_bolivares || 0), 0);
-        const totalVentas = ventasLista.length;
-        const promedioDolares = totalVentas > 0 ? totalDolares / totalVentas : 0;
-        const promedioBs = totalVentas > 0 ? totalBs / totalVentas : 0;
+        const resumen = this.obtenerResumenVentasGlobal(ventasLista);
 
         if (resumenDiv) {
             resumenDiv.innerHTML = `
@@ -185,20 +212,20 @@ const InformesService = {
                 <div class="resumen-ventas-grid">
                     <div class="tarjeta-resumen tarjeta-resumen--ventas">
                         <h3>Total Ventas</h3>
-                        <div class="valor">${totalVentas}</div>
+                        <div class="valor">${resumen.totalVentas}</div>
                     </div>
                     <div class="tarjeta-resumen tarjeta-resumen--dolares">
                         <h3>Total en Dolares</h3>
-                        <div class="valor">$${totalDolares.toFixed(2)}</div>
+                        <div class="valor">$${resumen.totalDolares.toFixed(2)}</div>
                     </div>
                     <div class="tarjeta-resumen tarjeta-resumen--bolivares">
                         <h3>Total en Bolivares</h3>
-                        <div class="valor">Bs ${totalBs.toFixed(2)}</div>
+                        <div class="valor">Bs ${resumen.totalBs.toFixed(2)}</div>
                     </div>
                     <div class="tarjeta-resumen tarjeta-resumen--promedio">
                         <h3>Promedio por Venta</h3>
-                        <div class="valor">$${promedioDolares.toFixed(2)}</div>
-                        <small>Bs ${promedioBs.toFixed(2)}</small>
+                        <div class="valor">$${resumen.promedioDolares.toFixed(2)}</div>
+                        <small>Bs ${resumen.promedioBs.toFixed(2)}</small>
                     </div>
                 </div>
             `;

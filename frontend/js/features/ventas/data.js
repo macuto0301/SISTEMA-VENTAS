@@ -28,6 +28,7 @@ const VentasDataFeature = {
             filters: options.filters || {}
         });
         window.AppState.ventas = response.items;
+        window.AppState.ventasResumen = response.summary || null;
         this.actualizarPaginacion('ventas', response.pagination);
         window.ventas = window.AppState.ventas;
         if (typeof window.InformesService !== 'undefined' && typeof window.InformesService.actualizarOpcionesUsuarios === 'function') {
