@@ -416,8 +416,9 @@ const VentasCartFeature = {
             return sum + this.aplicarRedondeoBsSeguro(item.subtotal_dolares * tasaDolar, prodOriginal.metodo_redondeo || 'none');
         }, 0);
 
+        const totalCantidad = carrito.reduce((sum, item) => sum + (item.cantidad || 0), 0);
         document.getElementById('totalDolares').textContent = `$${totalDolares.toFixed(2)}`;
-        this.renderResumenPos(carrito.length, totalDolares, totalBs);
+        this.renderResumenPos(totalCantidad, totalDolares, totalBs);
 
         if (typeof window.actualizarResumenPagos === 'function') {
             window.actualizarResumenPagos(totalDolares, totalBs);
