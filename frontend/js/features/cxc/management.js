@@ -1,5 +1,9 @@
 const CxcFeature = {
     _clientPicker: null,
+    _searchModal: null,
+    _abonoModal: null,
+    _searchEventsBound: false,
+    _detailEventsBound: false,
 
     inicializarComponentesCxc() {
         if (!this._clientPicker && window.SVEntityPicker && document.getElementById('clienteCxcPicker')) {
@@ -23,6 +27,74 @@ const CxcFeature = {
                 `
             });
         }
+
+        if (!this._searchModal && window.SVModal) {
+            this._searchModal = window.SVModal.enhance('modalBuscarClienteCxc', {
+                closeSelector: '#btnCerrarModalBuscarClienteCxc'
+            });
+        }
+
+        if (!this._abonoModal && window.SVModal) {
+            this._abonoModal = window.SVModal.enhance('modalAbonoCuenta', {
+                closeSelector: '#btnCerrarModalAbonoCuenta'
+            });
+        }
+
+        this.registrarEventosBusquedaCxc();
+        this.registrarEventosDetalleCxc();
+    },
+
+    registrarEventosBusquedaCxc() {
+        if (this._searchEventsBound) return;
+
+        const list = document.getElementById('listaBusquedaClienteCxc');
+        const closeButton = document.getElementById('btnCerrarBuscarClienteCxc');
+
+        list?.addEventListener('click', event => {
+            const button = event.target.closest('[data-cxc-client-id]');
+            if (!button) return;
+            const clientId = Number(button.dataset.cxcClientId);
+            if (Number.isInteger(clientId) && clientId > 0) {
+                this.seleccionarClienteCxc(clientId);
+            }
+        });
+
+        closeButton?.addEventListener('click', () => this.cerrarModalBuscarClienteCxc());
+
+        this._searchEventsBound = true;
+    },
+
+    registrarEventosDetalleCxc() {
+        if (this._detailEventsBound) return;
+
+        const detalle = document.getElementById('detalleCuentaClienteSeleccionado');
+        const usarSaldo = document.getElementById('abonoUsarSaldoFavor');
+        const montoSaldo = document.getElementById('abonoMontoSaldoFavor');
+        const moneda = document.getElementById('abonoMoneda');
+        const monto = document.getElementById('abonoMonto');
+        const usarTasaSistema = document.getElementById('abonoUsarTasaSistema');
+        const tasaUsada = document.getElementById('abonoTasaUsada');
+
+        detalle?.addEventListener('click', event => {
+            const button = event.target.closest('[data-cxc-action="abono"]');
+            if (!button) return;
+            const cuentaId = Number(button.dataset.cuentaId);
+            if (Number.isInteger(cuentaId) && cuentaId > 0) {
+                this.registrarAbonoCuentaPrompt(cuentaId);
+            }
+        });
+
+        usarSaldo?.addEventListener('change', () => this.toggleModoAbonoCuenta());
+        montoSaldo?.addEventListener('input', () => this.actualizarResumenAbonoCuenta());
+        moneda?.addEventListener('change', () => {
+            this.toggleMonedaAbonoCuenta();
+            this.actualizarResumenAbonoCuenta();
+        });
+        monto?.addEventListener('input', () => this.actualizarResumenAbonoCuenta());
+        usarTasaSistema?.addEventListener('change', () => this.toggleTasaAbonoCuenta());
+        tasaUsada?.addEventListener('input', () => this.actualizarResumenAbonoCuenta());
+
+        this._detailEventsBound = true;
     },
 
     escaparHtml(valor) {
@@ -128,7 +200,7 @@ const CxcFeature = {
     },
 
     async abrirModalBuscarClienteCxc() {
-        const modal = document.getElementById('modalBuscarClienteCxc');
+        this.inicializarComponentesCxc();
         const input = document.getElementById('buscarClienteCxcModal');
         if (input) input.value = '';
 
@@ -140,13 +212,13 @@ const CxcFeature = {
         }
 
         this.renderListaBusquedaClienteCxc();
-        if (modal) modal.style.display = 'block';
+        this._searchModal?.open();
         if (input) setTimeout(() => input.focus(), 60);
     },
 
     cerrarModalBuscarClienteCxc() {
-        const modal = document.getElementById('modalBuscarClienteCxc');
-        if (modal) modal.style.display = 'none';
+        this.inicializarComponentesCxc();
+        this._searchModal?.close();
     },
 
     renderListaBusquedaClienteCxc() {
@@ -171,7 +243,7 @@ const CxcFeature = {
         }
 
         contenedor.innerHTML = lista.map(cliente => `
-            <button type="button" onclick="window.CxcFeature?.seleccionarClienteCxc?.(${cliente.id})" style="width: 100%; text-align: left; border: 1px solid #e6e6e6; background: white; border-radius: 10px; padding: 14px; margin-bottom: 10px; cursor: pointer;">
+            <button type="button" data-cxc-client-id="${cliente.id}" style="width: 100%; text-align: left; border: 1px solid #e6e6e6; background: white; border-radius: 10px; padding: 14px; margin-bottom: 10px; cursor: pointer;">
                 <div style="display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:6px;">
                     <strong>${cliente.nombre}</strong>
                     <span style="color:#5b6470;">${cliente.documento || 'Sin documento'}</span>
@@ -247,7 +319,7 @@ const CxcFeature = {
                     <div><small>Pendiente</small><strong>$${(cuenta.saldo_pendiente_usd || 0).toFixed(2)}</strong></div>
                 </div>
                 <div class="producto-acciones">
-                    <button class="btn-success" onclick="window.CxcFeature?.registrarAbonoCuentaPrompt?.(${cuenta.id})">💵 Abonar</button>
+                    <button type="button" class="btn-success" data-cxc-action="abono" data-cuenta-id="${cuenta.id}">💵 Abonar</button>
                 </div>
             </div>
         `;
@@ -324,6 +396,7 @@ const CxcFeature = {
     },
 
     registrarAbonoCuentaPrompt(cuentaId) {
+        this.inicializarComponentesCxc();
         const cuenta = window.cuentasPorCobrar.find(item => item.id === cuentaId);
         if (!cuenta) return;
 
@@ -351,11 +424,12 @@ const CxcFeature = {
         this.toggleMonedaAbonoCuenta();
         this.toggleTasaAbonoCuenta();
         this.actualizarResumenAbonoCuenta();
-        document.getElementById('modalAbonoCuenta').style.display = 'block';
+        this._abonoModal?.open();
     },
 
     cerrarModalAbonoCuenta() {
-        document.getElementById('modalAbonoCuenta').style.display = 'none';
+        this.inicializarComponentesCxc();
+        this._abonoModal?.close();
     },
 
     obtenerCuentaAbonoActual() {

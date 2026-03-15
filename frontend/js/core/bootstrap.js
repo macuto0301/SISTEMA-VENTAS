@@ -72,7 +72,10 @@ function registrarEventosGeneralesApp() {
     });
     registrarEventoElemento('productoPrecioDolares2', 'input', () => obtenerFuncionGlobal('recalcularPorcentajeGanancia')?.(2));
     registrarEventoElemento('productoPrecioDolares3', 'input', () => obtenerFuncionGlobal('recalcularPorcentajeGanancia')?.(3));
-    registrarEventoElemento('productoMetodoRedondeo', 'change', obtenerFuncionGlobal('actualizarResumenPreciosProducto'));
+    registrarEventoElemento('productoMetodoRedondeo', 'change', () => {
+        obtenerFuncionGlobal('calcularPrecioBolivares')?.();
+        obtenerFuncionGlobal('actualizarResumenPreciosProducto')?.();
+    });
 
     registrarEventoElemento('productoPrecioBolivares', 'input', () => {
         obtenerFuncionGlobal('calcularPrecioDolares')?.();
@@ -129,10 +132,27 @@ function registrarEventosGeneralesApp() {
     registrarEventoElemento('btnLimpiarFotoClienteCedula', 'click', () => window.ClientesMediaFeature?.limpiarFotoCliente?.('cedula'));
     registrarEventoElemento('btnBuscarClienteVenta', 'click', () => window.ClientesFeature?.abrirModalBuscarClienteVenta?.());
     registrarEventoElemento('btnLimpiarClienteVenta', 'click', () => window.ClientesFeature?.limpiarClienteVenta?.());
+    registrarEventoElemento('btnNuevoClienteVenta', 'click', () => window.ClientesFeature?.crearClienteRapidoDesdeVenta?.());
+    registrarEventoElemento('cliente', 'click', () => window.ClientesFeature?.abrirModalBuscarClienteVenta?.());
     registrarEventoElemento('buscarClienteVentaModal', 'input', () => window.ClientesFeature?.renderListaBusquedaClienteVenta?.());
     registrarEventoElemento('btnBuscarClienteCxc', 'click', () => window.CxcFeature?.abrirModalBuscarClienteCxc?.());
     registrarEventoElemento('btnLimpiarClienteCxc', 'click', () => window.CxcFeature?.limpiarClienteCxc?.());
     registrarEventoElemento('buscarClienteCxcModal', 'input', () => window.CxcFeature?.renderListaBusquedaClienteCxc?.());
+    registrarEventoElemento('btnToggleResumenVenta', 'click', () => window.VentasSummaryModalComponent?.open?.());
+    registrarEventoElemento('btnAbrirTotalizacionVenta', 'click', () => window.VentasPaymentsFeature?.abrirModalTotalizacion?.());
+    registrarEventoElemento('btnCerrarModalTotalizacion', 'click', () => window.VentasPaymentsFeature?.cerrarModalTotalizacion?.());
+    registrarEventoElemento('usarSaldoFavorVenta', 'change', () => window.VentasPaymentsFeature?.actualizarListaPagos?.());
+    registrarEventoElemento('montoSaldoFavorVenta', 'input', () => window.VentasPaymentsFeature?.actualizarListaPagos?.());
+    registrarEventoElemento('btnProcesarVenta', 'click', () => window.VentasCheckoutFeature?.procesarVenta?.());
+    registrarEventoElemento('btnLimpiarVenta', 'click', () => obtenerFuncionGlobal('limpiarCarrito')?.());
+    registrarEventoElemento('btnAgregarVueltoLista', 'click', () => window.VentasCheckoutFeature?.agregarVueltoALista?.());
+    registrarEventoElemento('btnFinalizarVentaSinVuelto', 'click', () => window.VentasCheckoutFeature?.finalizarVentaSinVuelto?.());
+    registrarEventoElemento('btnConfirmarVuelto', 'click', () => window.VentasCheckoutFeature?.confirmarVuelto?.());
+    registrarEventoElemento('btnCerrarModalVuelto', 'click', () => window.VentasPostventaFeature?.cerrarModalVuelto?.());
+    registrarEventoElemento('btnAceptarModalVuelto', 'click', () => window.VentasPostventaFeature?.cerrarModalVuelto?.());
+    registrarEventoElemento('btnCerrarModalExcedenteTotalizacion', 'click', () => window.VentasPaymentsFeature?.cerrarModalExcedenteTotalizacion?.());
+    registrarEventoElemento('btnAceptarExcedenteSaldoFavor', 'click', () => window.VentasPaymentsFeature?.aceptarExcedenteComoSaldoFavor?.());
+    registrarEventoElemento('btnGestionarExcedenteVuelto', 'click', () => window.VentasPaymentsFeature?.gestionarExcedenteComoVuelto?.());
     registrarEventoElemento('btnFiltrarInformes', 'click', () => window.InformesService?.filtrarPorFecha?.());
     registrarEventoElemento('btnLimpiarInformes', 'click', () => window.InformesService?.limpiarFiltros?.());
     registrarEventoElemento('btnVentasHoy', 'click', () => window.InformesService?.cargarVentasDelDia?.());
@@ -177,24 +197,17 @@ function registrarEventosGeneralesApp() {
     });
 }
 
-function inicializarFechaInformes() {
-    if (typeof flatpickr !== 'function') return;
+function inicializarCalendariosApp() {
+    if (!window.SVDatePicker) return;
 
-    flatpickr('#fechaInicioInforme', {
-        dateFormat: 'Y-m-d',
-        altInput: true,
-        altFormat: 'd/m/Y',
-        locale: 'es',
-        allowInput: true
-    });
-
-    flatpickr('#fechaFinInforme', {
-        dateFormat: 'Y-m-d',
-        altInput: true,
-        altFormat: 'd/m/Y',
-        locale: 'es',
-        allowInput: true
-    });
+    [
+        'fechaInicioInforme',
+        'fechaFinInforme',
+        'fechaInicioCompraFiltro',
+        'fechaFinCompraFiltro',
+        'compraFecha',
+        'compraFechaLibro'
+    ].forEach(id => window.SVDatePicker.enhance(id));
 }
 
 async function inicializarDatosApp() {
@@ -235,8 +248,18 @@ async function inicializarDatosApp() {
 
 document.addEventListener('DOMContentLoaded', async function () {
     window.LoginScreenComponent?.render?.();
+    window.ProviderModalComponent?.ensureRendered?.();
+    window.PurchaseModalComponent?.ensureRendered?.();
+    window.PurchasePricesModalComponent?.ensureRendered?.();
+    window.PurchaseDetailModalComponent?.ensureRendered?.();
+    window.ChangeManagementModalComponent?.ensureRendered?.();
+    window.SaleSuccessModalComponent?.ensureRendered?.();
+    window.SalesCheckoutModalComponent?.ensureRendered?.();
+    window.ReturnModalComponent?.ensureRendered?.();
+    window.VentasSummaryModalComponent?.ensureRendered?.();
+    window.VentasPostventaFeature?.inicializarComponentesPostventa?.();
     registrarEventosGeneralesApp();
-    inicializarFechaInformes();
+    inicializarCalendariosApp();
 
     const sincronizarTabConHash = obtenerFuncionGlobal('sincronizarTabConHash');
     if (sincronizarTabConHash) {

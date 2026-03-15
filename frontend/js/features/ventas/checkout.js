@@ -1,4 +1,39 @@
 const VentasCheckoutFeature = {
+    _gestionVueltoModal: null,
+    _eventsBound: false,
+
+    inicializarComponentesCheckout() {
+        window.ChangeManagementModalComponent?.ensureRendered?.();
+
+        if (!this._gestionVueltoModal && window.SVModal) {
+            this._gestionVueltoModal = window.SVModal.enhance('modalGestionVuelto');
+        }
+
+        this.registrarEventosCheckout();
+    },
+
+    registrarEventosCheckout() {
+        if (this._eventsBound) return;
+
+        document.getElementById('listaVueltosAgregados')?.addEventListener('click', event => {
+            const button = event.target.closest('[data-vuelto-index]');
+            if (!button) return;
+            const index = Number(button.dataset.vueltoIndex);
+            if (Number.isInteger(index) && index >= 0) {
+                this.eliminarVueltoDeLista(index);
+            }
+        });
+
+        document.querySelectorAll('input[name="monedaVuelto"]').forEach(radio => {
+            radio.addEventListener('change', event => this.actualizarMetodosVuelto(event.target.value));
+        });
+
+        document.getElementById('tasaVuelto')?.addEventListener('input', () => this.actualizarConversionesVuelto());
+        document.getElementById('montoEntregaVuelto')?.addEventListener('input', () => this.actualizarConversionesVuelto());
+
+        this._eventsBound = true;
+    },
+
     mostrarNotificacionSegura(mensaje) {
         if (typeof window.mostrarNotificacion === 'function') {
             return window.mostrarNotificacion(mensaje);
@@ -180,6 +215,7 @@ const VentasCheckoutFeature = {
     },
 
     abrirModalGestionVuelto(venta, monedaSugerida = 'USD') {
+        this.inicializarComponentesCheckout();
         vueltosAgregados = [];
 
         document.getElementById('montoExcedenteVuelto').textContent = `$${venta.excedenteUSD.toFixed(2)}`;
@@ -199,15 +235,13 @@ const VentasCheckoutFeature = {
 
         this.actualizarUIGestionVuelto();
         this.sugerirMontoVuelto();
-        document.getElementById('modalGestionVuelto').style.display = 'block';
+        this._gestionVueltoModal?.open();
         setTimeout(() => window.enfocarCampoVentas?.('montoEntregaVuelto'), 60);
     },
 
     volverATotalizacionDesdeGestionVuelto() {
         const modal = document.getElementById('modalGestionVuelto');
-        if (modal) {
-            modal.style.display = 'none';
-        }
+        if (modal) this._gestionVueltoModal?.close();
 
         if (ventaEnProgreso) {
             window.abrirModalTotalizacion?.();
@@ -360,7 +394,7 @@ const VentasCheckoutFeature = {
                         <strong>${v.moneda} ${v.monto.toFixed(2)}</strong> (${v.metodo})
                         ${v.tasa ? `<br><small style="color: #666;">Tasa: ${v.tasa}</small>` : ''}
                     </div>
-                    <button onclick="eliminarVueltoDeLista(${i})" style="border: none; background: none; cursor: pointer; color: #dc3545; padding: 5px;">🗑️</button>
+                    <button type="button" data-vuelto-index="${i}" style="border: none; background: none; cursor: pointer; color: #dc3545; padding: 5px;">🗑️</button>
                 </div>
             `).join('');
         }
@@ -393,7 +427,7 @@ const VentasCheckoutFeature = {
             ventaEnProgreso.excedenteBS = 0;
         }
 
-        document.getElementById('modalGestionVuelto').style.display = 'none';
+        this._gestionVueltoModal?.close();
         this.terminarProcesoVenta(ventaEnProgreso, 'Venta finalizada sin vuelto entregado');
     },
 
@@ -441,7 +475,7 @@ const VentasCheckoutFeature = {
             mensaje = 'Vuelto entregado en: ' + vueltosAgregados.map(v => `${v.moneda} ${v.monto.toFixed(2)}`).join(', ');
         }
 
-        document.getElementById('modalGestionVuelto').style.display = 'none';
+        this._gestionVueltoModal?.close();
         this.terminarProcesoVenta(ventaEnProgreso, mensaje);
     },
 
@@ -463,7 +497,7 @@ const VentasCheckoutFeature = {
                 const ventaGuardada = await res.json();
                 cerrarModalExcedenteTotalizacion();
                 cerrarModalTotalizacion();
-                document.getElementById('modalGestionVuelto').style.display = 'none';
+                this._gestionVueltoModal?.close();
                 this.mostrarNotificacionSegura('✅ Venta guardada en servidor');
                 await window.cargarProductos?.();
                 await window.cargarDatosVentas?.();
@@ -519,7 +553,8 @@ const VentasCheckoutFeature = {
                 </div>
             `;
             infoVuelto.innerHTML = contenido;
-            document.getElementById('modalVuelto').style.display = 'block';
+            window.VentasPostventaFeature?.inicializarComponentesPostventa?.();
+            window.VentasPostventaFeature?._vueltoModal?.open();
             window.VentasPostventaFeature?.enfocarAccionPrincipalVentaProcesada?.();
         }
 

@@ -8,6 +8,7 @@ const ProductosFeature = {
     _priceActions: null,
     _priceListActions: null,
     _productSearchBox: null,
+    _productGridEventsBound: false,
 
     inicializarComponentesProducto() {
         if (!this._productModal && window.SVModal) {
@@ -74,7 +75,47 @@ const ProductosFeature = {
             this._productSearchBox = window.SVSearchBox.enhance('buscarProductoGestion', { fullWidth: true });
         }
 
+        this.registrarEventosGridProductos();
+
         return this._productFields;
+    },
+
+    registrarEventosGridProductos() {
+        if (this._productGridEventsBound) return;
+
+        const grid = document.getElementById('productosGrid');
+        if (!grid) return;
+
+        grid.addEventListener('click', event => {
+            const actionButton = event.target.closest('[data-product-action]');
+            if (!actionButton) return;
+
+            const action = actionButton.dataset.productAction;
+            const index = Number(actionButton.dataset.productIndex);
+            if (!Number.isInteger(index) || index < 0) return;
+
+            if (action === 'gallery') {
+                const imageIndex = Number(actionButton.dataset.galleryIndex || 0);
+                window.ProductosGalleryFeature?.abrirGaleriaProductoPorIndice?.(index, imageIndex);
+                return;
+            }
+
+            if (action === 'add-cart') {
+                window.VentasCartFeature?.agregarAlCarrito?.(index);
+                return;
+            }
+
+            if (action === 'edit') {
+                this.editarProducto(index);
+                return;
+            }
+
+            if (action === 'delete') {
+                this.eliminarProducto(index);
+            }
+        });
+
+        this._productGridEventsBound = true;
     },
 
     obtenerCampoProducto(nombre) {
@@ -869,7 +910,7 @@ const ProductosFeature = {
                         const nombre = this.escaparHtml(row.nombre || 'Sin nombre');
                         const detalle = this.escaparHtml(row.__detalleTecnico || row.__detalleInventario || 'Sin detalles');
                         const imagen = row.__fotoPrincipalUrl && row.__cacheIndex >= 0
-                            ? `<button type="button" onclick="abrirGaleriaProductoPorIndice(${row.__cacheIndex}, 0)" style="width: 36px; height: 36px; border: 0; border-radius: 10px; overflow: hidden; padding: 0; cursor: pointer; background: #f3f4f6; flex-shrink: 0;"><img src="${this.escaparHtml(row.__fotoPrincipalUrl)}" alt="${nombre}" loading="lazy" style="width: 100%; height: 100%; object-fit: cover;"></button>`
+                            ? `<button type="button" data-product-action="gallery" data-product-index="${row.__cacheIndex}" data-gallery-index="0" style="width: 36px; height: 36px; border: 0; border-radius: 10px; overflow: hidden; padding: 0; cursor: pointer; background: #f3f4f6; flex-shrink: 0;"><img src="${this.escaparHtml(row.__fotoPrincipalUrl)}" alt="${nombre}" loading="lazy" style="width: 100%; height: 100%; object-fit: cover;"></button>`
                             : '<div style="width: 36px; height: 36px; border-radius: 10px; background: #f3f4f6; display: flex; align-items: center; justify-content: center; color: #6b7280; font-size: 9px; flex-shrink: 0;">Foto</div>';
                         return `
                             <div style="display: flex; gap: 8px; align-items: center; min-width: 220px;">
@@ -955,9 +996,9 @@ const ProductosFeature = {
                     align: 'center',
                     render: row => row.__cacheIndex < 0 ? '-' : `
                         <div style="display: flex; align-items: center; justify-content: center; gap: 6px; flex-wrap: nowrap;">
-                            <button onclick="agregarAlCarrito(${row.__cacheIndex})" class="btn-small" style="background: #2563eb; color: white; min-height: 30px; padding: 4px 8px; font-size: 12px; border-radius: 10px;" title="Agregar al carrito">🛒</button>
-                            <button onclick="editarProducto(${row.__cacheIndex})" class="btn-small" style="background: #f59e0b; color: white; min-height: 30px; padding: 4px 8px; font-size: 12px; border-radius: 10px;" title="Editar producto">✏️</button>
-                            <button onclick="eliminarProducto(${row.__cacheIndex})" class="btn-small" style="background: #dc2626; color: white; min-height: 30px; padding: 4px 8px; font-size: 12px; border-radius: 10px;" title="Eliminar producto">🗑️</button>
+                            <button type="button" data-product-action="add-cart" data-product-index="${row.__cacheIndex}" class="btn-small" style="background: #2563eb; color: white; min-height: 30px; padding: 4px 8px; font-size: 12px; border-radius: 10px;" title="Agregar al carrito">🛒</button>
+                            <button type="button" data-product-action="edit" data-product-index="${row.__cacheIndex}" class="btn-small" style="background: #f59e0b; color: white; min-height: 30px; padding: 4px 8px; font-size: 12px; border-radius: 10px;" title="Editar producto">✏️</button>
+                            <button type="button" data-product-action="delete" data-product-index="${row.__cacheIndex}" class="btn-small" style="background: #dc2626; color: white; min-height: 30px; padding: 4px 8px; font-size: 12px; border-radius: 10px;" title="Eliminar producto">🗑️</button>
                         </div>
                     `,
                     allowHtml: true,

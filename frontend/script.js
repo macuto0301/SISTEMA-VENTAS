@@ -312,13 +312,11 @@ function actualizarInfoClienteSeleccionado() {
 }
 
 function abrirModalResumenVenta() {
-    const modal = document.getElementById('modalResumenVenta');
-    if (modal) modal.style.display = 'block';
+    return window.VentasSummaryModalComponent?.open?.();
 }
 
 function cerrarModalResumenVenta() {
-    const modal = document.getElementById('modalResumenVenta');
-    if (modal) modal.style.display = 'none';
+    return window.VentasSummaryModalComponent?.close?.();
 }
 
 async function abrirModalBuscarClienteVenta() {

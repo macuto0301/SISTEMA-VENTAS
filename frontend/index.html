@@ -24,9 +24,19 @@
     <script src="js/components/base/status-badge.js"></script>
     <script src="js/components/base/empty-state.js"></script>
     <script src="js/components/base/toast-service.js"></script>
+    <script src="js/components/base/date-picker.js"></script>
     <script src="js/components/composite/entity-picker.js"></script>
     <script src="js/components/composite/media-uploader.js"></script>
     <script src="js/components/composite/summary-card.js"></script>
+    <script src="js/components/composite/provider-modal.js"></script>
+    <script src="js/components/composite/purchase-modal.js"></script>
+    <script src="js/components/composite/purchase-prices-modal.js"></script>
+    <script src="js/components/composite/purchase-detail-modal.js"></script>
+    <script src="js/components/composite/change-management-modal.js"></script>
+    <script src="js/components/composite/sale-success-modal.js"></script>
+    <script src="js/components/composite/sales-checkout-modal.js"></script>
+    <script src="js/components/composite/return-modal.js"></script>
+    <script src="js/components/composite/sales-summary-modal.js"></script>
     <script src="js/components/composite/login-screen.js"></script>
     <script src="js/core/state-cache.js"></script>
     <script src="js/features/clientes/media.js"></script>
@@ -140,10 +150,10 @@
                             <div id="clienteVentaPicker" class="ventas-cliente-picker-shell">
                                 <input type="hidden" id="clienteId" name="clienteId">
                                 <div class="ventas-cliente-picker-actions">
-                                    <input type="text" id="cliente" name="clienteVenta" class="form-control ventas-clickable-input" value="Cliente General / Contado" placeholder="Seleccione un cliente..." aria-label="Cliente de la venta" readonly onclick="abrirModalBuscarClienteVenta()">
-                                    <button type="button" id="btnBuscarClienteVenta" class="btn-primary" onclick="abrirModalBuscarClienteVenta()">🔎 Buscar</button>
-                                    <button type="button" id="btnLimpiarClienteVenta" data-role="clear" class="btn-secondary" onclick="limpiarClienteVenta()">Contado</button>
-                                    <button type="button" class="btn-secondary" onclick="crearClienteRapidoDesdeVenta()">Nuevo</button>
+                                    <input type="text" id="cliente" name="clienteVenta" class="form-control ventas-clickable-input" value="Cliente General / Contado" placeholder="Seleccione un cliente..." aria-label="Cliente de la venta" readonly>
+                                    <button type="button" id="btnBuscarClienteVenta" class="btn-primary">🔎 Buscar</button>
+                                    <button type="button" id="btnLimpiarClienteVenta" data-role="clear" class="btn-secondary">Contado</button>
+                                    <button type="button" id="btnNuevoClienteVenta" class="btn-secondary">Nuevo</button>
                                 </div>
                                 <div class="ventas-cliente-picker-summary">
                                     <span class="ventas-cliente-picker-status" data-role="status">Venta a contado</span>
@@ -187,7 +197,7 @@
                             </div>
                         </div>
                         <div class="ventas-summary-actions">
-                            <button type="button" id="btnToggleResumenVenta" class="btn-secondary" onclick="abrirModalResumenVenta()" title="F1">Ver Atajos (F1)</button>
+                            <button type="button" id="btnToggleResumenVenta" class="btn-secondary" title="F1">Ver Atajos (F1)</button>
                         </div>
                     </div>
                 </div>
@@ -225,7 +235,7 @@
                     </div>
 
                     <div class="venta-totalizar-acciones">
-                        <button type="button" class="btn-success" onclick="abrirModalTotalizacion()" title="F10 o Ctrl + Enter">
+                        <button type="button" id="btnAbrirTotalizacionVenta" class="btn-success" title="F10 o Ctrl + Enter">
                             Totalizar Venta (F10)
                         </button>
                     </div>
@@ -335,8 +345,8 @@
                 </div>
                 <div style="display: flex; gap: 10px; align-items: center;">
                     <input type="text" id="buscarProveedor" name="buscarProveedor" placeholder="Buscar proveedor..." aria-label="Buscar proveedores"
-                        onkeyup="filtrarProveedores()" class="form-control" style="width: 250px;">
-                    <button onclick="abrirModalProveedor()" class="btn-primary">➕ Nuevo Proveedor</button>
+                        class="form-control" style="width: 250px;">
+                    <button id="btnNuevoProveedor" class="btn-primary">➕ Nuevo Proveedor</button>
                 </div>
             </div>
             <div id="listaProveedores" style="padding: 15px;">
@@ -355,7 +365,7 @@
                     <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;">
                         <h2>🛒 Compras</h2>
                         <div style="display: flex; gap: 10px; align-items: center;">
-                            <button onclick="abrirModalCompra()" class="btn-primary">➕ Nueva Compra</button>
+                            <button id="btnNuevaCompra" class="btn-primary">➕ Nueva Compra</button>
                         </div>
                     </div>
                     <div class="filtros-informe" style="display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap;">
@@ -376,12 +386,12 @@
                                 <option value="cancelada">Cancelada</option>
                             </select>
                         </div>
-                        <button onclick="filtrarCompras()" class="btn-primary" style="height: 32px; margin-bottom: 2px;">🔍 Filtrar</button>
-                        <button onclick="limpiarFiltrosCompras()" class="btn-secondary" style="height: 32px; margin-bottom: 2px;">🧹 Limpiar</button>
+                        <button id="btnFiltrarCompras" class="btn-primary" style="height: 32px; margin-bottom: 2px;">🔍 Filtrar</button>
+                        <button id="btnLimpiarFiltrosCompras" class="btn-secondary" style="height: 32px; margin-bottom: 2px;">🧹 Limpiar</button>
 
                         <div style="margin-left: auto; display: flex; gap: 5px;">
-                            <button onclick="cargarComprasDelDia()" class="btn-secondary" style="height: 32px;">📅 Hoy</button>
-                            <button onclick="cargarTodasLasCompras()" class="btn-secondary" style="height: 32px;">📋 Todas</button>
+                            <button id="btnComprasHoy" class="btn-secondary" style="height: 32px;">📅 Hoy</button>
+                            <button id="btnTodasLasCompras" class="btn-secondary" style="height: 32px;">📋 Todas</button>
                         </div>
                     </div>
                 </div>
@@ -393,9 +403,9 @@
     </div>
 
     <!-- Modal para crear/editar productos -->
-    <div id="modalProducto" class="modal" onclick="if (event.target === this) { window.ProductosFeature?.cerrarModalProducto?.(); }">
+    <div id="modalProducto" class="modal">
         <div class="modal-content">
-            <span id="btnCerrarModalProducto" class="close" onclick="if (window.ProductosFeature?.cerrarModalProducto) { window.ProductosFeature.cerrarModalProducto(); }">&times;</span>
+            <span id="btnCerrarModalProducto" class="close">&times;</span>
             <h2 id="modalTitulo">Nuevo Producto</h2>
             <form id="formProducto" class="producto-form-grid">
                 <input type="hidden" id="productoId" value="-1" name="productoId">
@@ -495,9 +505,9 @@
         </div>
     </div>
 
-    <div id="modalProductoPrecios" class="modal" onclick="if (event.target === this) { window.ProductosFeature?.cerrarModalPreciosProducto?.(); }">
+    <div id="modalProductoPrecios" class="modal">
         <div class="modal-content modal-producto-precios-content">
-            <span id="btnCerrarModalPreciosProducto" class="close" onclick="if (window.ProductosFeature?.cerrarModalPreciosProducto) { window.ProductosFeature.cerrarModalPreciosProducto(); }">&times;</span>
+            <span id="btnCerrarModalPreciosProducto" class="close">&times;</span>
             <h3>Precios del producto</h3>
             <div class="producto-precios-modal-grid">
                 <div class="form-group producto-form-span-2 producto-precios-modal-highlight">
@@ -542,7 +552,7 @@
 
                 <div class="form-group">
                     <label for="productoMetodoRedondeo">Redondeo:</label>
-                    <select id="productoMetodoRedondeo" onchange="calcularPrecioBolivares()" name="productoMetodoRedondeo">
+                    <select id="productoMetodoRedondeo" name="productoMetodoRedondeo">
                         <option value="none">Sin Redondeo</option>
                         <option value="no_decimals">Sin Decimales</option>
                         <option value="five_cents">Cinco céntimos (0.05)</option>
@@ -559,7 +569,7 @@
         </div>
     </div>
 
-    <div id="modalListaPrecios" class="modal" onclick="if (event.target === this) { window.ProductosFeature?.cerrarModalListaPrecios?.(); }">
+    <div id="modalListaPrecios" class="modal">
         <div class="modal-content modal-lista-precios-content">
             <span id="btnCerrarModalListaPrecios" class="close">&times;</span>
             <h3>Lista de precios</h3>
@@ -645,20 +655,20 @@
         </div>
     </div>
 
-    <div id="modalGaleriaProducto" class="modal modal-galeria-producto" onclick="if (event.target === this) ProductoGaleria.cerrar()">
+    <div id="modalGaleriaProducto" class="modal modal-galeria-producto">
         <div class="modal-content modal-galeria-content">
-            <button type="button" class="close close-gallery" onclick="ProductoGaleria.cerrar()">&times;</button>
+            <button type="button" id="btnCerrarGaleriaProducto" class="close close-gallery">&times;</button>
             <div class="galeria-toolbar">
-                <button type="button" class="galeria-zoom-btn" onclick="ProductoGaleria.zoomOut()" aria-label="Alejar imagen">-</button>
-                <button type="button" class="galeria-zoom-btn" onclick="ProductoGaleria.resetZoom()" aria-label="Restablecer zoom">100%</button>
-                <button type="button" class="galeria-zoom-btn" onclick="ProductoGaleria.zoomIn()" aria-label="Acercar imagen">+</button>
+                <button type="button" class="galeria-zoom-btn" data-gallery-action="zoom-out" aria-label="Alejar imagen">-</button>
+                <button type="button" class="galeria-zoom-btn" data-gallery-action="reset-zoom" aria-label="Restablecer zoom">100%</button>
+                <button type="button" class="galeria-zoom-btn" data-gallery-action="zoom-in" aria-label="Acercar imagen">+</button>
             </div>
             <div class="galeria-producto-shell">
-                <button type="button" class="galeria-nav galeria-nav-prev" onclick="ProductoGaleria.anterior()" aria-label="Foto anterior">&#10094;</button>
+                <button type="button" class="galeria-nav galeria-nav-prev" data-gallery-action="prev" aria-label="Foto anterior">&#10094;</button>
                 <div class="galeria-stage">
-                    <img id="galeriaProductoImagen" src="" alt="Imagen ampliada del producto" ondblclick="ProductoGaleria.toggleZoom()">
+                    <img id="galeriaProductoImagen" src="" alt="Imagen ampliada del producto">
                 </div>
-                <button type="button" class="galeria-nav galeria-nav-next" onclick="ProductoGaleria.siguiente()" aria-label="Foto siguiente">&#10095;</button>
+                <button type="button" class="galeria-nav galeria-nav-next" data-gallery-action="next" aria-label="Foto siguiente">&#10095;</button>
             </div>
             <div class="galeria-meta">
                 <strong id="galeriaProductoTitulo">Producto</strong>
@@ -669,268 +679,6 @@
     </div>
 
     <!-- Modal para gestionar vuelto -->
-    <div id="modalGestionVuelto" class="modal">
-        <div class="modal-content" style="max-width: 500px;">
-            <h2 style="color: #007bff; margin-top: 0;">💰 Gestión de Vuelto Multimoneda</h2>
-
-            <!-- Resumen de Vuelto -->
-            <div
-                style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 20px; text-align: center;">
-                <div style="background: #e7f3ff; padding: 10px; border-radius: 8px;">
-                    <span style="font-size: 0.8em; color: #555;">Excedente:</span><br>
-                    <strong id="montoExcedenteVuelto" style="font-size: 1.1em; color: #007bff;">$0.00</strong><br>
-                    <span id="montoExcedenteVueltoBs" style="font-size: 0.85em; color: #007bff; font-weight: bold;">Bs
-                        0.00</span>
-                </div>
-                <div style="background: #e6ffed; padding: 10px; border-radius: 8px;">
-                    <span style="font-size: 0.8em; color: #555;">Entregado:</span><br>
-                    <strong id="montoEntregadoVuelto" style="font-size: 1.1em; color: #28a745;">$0.00</strong><br>
-                    <span id="montoEntregadoVueltoBs" style="font-size: 0.85em; color: #28a745; font-weight: bold;">Bs
-                        0.00</span>
-                </div>
-                <div style="background: #fff5f5; padding: 10px; border-radius: 8px;">
-                    <span style="font-size: 0.8em; color: #555;">Faltante:</span><br>
-                    <strong id="montoFaltanteVuelto" style="font-size: 1.1em; color: #dc3545;">$0.00</strong><br>
-                    <span id="montoFaltanteVueltoBs" style="font-size: 0.85em; color: #dc3545; font-weight: bold;">Bs
-                        0.00</span>
-                </div>
-            </div>
-
-            <!-- Sección para agregar vuelto -->
-            <div
-                style="background: #f8f9fa; padding: 15px; border-radius: 10px; border: 1px solid #eee; margin-bottom: 20px;">
-                <h4
-                    style="margin-top: 0; margin-bottom: 15px; font-size: 0.95em; border-bottom: 1px solid #ddd; padding-bottom: 5px;">
-                    Añadir Entrega (F9)</h4>
-
-                <div style="margin-bottom: 12px;">
-                    <label
-                        style="font-weight: bold; display: block; margin-bottom: 5px; font-size: 0.85em;">Moneda:</label>
-                    <div style="display: flex; gap: 8px;">
-                        <label
-                            style="flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 5px; cursor: pointer; display: flex; align-items: center; gap: 5px; background: white; font-size: 0.85em;">
-                            <input type="radio" name="monedaVuelto" value="USD" checked
-                                onchange="actualizarMetodosVuelto('USD')"> Dólares
-                        </label>
-                        <label
-                            style="flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 5px; cursor: pointer; display: flex; align-items: center; gap: 5px; background: white; font-size: 0.85em;">
-                            <input type="radio" name="monedaVuelto" value="BS" onchange="actualizarMetodosVuelto('BS')">
-                            Bolívares
-                        </label>
-                    </div>
-                </div>
-
-                <div id="containerTasaVuelto" style="margin-bottom: 12px; display: none;">
-                    <label for="tasaVuelto"
-                        style="font-weight: bold; display: block; margin-bottom: 3px; font-size: 0.85em;">Tasa
-                        USD/Bs:</label>
-                    <input type="number" id="tasaVuelto" step="0.01"
-                        style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 5px;"
-                        oninput="actualizarConversionesVuelto()" name="tasaVuelto">
-                </div>
-
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
-                    <div>
-                        <label for="metodoEntregaVuelto"
-                            style="font-weight: bold; display: block; margin-bottom: 3px; font-size: 0.85em;">Método:</label>
-                        <select id="metodoEntregaVuelto"
-                            style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 5px; font-size: 0.85em;" name="metodoEntregaVuelto">
-                            <option value="Efectivo">Efectivo</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label for="montoEntregaVuelto"
-                            style="font-weight: bold; display: block; margin-bottom: 3px; font-size: 0.85em;">Monto:</label>
-                        <input type="number" id="montoEntregaVuelto" step="0.01"
-                            style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 5px; font-size: 0.85em;"
-                            placeholder="0.00" oninput="actualizarConversionesVuelto()" name="montoEntregaVuelto">
-                        <div id="previewConversionVuelto"
-                            style="font-size: 0.75em; color: #666; margin-top: 3px; display: none;">Equivale a: <span
-                                id="valorequivaleUSD">$0.00</span></div>
-                    </div>
-                </div>
-
-                <button onclick="agregarVueltoALista()" class="btn-primary" title="F9 o Enter en campos de vuelto"
-                    style="width: 100%; padding: 10px; font-size: 0.9em;">➕ Agregar a la lista</button>
-            </div>
-
-            <!-- Lista de vueltos agregados -->
-            <div style="margin-bottom: 20px;">
-                <h4 style="margin-top: 0; margin-bottom: 10px; font-size: 0.95em;">Vueltos Agregados:</h4>
-                <div id="listaVueltosAgregados"
-                    style="max-height: 150px; overflow-y: auto; background: white; border: 1px solid #eee; border-radius: 5px; padding: 5px;">
-                    <!-- Se llena con JS -->
-                </div>
-            </div>
-
-            <div
-                style="text-align: right; border-top: 1px solid #eee; padding-top: 15px; display: flex; gap: 10px; justify-content: flex-end;">
-                <button class="btn-secondary" onclick="finalizarVentaSinVuelto()">No entregar vuelto</button>
-                <button class="btn-success" onclick="confirmarVuelto()" title="F10 o Ctrl+Enter">✅ Finalizar Venta (F10)</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="modalVuelto" class="modal">
-        <div class="modal-content modal-small">
-            <span class="close" onclick="cerrarModalVuelto()">&times;</span>
-            <h2>✅ Venta Procesada</h2>
-            <div id="vueltoInfo" class="vuelto-info"></div>
-            <button onclick="cerrarModalVuelto()" class="btn-primary" title="F10 o Enter"
-                style="width: 100%; padding: 12px; font-size: 1.1em;">Aceptar (F10)</button>
-        </div>
-    </div>
-
-    <div id="modalTotalizacionVenta" class="modal">
-        <div class="modal-content modal-totalizacion-venta">
-            <span class="close" onclick="cerrarModalTotalizacion()">&times;</span>
-            <h2 style="margin-bottom: 18px;">Totalizar Venta</h2>
-
-            <div class="datos-venta sales-panel-card sales-panel-accent modal-datos-venta">
-                <h3>Datos de la Venta</h3>
-
-                <div class="resumen-total sales-subcard"
-                    style="background: #e9ecef; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
-                    <div style="display: flex; justify-content: space-between; font-size: 1.2em;">
-                        <span><strong>Total Venta:</strong></span>
-                        <span>
-                            <span id="totalVentaDolares">$0.00</span> /
-                            <span id="totalVentaBs">Bs 0.00</span>
-                        </span>
-                    </div>
-                    <div id="containerAhorroRealTime"
-                        style="display: none; justify-content: space-between; color: #28a745; margin-top: 5px; font-size: 0.95em; border-top: 1px dashed #ccc; padding-top: 5px;">
-                        <span>Ahorro aplicado:</span>
-                        <span id="ahorroVentaRealTime">-$0.00</span>
-                    </div>
-                    <div id="containerTotalAPagarRealTime"
-                        style="display: none; justify-content: space-between; font-weight: bold; font-size: 1.3em; margin-top: 5px; color: #007bff; border-top: 1px solid #ccc; padding-top: 5px;">
-                        <span>TOTAL A PAGAR:</span>
-                        <span id="totalAPagarRealTime">$0.00</span>
-                    </div>
-                </div>
-
-                <div class="agregar-pago sales-subcard"
-                    style="background: #f8f9fa; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
-                    <div class="carrito-header-inline">
-                        <h4>Agregar Pago (F4)</h4>
-                    </div>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px;">
-                        <label for="medioPago" class="sr-only">Medio de pago</label>
-                        <select id="medioPago" name="medioPago" required>
-                            <option value="">Medio de pago...</option>
-                            <option value="Efectivo en Dólares">💵 Efectivo en Dólares</option>
-                            <option value="Efectivo en Bolívares">💶 Efectivo en Bolívares</option>
-                            <option value="Tarjeta de Débito">💳 Tarjeta de Débito</option>
-                            <option value="Pago Móvil">📱 Pago Móvil</option>
-                            <option value="Tarjeta de Crédito">💳 Tarjeta de Crédito</option>
-                            <option value="Transferencia en Bs">🏦 Transferencia en Bs</option>
-                            <option value="Transferencia en Dólares">🏦 Transferencia en Dólares</option>
-                        </select>
-                        <label for="montoPago" class="sr-only">Monto del pago</label>
-                        <input type="number" id="montoPago" name="montoPago" step="0.01" min="0" placeholder="Monto">
-                        <button type="button" id="btnAgregarPago" class="btn-success" title="F9 o Enter en pago">➕ Agregar (F9)</button>
-                    </div>
-                </div>
-
-                <div class="lista-pagos sales-subcard" style="margin-bottom: 20px;">
-                    <h4>Pagos Realizados</h4>
-                    <div id="listaPagos" style="max-height: 200px; overflow-y: auto;">
-                    </div>
-                </div>
-
-                <div class="resumen-pagos sales-subcard"
-                    style="background: #e3f2fd; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                        <div>
-                            <small>Pagado en $:</small>
-                            <strong id="totalPagadoDolares">$0.00</strong>
-                        </div>
-                        <div>
-                            <small>Pagado en Bs:</small>
-                            <strong id="totalPagadoBs">Bs 0.00</strong>
-                        </div>
-                        <div>
-                            <small>Pendiente $:</small>
-                            <strong id="pendienteDolares" style="color: #dc3545;">$0.00</strong>
-                        </div>
-                        <div>
-                            <small>Pendiente Bs:</small>
-                            <strong id="pendienteBs" style="color: #dc3545;">Bs 0.00</strong>
-                        </div>
-                    </div>
-                </div>
-
-                <div id="panelSaldoFavorCliente" class="sales-subcard" style="background: #fff8e1; padding: 12px; border-radius: 10px; margin-bottom: 20px; display: none;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;">
-                        <strong>Saldo a favor del cliente</strong>
-                        <label style="display: inline-flex; align-items: center; gap: 6px;">
-                            <input type="checkbox" id="usarSaldoFavorVenta" onchange="actualizarListaPagos()" name="usarSaldoFavorVenta">
-                            Aplicar manualmente
-                        </label>
-                    </div>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
-                        <div>
-                            <small>Disponible:</small>
-                            <strong id="saldoFavorDisponibleVenta">$0.00</strong>
-                        </div>
-                        <div>
-                            <small>A aplicar:</small>
-                            <label for="montoSaldoFavorVenta" class="sr-only">Monto a aplicar del saldo a favor</label>
-                            <input type="number" id="montoSaldoFavorVenta" name="montoSaldoFavorVenta" step="0.01" min="0" value="0" oninput="actualizarListaPagos()">
-                        </div>
-                    </div>
-                </div>
-
-                <div id="panelCreditoCliente" class="sales-subcard" style="background: #eef7ff; padding: 12px; border-radius: 10px; margin-bottom: 20px; display: none;">
-                    <div style="display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; align-items: center;">
-                        <strong>Credito y excedente</strong>
-                        <span id="tipoVentaPreview" style="font-weight: bold; color: #0d6efd;">Contado</span>
-                    </div>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
-                        <div>
-                            <small>Saldo pendiente:</small>
-                            <strong id="saldoPendienteCreditoPreview">$0.00</strong>
-                        </div>
-                        <div>
-                            <small>Excedente a favor:</small>
-                            <strong id="saldoFavorGeneradoPreview">$0.00</strong>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="form-actions">
-                    <button type="button" id="btnProcesarVenta" onclick="procesarVenta()" class="btn-success" title="F10 o Ctrl+Enter"
-                        disabled>
-                        ✅ Procesar Venta (F10)
-                    </button>
-                    <button type="button" id="btnLimpiarVenta" onclick="limpiarCarrito()" class="btn-secondary" title="Ctrl+Supr">
-                        🗑️ Limpiar Todo (Ctrl+Supr)
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div id="modalExcedenteTotalizacion" class="modal"
-        onclick="if (event.target === this) cerrarModalExcedenteTotalizacion()">
-        <div class="modal-content modal-small modal-excedente-totalizacion">
-            <span class="close" onclick="cerrarModalExcedenteTotalizacion()">&times;</span>
-            <div class="modal-excedente-badge">Excedente detectado</div>
-            <h2>Saldo a favor o vuelto</h2>
-            <p class="modal-excedente-texto">
-                El cliente tiene un excedente de <strong id="modalExcedenteTotalizacionMonto">$0.00</strong>.
-            </p>
-            <p class="modal-excedente-ayuda">
-                Puede guardarlo como saldo a favor o gestionar el vuelto ahora mismo.
-            </p>
-            <div class="modal-excedente-acciones">
-                <button class="btn-primary" onclick="aceptarExcedenteComoSaldoFavor()">Guardar saldo a favor</button>
-                <button class="btn-secondary" onclick="gestionarExcedenteComoVuelto()">Gestionar vuelto</button>
-            </div>
-        </div>
-    </div>
-
     <div id="modalCerrarSesion" class="modal">
         <div class="modal-content modal-small modal-cerrar-sesion">
             <span id="btnCerrarModalCerrarSesion" class="close">&times;</span>
@@ -1042,51 +790,6 @@
         </div>
     </div>
 
-    <!-- Modal Proveedor -->
-    <div id="modalProveedor" class="modal">
-        <div class="modal-content" style="max-width: 450px;">
-            <span class="close" onclick="cerrarModalProveedor()">&times;</span>
-            <h2 id="modalTituloProveedor" style="text-align: center; margin-bottom: 20px;">➕ Nuevo Proveedor</h2>
-            
-            <input type="hidden" id="proveedorId" value="-1" name="proveedorId">
-            
-            <div style="margin-bottom: 12px;">
-                <label for="proveedorNombre" style="font-weight: bold; display: block; margin-bottom: 5px;">Nombre:</label>
-                <input type="text" id="proveedorNombre" placeholder="Nombre del proveedor"
-                    style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;" name="proveedorNombre">
-            </div>
-
-            <div style="margin-bottom: 12px;">
-                <label for="proveedorRif" style="font-weight: bold; display: block; margin-bottom: 5px;">RIF:</label>
-                <input type="text" id="proveedorRif" placeholder="J-12345678-9"
-                    style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;" name="proveedorRif">
-            </div>
-
-            <div style="margin-bottom: 12px;">
-                <label for="proveedorTelefono" style="font-weight: bold; display: block; margin-bottom: 5px;">Teléfono:</label>
-                <input type="text" id="proveedorTelefono" placeholder="0412-1234567"
-                    style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;" name="proveedorTelefono">
-            </div>
-
-            <div style="margin-bottom: 12px;">
-                <label for="proveedorEmail" style="font-weight: bold; display: block; margin-bottom: 5px;">Email:</label>
-                <input type="email" id="proveedorEmail" placeholder="correo@ejemplo.com"
-                    style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;" name="proveedorEmail">
-            </div>
-
-            <div style="margin-bottom: 15px;">
-                <label for="proveedorDireccion" style="font-weight: bold; display: block; margin-bottom: 5px;">Dirección:</label>
-                <textarea id="proveedorDireccion" rows="2" placeholder="Dirección del proveedor"
-                    style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px; resize: vertical;" name="proveedorDireccion"></textarea>
-            </div>
-
-            <div style="text-align: right; border-top: 1px solid #eee; padding-top: 15px;">
-                <button class="btn-secondary" onclick="cerrarModalProveedor()">Cancelar</button>
-                <button class="btn-primary" onclick="guardarProveedor()">💾 Guardar</button>
-            </div>
-        </div>
-    </div>
-
     <!-- Modal Cliente -->
     <div id="modalCliente" class="modal">
         <div class="modal-content">
@@ -1159,7 +862,7 @@
 
     <div id="modalEstadoCuentaCliente" class="modal">
         <div class="modal-content" style="max-width: 720px;">
-            <span class="close" onclick="cerrarModalEstadoCuentaCliente()">&times;</span>
+            <span id="btnCerrarModalEstadoCuentaCliente" class="close">&times;</span>
             <h2 id="tituloEstadoCuentaCliente" style="text-align: center; margin-bottom: 20px;">Estado de Cuenta</h2>
 
             <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 18px;">
@@ -1181,14 +884,14 @@
             <div id="estadoCuentaClienteLista" style="max-height: 420px; overflow-y: auto; padding-right: 6px;"></div>
 
             <div style="text-align: right; border-top: 1px solid #eee; padding-top: 15px; margin-top: 15px;">
-                <button class="btn-secondary" onclick="cerrarModalEstadoCuentaCliente()">Cerrar</button>
+                <button id="btnCerrarEstadoCuentaCliente" class="btn-secondary">Cerrar</button>
             </div>
         </div>
     </div>
 
     <div id="modalAbonoCuenta" class="modal">
         <div class="modal-content" style="max-width: 560px;">
-            <span id="btnCerrarModalAbonoCuenta" class="close" onclick="window.CxcFeature?.cerrarModalAbonoCuenta?.()">&times;</span>
+            <span id="btnCerrarModalAbonoCuenta" class="close">&times;</span>
             <h2 id="tituloModalAbonoCuenta" style="text-align: center; margin-bottom: 18px;">Registrar Abono</h2>
 
             <input type="hidden" id="abonoCuentaId" value="" name="abonoCuentaId">
@@ -1205,14 +908,14 @@
 
             <div style="margin-bottom: 14px;">
                 <label style="display: flex; align-items: center; gap: 8px; font-weight: bold;">
-                    <input type="checkbox" id="abonoUsarSaldoFavor" onchange="toggleModoAbonoCuenta()" name="abonoUsarSaldoFavor">
+                    <input type="checkbox" id="abonoUsarSaldoFavor" name="abonoUsarSaldoFavor">
                     Aplicar saldo a favor del cliente
                 </label>
             </div>
 
             <div id="panelAbonoSaldoFavor" style="display: none; margin-bottom: 16px; background: #eefbf3; border-radius: 10px; padding: 14px;">
                 <label for="abonoMontoSaldoFavor" style="font-weight: bold; display: block; margin-bottom: 6px;">Monto a aplicar en USD:</label>
-                <input type="number" id="abonoMontoSaldoFavor" min="0" step="0.01" value="0" oninput="actualizarResumenAbonoCuenta()"
+                <input type="number" id="abonoMontoSaldoFavor" min="0" step="0.01" value="0"
                     style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;" name="abonoMontoSaldoFavor">
             </div>
 
@@ -1232,14 +935,14 @@
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
                     <div>
                         <label for="abonoMoneda" style="font-weight: bold; display: block; margin-bottom: 5px;">Moneda:</label>
-                        <select id="abonoMoneda" onchange="toggleMonedaAbonoCuenta(); actualizarResumenAbonoCuenta()" style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;" name="abonoMoneda">
+                        <select id="abonoMoneda" style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;" name="abonoMoneda">
                             <option value="USD">USD</option>
                             <option value="BS">BS</option>
                         </select>
                     </div>
                     <div>
                         <label for="abonoMonto" style="font-weight: bold; display: block; margin-bottom: 5px;">Monto:</label>
-                        <input type="number" id="abonoMonto" min="0" step="0.01" value="0" oninput="actualizarResumenAbonoCuenta()"
+                        <input type="number" id="abonoMonto" min="0" step="0.01" value="0"
                             style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;" name="abonoMonto">
                     </div>
                 </div>
@@ -1247,12 +950,12 @@
                 <div id="panelTasaAbonoCuenta" style="display: none; margin-bottom: 12px; background: #fff8e1; border-radius: 10px; padding: 14px;">
                     <div style="margin-bottom: 10px;">
                         <label style="display: flex; align-items: center; gap: 8px; font-weight: bold;">
-                            <input type="checkbox" id="abonoUsarTasaSistema" checked onchange="toggleTasaAbonoCuenta()" name="abonoUsarTasaSistema">
+                            <input type="checkbox" id="abonoUsarTasaSistema" checked name="abonoUsarTasaSistema">
                             Usar tasa del sistema
                         </label>
                     </div>
                     <label for="abonoTasaUsada" style="font-weight: bold; display: block; margin-bottom: 5px;">Tasa usada:</label>
-                    <input type="number" id="abonoTasaUsada" min="0" step="0.0001" value="0" oninput="actualizarResumenAbonoCuenta()"
+                    <input type="number" id="abonoTasaUsada" min="0" step="0.0001" value="0"
                         style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;" name="abonoTasaUsada">
                 </div>
             </div>
@@ -1269,315 +972,47 @@
             </div>
 
             <div style="text-align: right; border-top: 1px solid #eee; padding-top: 15px;">
-                <button id="btnCancelarAbonoCuenta" type="button" class="btn-secondary" onclick="window.CxcFeature?.cerrarModalAbonoCuenta?.()">Cancelar</button>
-                <button id="btnGuardarAbonoCuenta" type="button" class="btn-primary" onclick="window.CxcFeature?.guardarAbonoCuentaDesdeModal?.()">💾 Guardar Abono</button>
+                <button id="btnCancelarAbonoCuenta" type="button" class="btn-secondary">Cancelar</button>
+                <button id="btnGuardarAbonoCuenta" type="button" class="btn-primary">💾 Guardar Abono</button>
             </div>
         </div>
     </div>
 
     <div id="modalBuscarClienteCxc" class="modal">
         <div class="modal-content" style="max-width: 680px;">
-            <span class="close" onclick="cerrarModalBuscarClienteCxc()">&times;</span>
+            <span id="btnCerrarModalBuscarClienteCxc" class="close">&times;</span>
             <h2 style="text-align: center; margin-bottom: 18px;">Buscar Cliente para CxC</h2>
 
             <div style="margin-bottom: 16px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
-                <input type="text" id="buscarClienteCxcModal" name="buscarClienteCxcModal" class="form-control" placeholder="Buscar por nombre, documento, telefono..." aria-label="Buscar cliente para cuentas por cobrar" oninput="renderListaBusquedaClienteCxc()" style="flex: 1; min-width: 260px;">
+                <input type="text" id="buscarClienteCxcModal" name="buscarClienteCxcModal" class="form-control" placeholder="Buscar por nombre, documento, telefono..." aria-label="Buscar cliente para cuentas por cobrar" style="flex: 1; min-width: 260px;">
             </div>
 
             <div id="listaBusquedaClienteCxc" style="max-height: 420px; overflow-y: auto;"></div>
 
             <div style="text-align: right; border-top: 1px solid #eee; padding-top: 15px; margin-top: 15px;">
-                <button class="btn-secondary" onclick="cerrarModalBuscarClienteCxc()">Cerrar</button>
+                <button id="btnCerrarBuscarClienteCxc" class="btn-secondary">Cerrar</button>
             </div>
         </div>
     </div>
 
     <div id="modalBuscarClienteVenta" class="modal">
         <div class="modal-content" style="max-width: 680px;">
-            <span class="close" onclick="cerrarModalBuscarClienteVenta()">&times;</span>
+            <span id="btnCerrarModalBuscarClienteVenta" class="close">&times;</span>
             <h2 style="text-align: center; margin-bottom: 18px;">Buscar Cliente para Venta</h2>
 
             <div style="margin-bottom: 16px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
-                <input type="text" id="buscarClienteVentaModal" name="buscarClienteVentaModal" class="form-control" placeholder="Buscar por nombre, documento, telefono..." aria-label="Buscar cliente para venta" oninput="renderListaBusquedaClienteVenta()" style="flex: 1; min-width: 260px;">
+                <input type="text" id="buscarClienteVentaModal" name="buscarClienteVentaModal" class="form-control" placeholder="Buscar por nombre, documento, telefono..." aria-label="Buscar cliente para venta" style="flex: 1; min-width: 260px;">
             </div>
 
             <div id="listaBusquedaClienteVenta" style="max-height: 420px; overflow-y: auto;"></div>
 
             <div style="text-align: right; border-top: 1px solid #eee; padding-top: 15px; margin-top: 15px; display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap;">
-                <button class="btn-secondary" onclick="limpiarClienteVenta(); cerrarModalBuscarClienteVenta();">Usar contado</button>
-                <button class="btn-secondary" onclick="cerrarModalBuscarClienteVenta()">Cerrar</button>
+                <button id="btnUsarContadoClienteVenta" class="btn-secondary">Usar contado</button>
+                <button id="btnCerrarBuscarClienteVenta" class="btn-secondary">Cerrar</button>
             </div>
         </div>
     </div>
 
-    <div id="modalResumenVenta" class="modal">
-        <div class="modal-content sales-panel-card sales-panel-accent venta-resumen-rapido" style="max-width: 680px; border-radius: 12px; max-height: 85vh; overflow-y: auto;">
-            <span class="close" onclick="cerrarModalResumenVenta()">&times;</span>
-            <div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; align-items: start; margin-top: 10px;">
-                <div>
-                    <div class="pos-summary-stack">
-                        <span class="pos-badge">Caja activa</span>
-                        <h3>Cobro</h3>
-                        <p>Valida rapidamente el estado de la venta y abre el modal de cobro cuando el carrito este listo.</p>
-                    </div>
-
-                    <div class="pos-flow">
-                        <div class="pos-flow-step"><strong>1</strong><span>Busca el producto y agregalo al carrito.</span></div>
-                        <div class="pos-flow-step"><strong>2</strong><span>Ajusta cantidades o elimina items desde el teclado.</span></div>
-                        <div class="pos-flow-step"><strong>3</strong><span>Abre el cobro con F10 o Ctrl + Enter.</span></div>
-                    </div>
-                </div>
-
-                <div class="atajos-panel atajos-panel-compacto" style="margin-top: 0;">
-                    <div class="atajos-panel-header">
-                        <strong>Atajos del POS</strong>
-                        <span>Comandos rapidos de caja</span>
-                    </div>
-                    <div class="atajos-grid">
-                        <div><kbd>F2</kbd><span>Buscar producto</span></div>
-                        <div><kbd>F3</kbd><span>Ir a cliente</span></div>
-                        <div><kbd>F4</kbd><span>Ir a medio de pago</span></div>
-                        <div><kbd>F8</kbd><span>Ir a monto</span></div>
-                        <div><kbd>F9</kbd><span>Agregar pago</span></div>
-                        <div><kbd>F10</kbd><span>Abrir cobro</span></div>
-                        <div><kbd>Ctrl + Enter</kbd><span>Abrir cobro</span></div>
-                        <div><kbd>Esc</kbd><span>Cerrar modal</span></div>
-                        <div><kbd>↑ / ↓</kbd><span>Moverse en carrito</span></div>
-                        <div><kbd>+</kbd><span>Subir cantidad</span></div>
-                        <div><kbd>-</kbd><span>Bajar cantidad</span></div>
-                        <div><kbd>Supr</kbd><span>Eliminar producto</span></div>
-                        <div><kbd>Ctrl + Supr</kbd><span>Limpiar venta</span></div>
-                        <div><kbd>Enter</kbd><span>Agregar producto o pago</span></div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal Compra -->
-    <div id="modalCompra" class="modal">
-        <div class="modal-content">
-            <span class="close" onclick="cerrarModalCompra()">&times;</span>
-            <h2 style="text-align: center; margin-bottom: 20px;">🛒 Nueva Compra</h2>
-            
-            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                <div>
-                    <label for="compraNroFactura" style="font-weight: bold; display: block; margin-bottom: 5px;">Nro. Factura:</label>
-                    <input type="text" id="compraNroFactura" 
-                        placeholder="Ej: FAC-001234"
-                        style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;" name="compraNroFactura">
-                </div>
-                <div>
-                    <label for="compraFecha" style="font-weight: bold; display: block; margin-bottom: 5px;">Fecha Factura:</label>
-                    <input type="date" id="compraFecha" 
-                        style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;" name="compraFecha">
-                </div>
-                <div>
-                    <label for="compraFechaLibro" style="font-weight: bold; display: block; margin-bottom: 5px;">Fecha Libro:</label>
-                    <input type="date" id="compraFechaLibro" 
-                        style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;" name="compraFechaLibro">
-                </div>
-            </div>
-
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                <div>
-                    <label for="compraProveedor" style="font-weight: bold; display: block; margin-bottom: 5px;">Proveedor:</label>
-                    <select id="compraProveedor"
-                        style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;" name="compraProveedor">
-                        <option value="">Seleccionar proveedor...</option>
-                    </select>
-                </div>
-                <div>
-                    <div style="font-weight: bold; display: block; margin-bottom: 5px;">Total:</div>
-                    <div style="font-size: 1.5em; font-weight: bold; color: #667eea;">
-                        $ <span id="compraTotal">0.00</span>
-                    </div>
-                </div>
-            </div>
-
-            <div style="margin-bottom: 15px; padding: 15px; background: #f5f5f5; border-radius: 8px;">
-                <h4 style="margin: 0 0 10px 0;">Agregar Producto</h4>
-                
-                <!-- Buscador de productos -->
-                <div style="position: relative;">
-                    <input type="text" id="buscarProductoCompra" name="buscarProductoCompra" class="form-control" aria-label="Buscar producto para compra"
-                        placeholder="🔍 Buscar producto por nombre o código... (Ej: 5*codigo para agregar 5 unidades)"
-                        autocomplete="off"
-                        style="width: 100%; padding: 10px; font-size: 1em;">
-                    <div id="sugerenciasCompra" class="sugerencias-productos" style="position: absolute; top: 100%; left: 0; right: 0; z-index: 1000; max-height: 250px; overflow-y: auto; display: none;"></div>
-                </div>
-            </div>
-
-            <div id="listaProductosCompra" style="margin-bottom: 15px; max-height: 200px; overflow-y: auto;">
-                <!-- Productos agregados -->
-            </div>
-
-            <div style="text-align: right; border-top: 1px solid #eee; padding-top: 15px;">
-                <button class="btn-secondary" onclick="cerrarModalCompra()">Cancelar</button>
-                <button class="btn-primary" onclick="guardarCompra()">💾 Registrar Compra</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="modalCompraPrecios" class="modal">
-        <div class="modal-content" style="max-width: 720px;">
-            <span class="close" onclick="cerrarModalPreciosCompra()">&times;</span>
-            <h3 style="margin-bottom: 8px;">Actualizar precios</h3>
-            <p style="margin: 0 0 18px 0; color: #64748b;">Ajusta el costo y los precios de venta del producto agregado a la compra.</p>
-            <input type="hidden" id="compraPrecioIndex" name="compraPrecioIndex">
-            <div style="margin-bottom: 16px; padding: 12px 14px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px;">
-                <strong id="compraPrecioProductoNombre">Producto</strong>
-            </div>
-            <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-bottom: 16px;">
-                <div>
-                    <label for="compraPrecioCostoModal" style="font-weight: bold; display: block; margin-bottom: 5px;">Costo ($):</label>
-                    <input type="number" id="compraPrecioCostoModal" step="0.01" min="0" oninput="recalcularTodosLosPreciosCompra()" style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;" name="compraPrecioCostoModal">
-                </div>
-                <div>
-                    <label for="compraPrecioBolivaresModal" style="font-weight: bold; display: block; margin-bottom: 5px;">Precio en Bs:</label>
-                    <input type="number" id="compraPrecioBolivaresModal" step="0.01" min="0" oninput="calcularPrecioDolaresCompra()" style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;" name="compraPrecioBolivaresModal">
-                </div>
-                <div>
-                    <label for="compraMetodoRedondeoModal" style="font-weight: bold; display: block; margin-bottom: 5px;">Redondeo:</label>
-                    <select id="compraMetodoRedondeoModal" onchange="calcularPrecioBolivaresCompra()" style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;" name="compraMetodoRedondeoModal">
-                        <option value="none">Sin Redondeo</option>
-                        <option value="no_decimals">Sin Decimales</option>
-                        <option value="five_cents">Cinco céntimos (0.05)</option>
-                        <option value="unit_up">Unidad Superior</option>
-                        <option value="five_units">Cinco Unidades (5.00)</option>
-                        <option value="ten_up">Decena Superior (10.00)</option>
-                        <option value="hundred_up">Centena Superior (100.00)</option>
-                    </select>
-                </div>
-            </div>
-            <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 18px;">
-                <div>
-                    <label for="compraPorcentajeGanancia1Modal" style="font-weight: bold; display: block; margin-bottom: 5px;">% Ganancia P1:</label>
-                    <input type="number" id="compraPorcentajeGanancia1Modal" step="0.0001" min="0" oninput="recalcularPrecioCompraDesdePorcentaje(1)" style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;" name="compraPorcentajeGanancia1Modal">
-                </div>
-                <div>
-                    <label for="compraPrecioDolares1Modal" style="font-weight: bold; display: block; margin-bottom: 5px;">Precio Venta P1 ($):</label>
-                    <input type="number" id="compraPrecioDolares1Modal" step="0.01" min="0" oninput="recalcularPorcentajeCompraDesdePrecio(1)" style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;" name="compraPrecioDolares1Modal">
-                </div>
-                <div>
-                    <label for="compraPorcentajeGanancia2Modal" style="font-weight: bold; display: block; margin-bottom: 5px;">% Ganancia P2:</label>
-                    <input type="number" id="compraPorcentajeGanancia2Modal" step="0.0001" min="0" oninput="recalcularPrecioCompraDesdePorcentaje(2)" style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;" name="compraPorcentajeGanancia2Modal">
-                </div>
-                <div>
-                    <label for="compraPrecioDolares2Modal" style="font-weight: bold; display: block; margin-bottom: 5px;">Precio Venta P2 ($):</label>
-                    <input type="number" id="compraPrecioDolares2Modal" step="0.01" min="0" oninput="recalcularPorcentajeCompraDesdePrecio(2)" style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;" name="compraPrecioDolares2Modal">
-                </div>
-                <div>
-                    <label for="compraPorcentajeGanancia3Modal" style="font-weight: bold; display: block; margin-bottom: 5px;">% Ganancia P3:</label>
-                    <input type="number" id="compraPorcentajeGanancia3Modal" step="0.0001" min="0" oninput="recalcularPrecioCompraDesdePorcentaje(3)" style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;" name="compraPorcentajeGanancia3Modal">
-                </div>
-                <div>
-                    <label for="compraPrecioDolares3Modal" style="font-weight: bold; display: block; margin-bottom: 5px;">Precio Venta P3 ($):</label>
-                    <input type="number" id="compraPrecioDolares3Modal" step="0.01" min="0" oninput="recalcularPorcentajeCompraDesdePrecio(3)" style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;" name="compraPrecioDolares3Modal">
-                </div>
-            </div>
-            <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
-                <button type="button" class="btn-secondary" onclick="cerrarModalPreciosCompra()">Cancelar</button>
-                <button type="button" class="btn-primary" onclick="guardarPreciosCompra()">Aplicar precios</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal Ver Detalle Compra -->
-    <div id="modalDetalleCompra" class="modal">
-        <div class="modal-content" style="max-width: 600px;">
-            <span class="close" onclick="cerrarModalDetalleCompra()">&times;</span>
-            <h2 style="text-align: center; margin-bottom: 20px;">📋 Detalle de Compra</h2>
-            
-            <div id="detalleCompraInfo" style="margin-bottom: 15px; padding: 15px; background: #f5f5f5; border-radius: 8px;">
-            </div>
-            
-            <div id="detalleCompraTabla" style="max-height: 300px; overflow-y: auto;">
-            </div>
-            
-            <div style="text-align: right; margin-top: 15px;">
-                <button class="btn-secondary" onclick="cerrarModalDetalleCompra()">Cerrar</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="modalDevolucion" class="modal">
-        <div class="modal-content" style="max-width: 760px;">
-            <span class="close" onclick="cerrarModalDevolucion()">&times;</span>
-            <h2 style="margin-bottom: 16px;">↩️ Registrar devolución</h2>
-
-            <div id="devolucionVentaInfo" style="margin-bottom: 15px; padding: 15px; background: #f5f7fb; border-radius: 8px;"></div>
-
-            <div style="margin-bottom: 15px;">
-                <h4 style="margin-bottom: 10px;">Productos a devolver</h4>
-                <div id="devolucionProductosLista" style="max-height: 280px; overflow-y: auto; border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px; background: #fff;"></div>
-            </div>
-
-            <div style="margin-bottom: 15px; padding: 15px; background: #f8fafc; border-radius: 8px; border: 1px solid #e5e7eb;">
-                <h4 style="margin-bottom: 10px;">Entregas de reintegro</h4>
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 12px;">
-                    <div>
-                        <label for="devolucionMetodoReintegro" style="display: block; font-weight: bold; margin-bottom: 5px;">Método</label>
-                        <select id="devolucionMetodoReintegro" class="form-control" name="devolucionMetodoReintegro">
-                            <option value="Efectivo">Efectivo</option>
-                            <option value="Pago móvil">Pago móvil</option>
-                            <option value="Transferencia">Transferencia</option>
-                            <option value="Zelle">Zelle</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label for="devolucionMonedaReintegro" style="display: block; font-weight: bold; margin-bottom: 5px;">Moneda</label>
-                        <select id="devolucionMonedaReintegro" class="form-control" onchange="sincronizarFormularioReintegro()" name="devolucionMonedaReintegro">
-                            <option value="USD">USD</option>
-                            <option value="BS">Bs</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label for="devolucionTasaReintegro" style="display: block; font-weight: bold; margin-bottom: 5px;">Tasa</label>
-                        <input type="number" id="devolucionTasaReintegro" class="form-control" min="0" step="0.01" oninput="actualizarVistaFormularioReintegro()" name="devolucionTasaReintegro">
-                    </div>
-                    <div>
-                        <label for="devolucionMontoReintegro" style="display: block; font-weight: bold; margin-bottom: 5px;">Monto</label>
-                        <input type="number" id="devolucionMontoReintegro" class="form-control" min="0" step="0.01" oninput="actualizarVistaFormularioReintegro()" name="devolucionMontoReintegro">
-                    </div>
-                </div>
-                <div style="display: flex; justify-content: space-between; gap: 10px; align-items: center; flex-wrap: wrap;">
-                    <small id="devolucionVistaFormulario" style="color: #475569;">USD 0.00 equivalen a $0.00</small>
-                    <button type="button" class="btn-secondary" onclick="agregarReintegroDevolucion()">➕ Agregar entrega</button>
-                </div>
-                <div id="devolucionListaReintegros" style="margin-top: 12px;"></div>
-            </div>
-
-            <div style="margin-bottom: 15px;">
-                <label for="devolucionMotivo" style="display: block; font-weight: bold; margin-bottom: 5px;">Motivo</label>
-                <textarea id="devolucionMotivo" rows="2" class="form-control" placeholder="Motivo de la devolución" name="devolucionMotivo"></textarea>
-            </div>
-
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 15px;">
-                <div>
-                    <small>Total devolución</small><br>
-                    <strong id="devolucionTotalUSD">$0.00</strong>
-                </div>
-                <div style="padding: 12px; border-radius: 8px; background: #eef6ff;">
-                    <small>Reintegrado</small><br>
-                    <strong id="devolucionEntregadoUSD">$0.00</strong>
-                </div>
-                <div style="padding: 12px; border-radius: 8px; background: #f4fdf6;">
-                    <small>Reintegrado Bs</small><br>
-                    <strong id="devolucionEntregadoBS">Bs 0.00</strong>
-                </div>
-                <div style="padding: 12px; border-radius: 8px; background: #fff7ed;">
-                    <small>Diferencia</small><br>
-                    <strong id="devolucionFaltanteUSD">$0.00</strong>
-                </div>
-            </div>
-
-            <div style="text-align: right; border-top: 1px solid #eee; padding-top: 15px;">
-                <button class="btn-secondary" onclick="cerrarModalDevolucion()">Cancelar</button>
-                <button class="btn-primary" id="btnGuardarDevolucion" onclick="guardarDevolucionVenta()">💾 Confirmar devolución</button>
-            </div>
-        </div>
-        </div>
             </main>
         </div>
 

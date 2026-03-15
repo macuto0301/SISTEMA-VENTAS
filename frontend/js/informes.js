@@ -3,6 +3,10 @@
 // ============================================
 
 const InformesService = {
+    obtenerCalendario(id) {
+        return window.SVDatePicker?.get?.(id);
+    },
+
     obtenerAppState() {
         return window.AppState || { ventas: [], paginacion: { ventas: { page: 1, page_size: 10, total: 0, total_pages: 1 } } };
     },
@@ -51,6 +55,10 @@ const InformesService = {
     },
 
     obtenerValorFiltro(id) {
+        const calendario = this.obtenerCalendario(id);
+        if (calendario) {
+            return calendario.getValue();
+        }
         const elemento = document.getElementById(id);
         return elemento ? elemento.value : '';
     },
@@ -133,14 +141,14 @@ const InformesService = {
         const inicioInput = this.obtenerValorFiltro('fechaInicioInforme');
         const finInput = this.obtenerValorFiltro('fechaFinInforme');
         if (!inicioInput || !finInput) {
-            alert('Seleccione fechas de Inicio y Fin');
+            window.mostrarNotificacion?.('⚠️ Seleccione fechas de Inicio y Fin');
             return;
         }
 
         const fechaInicio = new Date(inicioInput + 'T00:00:00');
         const fechaFin = new Date(finInput + 'T23:59:59');
         if (fechaInicio > fechaFin) {
-            alert('La fecha final no puede ser menor a la inicial');
+            window.mostrarNotificacion?.('⚠️ La fecha final no puede ser menor a la inicial');
             return;
         }
 
@@ -156,8 +164,8 @@ const InformesService = {
     },
 
     async limpiarFiltros() {
-        document.getElementById('fechaInicioInforme').value = '';
-        document.getElementById('fechaFinInforme').value = '';
+        this.obtenerCalendario('fechaInicioInforme')?.clear();
+        this.obtenerCalendario('fechaFinInforme')?.clear();
 
         const selectRol = document.getElementById('filtroRolInforme');
         const selectUsuario = document.getElementById('filtroUsuarioInforme');

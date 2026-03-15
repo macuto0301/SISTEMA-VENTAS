@@ -2,6 +2,7 @@ const ProductosMediaFeature = {
     productoFotosSeleccionadas: [],
     productoFotosExistentes: [],
     _mediaUploader: null,
+    _previewEventsBound: false,
 
     inicializarMediaUploader() {
         if (!this._mediaUploader && window.SVMediaUploader) {
@@ -15,7 +16,29 @@ const ProductosMediaFeature = {
             });
         }
 
+        this.registrarEventosPreview();
+
         return this._mediaUploader;
+    },
+
+    registrarEventosPreview() {
+        if (this._previewEventsBound) return;
+
+        const preview = document.getElementById('productoFotoPreview');
+        if (!preview) return;
+
+        preview.addEventListener('click', event => {
+            const button = event.target.closest('[data-remove-photo-type]');
+            if (!button) return;
+
+            const tipo = button.dataset.removePhotoType;
+            const index = Number(button.dataset.removePhotoIndex);
+            if (!tipo || !Number.isInteger(index)) return;
+
+            this.quitarFotoProducto(tipo, index);
+        });
+
+        this._previewEventsBound = true;
     },
 
     liberarObjectUrlFotoProducto() {
@@ -65,7 +88,7 @@ const ProductosMediaFeature = {
         preview.innerHTML = fotos.map((foto, index) => `
             <div class="producto-foto-thumb">
                 <img src="${foto.url}" alt="Foto ${index + 1} del producto">
-                <button type="button" class="producto-foto-thumb-remove" onclick="quitarFotoProducto('${foto.tipo}', ${foto.tipo === 'nueva' ? foto.index : index})">&times;</button>
+                <button type="button" class="producto-foto-thumb-remove" data-remove-photo-type="${foto.tipo}" data-remove-photo-index="${foto.tipo === 'nueva' ? foto.index : index}">&times;</button>
                 <span class="producto-foto-thumb-badge">${foto.tipo === 'existente' ? 'Guardada' : 'Nueva'}</span>
             </div>
         `).join('');

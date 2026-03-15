@@ -27,6 +27,32 @@ function redondearMontoCompra(valor) {
     return Math.round((parseFloat(valor) || 0) * 100) / 100;
 }
 
+function obtenerValorCalendarioCompra(id) {
+    return window.SVDatePicker?.get?.(id)?.getValue?.() || document.getElementById(id)?.value || '';
+}
+
+function asignarValorCalendarioCompra(id, value) {
+    const calendario = window.SVDatePicker?.get?.(id);
+    if (calendario) {
+        calendario.setValue(value);
+        return;
+    }
+
+    const input = document.getElementById(id);
+    if (input) input.value = value || '';
+}
+
+function limpiarCalendarioCompra(id) {
+    const calendario = window.SVDatePicker?.get?.(id);
+    if (calendario) {
+        calendario.clear();
+        return;
+    }
+
+    const input = document.getElementById(id);
+    if (input) input.value = '';
+}
+
 function construirItemCompra(producto, cantidad = 1) {
     const precioCosto = redondearMontoCompra(producto.precio_costo);
     const porcentaje1 = parseFloat(producto.porcentaje_ganancia_1 ?? producto.porcentaje_ganancia) || 0;
@@ -102,9 +128,9 @@ function calcularPrecioDolaresCompra() {
 }
 
 function abrirModalPreciosCompra(index) {
+    ComprasUi.init();
     const item = ComprasModule.productosCompra[index];
-    const modal = document.getElementById('modalCompraPrecios');
-    if (!item || !modal) return;
+    if (!item) return;
 
     document.getElementById('compraPrecioIndex').value = index;
     document.getElementById('compraPrecioProductoNombre').textContent = item.producto_nombre;
@@ -117,14 +143,12 @@ function abrirModalPreciosCompra(index) {
     document.getElementById('compraPrecioDolares3Modal').value = redondearMontoCompra(item.precio_3_dolares).toFixed(2);
     document.getElementById('compraMetodoRedondeoModal').value = item.metodo_redondeo || window.metodoRedondeoBs || 'none';
     calcularPrecioBolivaresCompra();
-    modal.style.display = 'block';
+    ComprasUi.purchasePricesModal?.open()?.focusFirstField();
 }
 
 function cerrarModalPreciosCompra() {
-    const modal = document.getElementById('modalCompraPrecios');
-    if (modal) {
-        modal.style.display = 'none';
-    }
+    ComprasUi.init();
+    ComprasUi.purchasePricesModal?.close();
 }
 
 function limpiarErrorProveedorCompra() {
@@ -183,6 +207,128 @@ function guardarPreciosCompra() {
     cerrarModalPreciosCompra();
     mostrarNotificacion(`✅ Precios preparados para ${item.producto_nombre}`);
 }
+
+const ComprasUi = {
+    providerModal: null,
+    purchaseModal: null,
+    purchasePricesModal: null,
+    purchaseDetailModal: null,
+    eventsBound: false,
+
+    init() {
+        window.ProviderModalComponent?.ensureRendered?.();
+        window.PurchaseModalComponent?.ensureRendered?.();
+        window.PurchasePricesModalComponent?.ensureRendered?.();
+        window.PurchaseDetailModalComponent?.ensureRendered?.();
+
+        if (!this.providerModal && window.SVModal) {
+            this.providerModal = window.SVModal.enhance('modalProveedor', {
+                closeSelector: '#btnCerrarModalProveedor'
+            });
+        }
+
+        if (!this.purchaseModal && window.SVModal) {
+            this.purchaseModal = window.SVModal.enhance('modalCompra', {
+                closeSelector: '#btnCerrarModalCompra'
+            });
+        }
+
+        if (!this.purchasePricesModal && window.SVModal) {
+            this.purchasePricesModal = window.SVModal.enhance('modalCompraPrecios', {
+                closeSelector: '#btnCerrarModalPreciosCompra'
+            });
+        }
+
+        if (!this.purchaseDetailModal && window.SVModal) {
+            this.purchaseDetailModal = window.SVModal.enhance('modalDetalleCompra', {
+                closeSelector: '#btnCerrarModalDetalleCompra'
+            });
+        }
+
+        this.bindEvents();
+    },
+
+    bindEvents() {
+        if (this.eventsBound) return;
+
+        document.getElementById('buscarProveedor')?.addEventListener('input', filtrarProveedores);
+        document.getElementById('btnNuevoProveedor')?.addEventListener('click', () => abrirModalProveedor());
+        document.getElementById('btnCancelarProveedor')?.addEventListener('click', cerrarModalProveedor);
+        document.getElementById('btnGuardarProveedor')?.addEventListener('click', guardarProveedor);
+        document.getElementById('btnNuevaCompra')?.addEventListener('click', abrirModalCompra);
+        document.getElementById('btnFiltrarCompras')?.addEventListener('click', filtrarCompras);
+        document.getElementById('btnLimpiarFiltrosCompras')?.addEventListener('click', limpiarFiltrosCompras);
+        document.getElementById('btnComprasHoy')?.addEventListener('click', cargarComprasDelDia);
+        document.getElementById('btnTodasLasCompras')?.addEventListener('click', cargarTodasLasCompras);
+        document.getElementById('btnCancelarCompra')?.addEventListener('click', cerrarModalCompra);
+        document.getElementById('btnGuardarCompra')?.addEventListener('click', guardarCompra);
+        document.getElementById('btnCancelarPreciosCompra')?.addEventListener('click', cerrarModalPreciosCompra);
+        document.getElementById('btnGuardarPreciosCompra')?.addEventListener('click', guardarPreciosCompra);
+        document.getElementById('btnCerrarDetalleCompra')?.addEventListener('click', cerrarModalDetalleCompra);
+
+        document.getElementById('compraPrecioCostoModal')?.addEventListener('input', recalcularTodosLosPreciosCompra);
+        document.getElementById('compraPrecioBolivaresModal')?.addEventListener('input', calcularPrecioDolaresCompra);
+        document.getElementById('compraMetodoRedondeoModal')?.addEventListener('change', calcularPrecioBolivaresCompra);
+        document.getElementById('compraPorcentajeGanancia1Modal')?.addEventListener('input', () => recalcularPrecioCompraDesdePorcentaje(1));
+        document.getElementById('compraPrecioDolares1Modal')?.addEventListener('input', () => recalcularPorcentajeCompraDesdePrecio(1));
+        document.getElementById('compraPorcentajeGanancia2Modal')?.addEventListener('input', () => recalcularPrecioCompraDesdePorcentaje(2));
+        document.getElementById('compraPrecioDolares2Modal')?.addEventListener('input', () => recalcularPorcentajeCompraDesdePrecio(2));
+        document.getElementById('compraPorcentajeGanancia3Modal')?.addEventListener('input', () => recalcularPrecioCompraDesdePorcentaje(3));
+        document.getElementById('compraPrecioDolares3Modal')?.addEventListener('input', () => recalcularPorcentajeCompraDesdePrecio(3));
+
+        document.getElementById('listaProveedores')?.addEventListener('click', event => {
+            const action = event.target.closest('[data-proveedor-action]');
+            if (!action) return;
+            const id = Number(action.dataset.proveedorId);
+            if (!Number.isInteger(id) || id <= 0) return;
+            if (action.dataset.proveedorAction === 'edit') {
+                editarProveedor(id);
+            } else if (action.dataset.proveedorAction === 'delete') {
+                eliminarProveedor(id);
+            }
+        });
+
+        document.getElementById('listaCompras')?.addEventListener('click', event => {
+            const action = event.target.closest('[data-compra-action]');
+            if (!action) return;
+            const id = Number(action.dataset.compraId);
+            if (!Number.isInteger(id) || id <= 0) return;
+            if (action.dataset.compraAction === 'detail') {
+                verDetalleCompra(id);
+            } else if (action.dataset.compraAction === 'pay') {
+                marcarCompraPagada(id);
+            }
+        });
+
+        document.getElementById('sugerenciasCompra')?.addEventListener('click', event => {
+            const item = event.target.closest('[data-producto-compra-id]');
+            if (!item) return;
+            seleccionarProductoCompra(Number(item.dataset.productoCompraId), Number(item.dataset.productoCompraCantidad || 1));
+        });
+
+        document.getElementById('listaProductosCompra')?.addEventListener('click', event => {
+            const action = event.target.closest('[data-compra-item-action]');
+            if (!action) return;
+            const index = Number(action.dataset.compraItemIndex);
+            if (!Number.isInteger(index) || index < 0) return;
+            if (action.dataset.compraItemAction === 'prices') {
+                abrirModalPreciosCompra(index);
+            } else if (action.dataset.compraItemAction === 'remove') {
+                eliminarProductoCompra(index);
+            }
+        });
+
+        document.getElementById('listaProductosCompra')?.addEventListener('change', event => {
+            const input = event.target.closest('[data-compra-item-field]');
+            if (!input) return;
+            const index = Number(input.dataset.compraItemIndex);
+            if (!Number.isInteger(index) || index < 0) return;
+            actualizarProductoCompra(index, input.dataset.compraItemField, input.value);
+        });
+
+        this.eventsBound = true;
+    }
+};
 
 const ProveedoresModule = {
     async init() {
@@ -275,8 +421,8 @@ const ProveedoresModule = {
                     hideable: false,
                     align: 'center',
                     render: row => `
-                        <button onclick="editarProveedor(${row.id})" class="btn-small" style="background: #ffc107; color: black;" title="Editar proveedor">✏️</button>
-                        <button onclick="eliminarProveedor(${row.id})" class="btn-small" style="background: #dc3545; color: white;" title="Eliminar proveedor">🗑️</button>
+                        <button type="button" data-proveedor-action="edit" data-proveedor-id="${row.id}" class="btn-small" style="background: #ffc107; color: black;" title="Editar proveedor">✏️</button>
+                        <button type="button" data-proveedor-action="delete" data-proveedor-id="${row.id}" class="btn-small" style="background: #dc3545; color: white;" title="Eliminar proveedor">🗑️</button>
                     `,
                     allowHtml: true,
                     exportable: false
@@ -301,6 +447,7 @@ const ProveedoresModule = {
 window.ProveedoresModule = ProveedoresModule;
 
 function abrirModalProveedor(proveedor = null) {
+    ComprasUi.init();
     document.getElementById('proveedorId').value = proveedor ? proveedor.id : -1;
     document.getElementById('proveedorNombre').value = proveedor ? proveedor.nombre : '';
     document.getElementById('proveedorRif').value = proveedor ? proveedor.rif : '';
@@ -308,11 +455,12 @@ function abrirModalProveedor(proveedor = null) {
     document.getElementById('proveedorEmail').value = proveedor ? proveedor.email : '';
     document.getElementById('proveedorDireccion').value = proveedor ? proveedor.direccion : '';
     document.getElementById('modalTituloProveedor').textContent = proveedor ? '✏️ Editar Proveedor' : '➕ Nuevo Proveedor';
-    document.getElementById('modalProveedor').style.display = 'block';
+    ComprasUi.providerModal?.open()?.focusFirstField();
 }
 
 function cerrarModalProveedor() {
-    document.getElementById('modalProveedor').style.display = 'none';
+    ComprasUi.init();
+    ComprasUi.providerModal?.close();
 }
 
 async function guardarProveedor() {
@@ -414,8 +562,8 @@ const ComprasModule = {
             search: options.search || '',
             filters: {
                 ...mapearFiltrosCompras(options.filters),
-                fecha_inicio: document.getElementById('fechaInicioCompraFiltro')?.value || '',
-                fecha_fin: document.getElementById('fechaFinCompraFiltro')?.value || '',
+                fecha_inicio: obtenerValorCalendarioCompra('fechaInicioCompraFiltro'),
+                fecha_fin: obtenerValorCalendarioCompra('fechaFinCompraFiltro'),
                 estado: document.getElementById('estadoCompraFiltro')?.value || mapearFiltrosCompras(options.filters).estado || ''
             }
         });
@@ -435,8 +583,8 @@ const ComprasModule = {
     },
 
     obtenerComprasFiltradas() {
-        const inicioInput = document.getElementById('fechaInicioCompraFiltro')?.value || '';
-        const finInput = document.getElementById('fechaFinCompraFiltro')?.value || '';
+        const inicioInput = obtenerValorCalendarioCompra('fechaInicioCompraFiltro');
+        const finInput = obtenerValorCalendarioCompra('fechaFinCompraFiltro');
         const estadoInput = document.getElementById('estadoCompraFiltro')?.value || '';
 
         let fechaInicio = null;
@@ -598,8 +746,8 @@ const ComprasModule = {
                     hideable: false,
                     align: 'center',
                     render: row => `
-                        <button onclick="verDetalleCompra(${row.id})" class="btn-small" style="background: #17a2b8; color: white;" title="Ver detalle">👁️ Ver</button>
-                        ${row.estado === 'pendiente' ? `<button onclick="marcarCompraPagada(${row.id})" class="btn-small" style="background: #28a745; color: white;" title="Marcar como pagada">💰 Pagar</button>` : ''}
+                        <button type="button" data-compra-action="detail" data-compra-id="${row.id}" class="btn-small" style="background: #17a2b8; color: white;" title="Ver detalle">👁️ Ver</button>
+                        ${row.estado === 'pendiente' ? `<button type="button" data-compra-action="pay" data-compra-id="${row.id}" class="btn-small" style="background: #28a745; color: white;" title="Marcar como pagada">💰 Pagar</button>` : ''}
                     `,
                     allowHtml: true,
                     exportable: false
@@ -624,6 +772,7 @@ const ComprasModule = {
 window.ComprasModule = ComprasModule;
 
 function abrirModalCompra() {
+    ComprasUi.init();
     ComprasModule.productosCompra = [];
     
     const selectProveedor = document.getElementById('compraProveedor');
@@ -636,21 +785,17 @@ function abrirModalCompra() {
             selectProveedor.appendChild(opt);
         });
         selectProveedor.value = '';
-        selectProveedor.onchange = limpiarErrorProveedorCompra;
         limpiarErrorProveedorCompra();
     }
     
     // Set default dates to today
     const today = obtenerFechaActualLocal();
-    const inputFecha = document.getElementById('compraFecha');
-    const inputFechaLibro = document.getElementById('compraFechaLibro');
     const inputNroFactura = document.getElementById('compraNroFactura');
     
-    if (inputFecha) inputFecha.value = today;
-    if (inputFechaLibro) inputFechaLibro.value = today;
+    asignarValorCalendarioCompra('compraFecha', today);
+    asignarValorCalendarioCompra('compraFechaLibro', today);
     if (inputNroFactura) {
         inputNroFactura.value = '';
-        inputNroFactura.oninput = limpiarErrorFacturaCompra;
         limpiarErrorFacturaCompra();
     }
     
@@ -676,15 +821,13 @@ function abrirModalCompra() {
 
     cerrarModalPreciosCompra();
     
-    const modal = document.getElementById('modalCompra');
-    if (modal) {
-        modal.style.display = 'block';
-    }
+    ComprasUi.purchaseModal?.open();
 }
 
 function cerrarModalCompra() {
+    ComprasUi.init();
     cerrarModalPreciosCompra();
-    document.getElementById('modalCompra').style.display = 'none';
+    ComprasUi.purchaseModal?.close();
 }
 
 async function filtrarProductosCompra(e) {
@@ -713,7 +856,7 @@ async function filtrarProductosCompra(e) {
     if (resultados.length > 0 && sugerencias) {
         const esRapido = !!matchRapido;
         sugerencias.innerHTML = resultados.map(p => `
-            <div class="sugerencia-item" onclick="seleccionarProductoCompra(${p.id}, ${esRapido ? matchRapido[1] : 1})" style="cursor: pointer; padding: 10px; border-bottom: 1px solid #eee;">
+            <div class="sugerencia-item" data-producto-compra-id="${p.id}" data-producto-compra-cantidad="${esRapido ? matchRapido[1] : 1}" style="cursor: pointer; padding: 10px; border-bottom: 1px solid #eee;">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                     <div>
                         <strong>${p.nombre}</strong>
@@ -807,21 +950,19 @@ function mostrarProductosCompra() {
                     <tr style="border-bottom: 1px solid #eee;">
                         <td style="padding: 10px;">${p.producto_nombre}</td>
                         <td style="padding: 5px; text-align: center;">
-                            <input type="number" min="1" value="${p.cantidad}" 
-                                onchange="actualizarProductoCompra(${idx}, 'cantidad', this.value)"
+                            <input type="number" min="1" value="${p.cantidad}" data-compra-item-field="cantidad" data-compra-item-index="${idx}"
                                 style="width: 70px; padding: 5px; text-align: center; border: 1px solid #ddd; border-radius: 4px;">
                         </td>
                         <td style="padding: 5px; text-align: center;">
-                            <input type="number" step="0.01" min="0" value="${p.precio_unitario.toFixed(2)}"
-                                onchange="actualizarProductoCompra(${idx}, 'costo', this.value)"
+                            <input type="number" step="0.01" min="0" value="${p.precio_unitario.toFixed(2)}" data-compra-item-field="costo" data-compra-item-index="${idx}"
                                 style="width: 90px; padding: 5px; text-align: center; border: 1px solid #ddd; border-radius: 4px;">
                         </td>
                         <td style="padding: 10px; text-align: right; font-weight: bold;">
                             <div>$${p.subtotal.toFixed(2)}</div>
-                            <button type="button" onclick="abrirModalPreciosCompra(${idx})" style="margin-top: 6px; border: none; background: #eef2ff; color: #4338ca; border-radius: 999px; padding: 4px 10px; cursor: pointer; font-size: 0.8rem;">Precios</button>
+                            <button type="button" data-compra-item-action="prices" data-compra-item-index="${idx}" style="margin-top: 6px; border: none; background: #eef2ff; color: #4338ca; border-radius: 999px; padding: 4px 10px; cursor: pointer; font-size: 0.8rem;">Precios</button>
                         </td>
                         <td style="padding: 10px; text-align: center;">
-                            <button onclick="eliminarProductoCompra(${idx})" style="background: #dc3545; color: white; border: none; border-radius: 4px; padding: 4px 8px; cursor: pointer;">✕</button>
+                            <button type="button" data-compra-item-action="remove" data-compra-item-index="${idx}" style="background: #dc3545; color: white; border: none; border-radius: 4px; padding: 4px 8px; cursor: pointer;">✕</button>
                         </td>
                     </tr>
                 `).join('')}
@@ -849,8 +990,8 @@ function eliminarProductoCompra(index) {
 async function guardarCompra() {
     const proveedorId = parseInt(document.getElementById('compraProveedor').value);
     const nroFactura = document.getElementById('compraNroFactura').value.trim();
-    const fechaFactura = document.getElementById('compraFecha').value;
-    const fechaLibro = document.getElementById('compraFechaLibro').value;
+    const fechaFactura = obtenerValorCalendarioCompra('compraFecha');
+    const fechaLibro = obtenerValorCalendarioCompra('compraFechaLibro');
     
     if (!proveedorId) {
         marcarErrorProveedorCompra();
@@ -954,7 +1095,8 @@ async function verDetalleCompra(id) {
             </table>
         `;
         
-        document.getElementById('modalDetalleCompra').style.display = 'block';
+        ComprasUi.init();
+        ComprasUi.purchaseDetailModal?.open();
     } catch (e) {
         console.error('Error al cargar detalle:', e);
         alert('Error al cargar los detalles de la compra');
@@ -962,7 +1104,8 @@ async function verDetalleCompra(id) {
 }
 
 function cerrarModalDetalleCompra() {
-    document.getElementById('modalDetalleCompra').style.display = 'none';
+    ComprasUi.init();
+    ComprasUi.purchaseDetailModal?.close();
 }
 
 async function marcarCompraPagada(id) {
@@ -974,15 +1117,15 @@ async function marcarCompraPagada(id) {
 }
 
 async function filtrarCompras() {
-    const inicioInput = document.getElementById('fechaInicioCompraFiltro')?.value;
-    const finInput = document.getElementById('fechaFinCompraFiltro')?.value;
+    const inicioInput = obtenerValorCalendarioCompra('fechaInicioCompraFiltro');
+    const finInput = obtenerValorCalendarioCompra('fechaFinCompraFiltro');
 
     if (inicioInput && finInput) {
         const fechaInicio = new Date(`${inicioInput}T00:00:00`);
         const fechaFin = new Date(`${finInput}T23:59:59`);
 
         if (fechaInicio > fechaFin) {
-            alert('La fecha final no puede ser menor a la inicial');
+            window.mostrarNotificacion?.('⚠️ La fecha final no puede ser menor a la inicial');
             return;
         }
     }
@@ -991,12 +1134,10 @@ async function filtrarCompras() {
 }
 
 async function limpiarFiltrosCompras() {
-    const fechaInicio = document.getElementById('fechaInicioCompraFiltro');
-    const fechaFin = document.getElementById('fechaFinCompraFiltro');
     const estado = document.getElementById('estadoCompraFiltro');
 
-    if (fechaInicio) fechaInicio.value = '';
-    if (fechaFin) fechaFin.value = '';
+    limpiarCalendarioCompra('fechaInicioCompraFiltro');
+    limpiarCalendarioCompra('fechaFinCompraFiltro');
     if (estado) estado.value = '';
 
     await ComprasModule.cargarCompras({ page: 1, pageSize: AppState.paginacion.compras?.page_size || 10 });
@@ -1005,11 +1146,8 @@ async function limpiarFiltrosCompras() {
 async function cargarComprasDelDia() {
     const hoy = obtenerFechaActualLocal();
 
-    const fechaInicio = document.getElementById('fechaInicioCompraFiltro');
-    const fechaFin = document.getElementById('fechaFinCompraFiltro');
-
-    if (fechaInicio) fechaInicio.value = hoy;
-    if (fechaFin) fechaFin.value = hoy;
+    asignarValorCalendarioCompra('fechaInicioCompraFiltro', hoy);
+    asignarValorCalendarioCompra('fechaFinCompraFiltro', hoy);
 
     await ComprasModule.aplicarFiltrosActivos();
 }
@@ -1031,7 +1169,14 @@ function obtenerFechaActualLocal() {
 // window.indiceSeleccionado is now window.window.indiceSeleccionado
 
 document.addEventListener('DOMContentLoaded', function() {
+    window.ProviderModalComponent?.ensureRendered?.();
+    window.PurchaseModalComponent?.ensureRendered?.();
+    window.PurchasePricesModalComponent?.ensureRendered?.();
+    window.PurchaseDetailModalComponent?.ensureRendered?.();
+    ComprasUi.init();
     const inputBusqueda = document.getElementById('buscarProductoCompra');
+    const selectProveedor = document.getElementById('compraProveedor');
+    const inputFactura = document.getElementById('compraNroFactura');
     if (inputBusqueda) {
         inputBusqueda.addEventListener('input', filtrarProductosCompra);
         inputBusqueda.addEventListener('keydown', async function(e) {
@@ -1100,6 +1245,9 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
+
+    selectProveedor?.addEventListener('change', limpiarErrorProveedorCompra);
+    inputFactura?.addEventListener('input', limpiarErrorFacturaCompra);
     
     function actualizarSeleccion(items) {
         items.forEach((item, idx) => {

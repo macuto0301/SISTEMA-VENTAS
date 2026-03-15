@@ -1,4 +1,41 @@
 const VentasPaymentsFeature = {
+    _totalizacionModal: null,
+    _excedenteModal: null,
+    _eventsBound: false,
+
+    inicializarComponentesPago() {
+        window.SalesCheckoutModalComponent?.ensureRendered?.();
+
+        if (!this._totalizacionModal && window.SVModal) {
+            this._totalizacionModal = window.SVModal.enhance('modalTotalizacionVenta', {
+                closeSelector: '#btnCerrarModalTotalizacion'
+            });
+        }
+
+        if (!this._excedenteModal && window.SVModal) {
+            this._excedenteModal = window.SVModal.enhance('modalExcedenteTotalizacion', {
+                closeSelector: '#btnCerrarModalExcedenteTotalizacion'
+            });
+        }
+
+        this.registrarEventosPago();
+    },
+
+    registrarEventosPago() {
+        if (this._eventsBound) return;
+
+        document.getElementById('listaPagos')?.addEventListener('click', event => {
+            const button = event.target.closest('[data-pago-index]');
+            if (!button) return;
+            const index = Number(button.dataset.pagoIndex);
+            if (Number.isInteger(index) && index >= 0) {
+                this.eliminarPago(index);
+            }
+        });
+
+        this._eventsBound = true;
+    },
+
     mostrarNotificacionSegura(mensaje) {
         if (typeof window.mostrarNotificacion === 'function') {
             return window.mostrarNotificacion(mensaje);
@@ -21,38 +58,34 @@ const VentasPaymentsFeature = {
     },
 
     abrirModalTotalizacion() {
+        this.inicializarComponentesPago();
         if (!carrito.length) {
             this.mostrarNotificacionSegura('❌ El carrito está vacío');
             return;
         }
 
-        const modal = document.getElementById('modalTotalizacionVenta');
-        if (!modal) return;
-
-        modal.style.display = 'block';
+        this._totalizacionModal?.open();
         this.actualizarListaPagos();
         setTimeout(() => this.enfocarCampoVentas('medioPago'), 60);
     },
 
     cerrarModalTotalizacion() {
-        const modal = document.getElementById('modalTotalizacionVenta');
-        if (!modal) return;
-        modal.style.display = 'none';
+        this.inicializarComponentesPago();
+        this._totalizacionModal?.close();
     },
 
     abrirModalExcedenteTotalizacion(venta) {
-        const modal = document.getElementById('modalExcedenteTotalizacion');
+        this.inicializarComponentesPago();
         const monto = document.getElementById('modalExcedenteTotalizacionMonto');
-        if (!modal || !monto || !venta) return;
+        if (!monto || !venta) return;
 
         monto.textContent = `$${venta.excedenteTotalUSD.toFixed(2)}`;
-        modal.style.display = 'block';
+        this._excedenteModal?.open();
     },
 
     cerrarModalExcedenteTotalizacion() {
-        const modal = document.getElementById('modalExcedenteTotalizacion');
-        if (!modal) return;
-        modal.style.display = 'none';
+        this.inicializarComponentesPago();
+        this._excedenteModal?.close();
     },
 
     volverATotalizacionDesdeExcedente() {
@@ -256,7 +289,7 @@ const VentasPaymentsFeature = {
                             ${pago.esDolares ? '$' : 'Bs'} ${pago.monto.toFixed(2)}
                         </div>
                     </div>
-                    <button class="btn-eliminar-item" onclick="eliminarPago(${index})" style="padding: 5px 10px; margin-left: 10px;">🗑️</button>
+                    <button type="button" class="btn-eliminar-item" data-pago-index="${index}" style="padding: 5px 10px; margin-left: 10px;">🗑️</button>
                 </div>
                 `;
             }).join('');

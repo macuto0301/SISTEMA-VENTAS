@@ -1,4 +1,21 @@
 const VentasSearchFeature = {
+    _eventsBound: false,
+
+    inicializarEventosBusqueda() {
+        if (this._eventsBound) return;
+
+        document.getElementById('sugerenciasProductos')?.addEventListener('click', event => {
+            const item = event.target.closest('[data-product-index]');
+            if (!item) return;
+            const index = Number(item.dataset.productIndex);
+            if (Number.isInteger(index) && index >= 0) {
+                this.seleccionarProducto(index);
+            }
+        });
+
+        this._eventsBound = true;
+    },
+
     async buscarProductosRemotosSeguros(termino, filters = {}, pageSize = 20) {
         if (typeof window.buscarProductosRemotos === 'function') {
             return window.buscarProductosRemotos(termino, filters, pageSize);
@@ -87,6 +104,7 @@ const VentasSearchFeature = {
     },
 
     async filtrarProductos(e) {
+        this.inicializarEventosBusqueda();
         const texto = e.target.value.toLowerCase();
         const sugerencias = document.getElementById('sugerenciasProductos');
 
@@ -103,7 +121,7 @@ const VentasSearchFeature = {
         if (resultadosBusqueda.length > 0) {
             const listaPrecio = this.obtenerListaPrecioVentaSeleccionadaSegura();
             sugerencias.innerHTML = resultadosBusqueda.map((item, i) => `
-                <div class="sugerencia-item" onclick="window.VentasSearchFeature?.seleccionarProducto?.(${item.index})" data-index="${i}">
+                <div class="sugerencia-item" data-index="${i}" data-product-index="${item.index}">
                     <strong>${item.producto.nombre}</strong> <small>(${item.producto.codigo})</small>
                     <div style="display: flex; justify-content: space-between; margin-top: 5px;">
                         <span style="color: #28a745;">${this.obtenerEtiquetaListaPrecioSegura(listaPrecio)}: $${this.obtenerPrecioProductoSeguro(item.producto, listaPrecio).toFixed(2)}</span>

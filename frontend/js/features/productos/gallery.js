@@ -2,6 +2,7 @@ const ProductoGaleria = {
     imagenes: [],
     titulo: '',
     indice: 0,
+    _eventsBound: false,
     zoom: 1,
     minZoom: 1,
     maxZoom: 3,
@@ -15,6 +16,7 @@ const ProductoGaleria = {
     dragStartPanY: 0,
 
     abrir(imagenes = [], indice = 0, titulo = 'Producto') {
+        this.inicializarEventosDom();
         this.imagenes = Array.isArray(imagenes) ? imagenes.filter(Boolean) : [];
         this.titulo = titulo || 'Producto';
         this.indice = Math.max(0, Math.min(indice, this.imagenes.length - 1));
@@ -168,6 +170,51 @@ const ProductoGaleria = {
         }
     },
 
+    inicializarEventosDom() {
+        if (this._eventsBound) return;
+
+        const modal = document.getElementById('modalGaleriaProducto');
+        const closeButton = document.getElementById('btnCerrarGaleriaProducto');
+        const image = document.getElementById('galeriaProductoImagen');
+        const thumbs = document.getElementById('galeriaProductoThumbs');
+
+        modal?.addEventListener('click', event => {
+            if (event.target === modal) {
+                this.cerrar();
+                return;
+            }
+
+            const actionButton = event.target.closest('[data-gallery-action]');
+            if (!actionButton) return;
+
+            const action = actionButton.dataset.galleryAction;
+            if (action === 'zoom-out') {
+                this.zoomOut();
+            } else if (action === 'reset-zoom') {
+                this.resetZoom();
+            } else if (action === 'zoom-in') {
+                this.zoomIn();
+            } else if (action === 'prev') {
+                this.anterior();
+            } else if (action === 'next') {
+                this.siguiente();
+            }
+        });
+
+        closeButton?.addEventListener('click', () => this.cerrar());
+        image?.addEventListener('dblclick', () => this.toggleZoom());
+        thumbs?.addEventListener('click', event => {
+            const thumb = event.target.closest('[data-gallery-index]');
+            if (!thumb) return;
+            const index = Number(thumb.dataset.galleryIndex);
+            if (Number.isInteger(index)) {
+                this.irA(index);
+            }
+        });
+
+        this._eventsBound = true;
+    },
+
     render() {
         const imagen = document.getElementById('galeriaProductoImagen');
         const titulo = document.getElementById('galeriaProductoTitulo');
@@ -187,7 +234,7 @@ const ProductoGaleria = {
             <button
                 type="button"
                 class="galeria-thumb${index === this.indice ? ' active' : ''}"
-                onclick="ProductoGaleria.irA(${index})"
+                data-gallery-index="${index}"
                 aria-label="Ver imagen ${index + 1}"
             >
                 <img src="${src}" alt="Miniatura ${index + 1}">

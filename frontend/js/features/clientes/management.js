@@ -5,6 +5,10 @@ const ClientesFeature = {
     _clientSearchBox: null,
     _clientSearchVentaBox: null,
     _clientVentaPicker: null,
+    _clientVentaSearchModal: null,
+    _clientAccountModal: null,
+    _clientTableEventsBound: false,
+    _clientVentaSearchEventsBound: false,
 
     inicializarComponentesCliente() {
         if (!this._clientModal && window.SVModal) {
@@ -12,6 +16,18 @@ const ClientesFeature = {
                 titleSelector: '#modalTituloCliente',
                 closeSelector: '#btnCerrarModalCliente',
                 backdropDismissible: false
+            });
+        }
+
+        if (!this._clientVentaSearchModal && window.SVModal) {
+            this._clientVentaSearchModal = window.SVModal.enhance('modalBuscarClienteVenta', {
+                closeSelector: '#btnCerrarModalBuscarClienteVenta'
+            });
+        }
+
+        if (!this._clientAccountModal && window.SVModal) {
+            this._clientAccountModal = window.SVModal.enhance('modalEstadoCuentaCliente', {
+                closeSelector: '#btnCerrarModalEstadoCuentaCliente'
             });
         }
 
@@ -59,7 +75,65 @@ const ClientesFeature = {
             });
         }
 
+        this.registrarEventosTablaClientes();
+        this.registrarEventosBusquedaVenta();
+
         return this._clientFields;
+    },
+
+    registrarEventosTablaClientes() {
+        if (this._clientTableEventsBound) return;
+
+        const container = document.getElementById('listaClientes');
+        if (!container) return;
+
+        container.addEventListener('click', event => {
+            const button = event.target.closest('[data-client-action]');
+            if (!button) return;
+
+            const action = button.dataset.clientAction;
+            const clientId = Number(button.dataset.clientId);
+            if (!Number.isInteger(clientId) || clientId <= 0) return;
+
+            if (action === 'edit') {
+                this.editarCliente(clientId);
+                return;
+            }
+
+            if (action === 'account') {
+                this.verEstadoCuentaCliente(clientId);
+            }
+        });
+
+        this._clientTableEventsBound = true;
+    },
+
+    registrarEventosBusquedaVenta() {
+        if (this._clientVentaSearchEventsBound) return;
+
+        const list = document.getElementById('listaBusquedaClienteVenta');
+        const useCashButton = document.getElementById('btnUsarContadoClienteVenta');
+        const closeButton = document.getElementById('btnCerrarBuscarClienteVenta');
+        const closeAccountButton = document.getElementById('btnCerrarEstadoCuentaCliente');
+
+        list?.addEventListener('click', event => {
+            const button = event.target.closest('[data-cliente-venta-id]');
+            if (!button) return;
+            const clientId = Number(button.dataset.clienteVentaId);
+            if (Number.isInteger(clientId) && clientId > 0) {
+                this.seleccionarClienteVenta(clientId);
+            }
+        });
+
+        useCashButton?.addEventListener('click', () => {
+            this.limpiarClienteVenta();
+            this.cerrarModalBuscarClienteVenta();
+        });
+
+        closeButton?.addEventListener('click', () => this.cerrarModalBuscarClienteVenta());
+        closeAccountButton?.addEventListener('click', () => this.cerrarModalEstadoCuentaCliente());
+
+        this._clientVentaSearchEventsBound = true;
     },
 
     obtenerCampoCliente(nombre) {
@@ -187,7 +261,7 @@ const ClientesFeature = {
     },
 
     async abrirModalBuscarClienteVenta() {
-        const modal = document.getElementById('modalBuscarClienteVenta');
+        this.inicializarComponentesCliente();
         const input = document.getElementById('buscarClienteVentaModal');
         if (input) input.value = '';
 
@@ -199,13 +273,13 @@ const ClientesFeature = {
         }
 
         this.renderListaBusquedaClienteVenta();
-        if (modal) modal.style.display = 'block';
+        this._clientVentaSearchModal?.open();
         if (input) setTimeout(() => input.focus(), 60);
     },
 
     cerrarModalBuscarClienteVenta() {
-        const modal = document.getElementById('modalBuscarClienteVenta');
-        if (modal) modal.style.display = 'none';
+        this.inicializarComponentesCliente();
+        this._clientVentaSearchModal?.close();
     },
 
     renderListaBusquedaClienteVenta() {
@@ -234,7 +308,7 @@ const ClientesFeature = {
         }
 
         contenedor.innerHTML = lista.map(cliente => `
-            <button type="button" onclick="window.ClientesFeature?.seleccionarClienteVenta?.(${cliente.id})" style="width: 100%; text-align: left; border: 1px solid #e6e6e6; background: white; border-radius: 10px; padding: 14px; margin-bottom: 10px; cursor: pointer;">
+            <button type="button" data-cliente-venta-id="${cliente.id}" style="width: 100%; text-align: left; border: 1px solid #e6e6e6; background: white; border-radius: 10px; padding: 14px; margin-bottom: 10px; cursor: pointer;">
                 <div style="display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:6px;">
                     <strong>${cliente.nombre}</strong>
                     <span style="color:#5b6470;">${cliente.documento || 'Sin documento'}</span>
@@ -429,8 +503,8 @@ const ClientesFeature = {
                     align: 'center',
                     render: row => `
                         <div style="display:flex; align-items:center; justify-content:center; gap:6px; flex-wrap:nowrap;">
-                            <button onclick="window.ClientesFeature?.editarCliente?.(${row.id})" class="btn-small" style="background:#f59e0b; color:white; min-height:30px; padding:4px 8px; font-size:12px; border-radius:10px;" title="Editar cliente">✏️</button>
-                            <button onclick="window.ClientesFeature?.verEstadoCuentaCliente?.(${row.id})" class="btn-small" style="background:#2563eb; color:white; min-height:30px; padding:4px 8px; font-size:12px; border-radius:10px;" title="Estado de cuenta">📄</button>
+                            <button type="button" data-client-action="edit" data-client-id="${row.id}" class="btn-small" style="background:#f59e0b; color:white; min-height:30px; padding:4px 8px; font-size:12px; border-radius:10px;" title="Editar cliente">✏️</button>
+                            <button type="button" data-client-action="account" data-client-id="${row.id}" class="btn-small" style="background:#2563eb; color:white; min-height:30px; padding:4px 8px; font-size:12px; border-radius:10px;" title="Estado de cuenta">📄</button>
                         </div>
                     `,
                     allowHtml: true,
@@ -574,6 +648,7 @@ const ClientesFeature = {
     },
 
     async verEstadoCuentaCliente(clienteId) {
+        this.inicializarComponentesCliente();
         try {
             const data = await window.ApiService.obtenerEstadoCuentaCliente(clienteId);
             const cliente = data.cliente || {};
@@ -604,14 +679,15 @@ const ClientesFeature = {
                 `).join('');
             }
 
-            document.getElementById('modalEstadoCuentaCliente').style.display = 'block';
+            this._clientAccountModal?.open();
         } catch (e) {
             window.mostrarNotificacion('❌ No se pudo cargar el estado de cuenta');
         }
     },
 
     cerrarModalEstadoCuentaCliente() {
-        document.getElementById('modalEstadoCuentaCliente').style.display = 'none';
+        this.inicializarComponentesCliente();
+        this._clientAccountModal?.close();
     }
 };
 

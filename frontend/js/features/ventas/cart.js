@@ -1,4 +1,75 @@
 const VentasCartFeature = {
+    _eventsBound: false,
+
+    inicializarEventosCarrito() {
+        if (this._eventsBound) return;
+
+        document.getElementById('carritoBody')?.addEventListener('click', event => {
+            const removeButton = event.target.closest('[data-cart-remove-index]');
+            if (removeButton) {
+                event.stopPropagation();
+                const index = Number(removeButton.dataset.cartRemoveIndex);
+                if (Number.isInteger(index) && index >= 0) {
+                    this.eliminarDelCarrito(index);
+                }
+                return;
+            }
+
+            const priceButton = event.target.closest('[data-cart-price-index]');
+            if (priceButton) {
+                event.stopPropagation();
+                const index = Number(priceButton.dataset.cartPriceIndex);
+                if (Number.isInteger(index) && index >= 0) {
+                    this.abrirSelectorPrecioCarrito(index);
+                }
+                return;
+            }
+
+            const row = event.target.closest('tr[data-carrito-index]');
+            if (!row) return;
+            const index = Number(row.dataset.carritoIndex);
+            if (Number.isInteger(index) && index >= 0) {
+                this.seleccionarFilaCarrito(index);
+            }
+        });
+
+        document.getElementById('carritoBody')?.addEventListener('change', event => {
+            const input = event.target.closest('[data-cart-quantity-index]');
+            if (!input) return;
+            const index = Number(input.dataset.cartQuantityIndex);
+            if (Number.isInteger(index) && index >= 0) {
+                this.actualizarCantidadCarrito(index, input.value);
+            }
+        });
+
+        document.body.addEventListener('click', event => {
+            const option = event.target.closest('[data-selector-price-index][data-selector-price-list]');
+            if (option) {
+                const index = Number(option.dataset.selectorPriceIndex);
+                const lista = Number(option.dataset.selectorPriceList);
+                if (Number.isInteger(index) && index >= 0 && Number.isInteger(lista)) {
+                    this.seleccionarPrecioCarrito(index, lista);
+                }
+                return;
+            }
+
+            const confirmButton = event.target.closest('[data-selector-price-confirm-index]');
+            if (confirmButton) {
+                const index = Number(confirmButton.dataset.selectorPriceConfirmIndex);
+                if (Number.isInteger(index) && index >= 0) {
+                    this.confirmarPrecioLibreCarrito(index);
+                }
+                return;
+            }
+
+            if (event.target.closest('[data-selector-price-close]')) {
+                this.cerrarSelectorPrecioCarrito();
+            }
+        });
+
+        this._eventsBound = true;
+    },
+
     renderResumenPos(totalItems = 0, totalDolares = 0, totalBs = 0) {
         const container = document.getElementById('ventasPosSummaryCards');
         if (!container) return;
@@ -175,6 +246,7 @@ const VentasCartFeature = {
     },
 
     abrirSelectorPrecioCarrito(index) {
+        this.inicializarEventosCarrito();
         if (!this.puedeEditarPrecioVentaSeguro() || !carrito[index]) return;
 
         this.cerrarSelectorPrecioCarrito();
@@ -188,7 +260,8 @@ const VentasCartFeature = {
             <button
                 type="button"
                 class="selector-precio-option${(item.lista_precio || 1) === opcion.lista ? ' active' : ''}"
-                onclick="seleccionarPrecioCarrito(${index}, ${opcion.lista})"
+                data-selector-price-index="${index}"
+                data-selector-price-list="${opcion.lista}"
             >
                 <span>${opcion.precio.toFixed(2)}</span>
                 <small>${opcion.etiqueta}</small>
@@ -201,7 +274,7 @@ const VentasCartFeature = {
         modal.style.display = 'block';
         modal.innerHTML = `
             <div class="modal-content modal-selector-precio-content">
-                <button type="button" class="close" onclick="cerrarSelectorPrecioCarrito()">&times;</button>
+                <button type="button" class="close" data-selector-price-close>&times;</button>
                 <h3>Seleccionar precio</h3>
                 <p>${item.nombre}</p>
                 <div class="selector-precio-grid">
@@ -212,7 +285,7 @@ const VentasCartFeature = {
                     <small>No puede ser menor al costo: $${precioCosto.toFixed(2)}</small>
                     <div class="selector-precio-libre-row">
                         <input type="number" id="selectorPrecioLibreInput" min="${precioCosto.toFixed(2)}" step="0.01" value="${item.precio_dolares.toFixed(2)}">
-                        <button type="button" class="btn-primary" onclick="confirmarPrecioLibreCarrito(${index})">Aplicar</button>
+                        <button type="button" class="btn-primary" data-selector-price-confirm-index="${index}">Aplicar</button>
                     </div>
                 </div>
             </div>
@@ -362,6 +435,7 @@ const VentasCartFeature = {
     },
 
     actualizarCarrito() {
+        this.inicializarEventosCarrito();
         const tbody = document.getElementById('carritoBody');
         let totalDolares = 0;
 
@@ -377,23 +451,23 @@ const VentasCartFeature = {
                 const codigo = prodOriginal?.codigo || '-';
 
                 return `
-                    <tr data-carrito-index="${index}" class="${index === indiceCarritoSeleccionado ? 'carrito-seleccionado' : ''}" onclick="seleccionarFilaCarrito(${index})">
+                    <tr data-carrito-index="${index}" class="${index === indiceCarritoSeleccionado ? 'carrito-seleccionado' : ''}">
                         <td class="carrito-col-codigo">${codigo}</td>
                         <td class="carrito-col-producto">
                             <div class="carrito-producto-info">
                                 <span class="carrito-producto-nombre">${item.nombre}</span>
                                 <small class="carrito-producto-lista">${item.lista_precio_nombre || this.obtenerEtiquetaListaPrecioSegura(item.lista_precio || 1)}</small>
                             </div>
-                            <button class="btn-eliminar-item" onclick="event.stopPropagation(); eliminarDelCarrito(${index})" aria-label="Eliminar producto">x</button>
+                            <button type="button" class="btn-eliminar-item" data-cart-remove-index="${index}" aria-label="Eliminar producto">x</button>
                         </td>
                         <td class="carrito-col-cantidad">
                             <input type="number" min="1" max="${productos[item.productoIndex].cantidad}" 
-                                   value="${item.cantidad}" onchange="actualizarCantidadCarrito(${index}, this.value)" onclick="event.stopPropagation()"
+                                   value="${item.cantidad}" data-cart-quantity-index="${index}"
                                    class="carrito-cantidad-input">
                         </td>
                         <td class="carrito-col-precio">
                             ${precioEditable
-                                ? `<button type="button" class="btn-selector-precio-carrito" onclick="event.stopPropagation(); abrirSelectorPrecioCarrito(${index})">$${item.precio_dolares.toFixed(2)}</button>`
+                                ? `<button type="button" class="btn-selector-precio-carrito" data-cart-price-index="${index}">$${item.precio_dolares.toFixed(2)}</button>`
                                 : `$${item.precio_dolares.toFixed(2)}`}
                         </td>
                         <td class="carrito-col-total">$${item.subtotal_dolares.toFixed(2)}</td>

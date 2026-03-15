@@ -14,12 +14,15 @@ const VentasShortcutsFeature = {
     },
 
     togglePanelAtajosVentas(forzarEstado) {
-        const modal = document.getElementById('modalResumenVenta');
-        if (!modal) return;
-
-        const visible = window.getComputedStyle(modal).display !== 'none';
+        const component = window.VentasSummaryModalComponent;
+        component?.ensureRendered?.();
+        const visible = component?.isOpen?.() || false;
         const mostrar = typeof forzarEstado === 'boolean' ? forzarEstado : !visible;
-        modal.style.display = mostrar ? 'block' : 'none';
+        if (mostrar) {
+            component?.open?.();
+        } else {
+            component?.close?.();
+        }
     },
 
     cerrarOverlayVentasActual() {

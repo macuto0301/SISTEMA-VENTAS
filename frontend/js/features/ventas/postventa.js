@@ -1,6 +1,139 @@
 const VentasPostventaFeature = {
+    _devolucionModal: null,
+    _vueltoModal: null,
+    _devolucionEventsBound: false,
+    _paymentsDetailEventsBound: false,
+    _receiptEventsBound: false,
+    _salesActionsBound: false,
+
+    escaparHtml(valor) {
+        return String(valor ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    },
+
+    inicializarComponentesPostventa() {
+        window.ReturnModalComponent?.ensureRendered?.();
+        window.SaleSuccessModalComponent?.ensureRendered?.();
+
+        if (!this._devolucionModal && window.SVModal) {
+            this._devolucionModal = window.SVModal.enhance('modalDevolucion', {
+                closeSelector: '#btnCerrarModalDevolucion'
+            });
+        }
+
+        if (!this._vueltoModal && window.SVModal) {
+            this._vueltoModal = window.SVModal.enhance('modalVuelto', {
+                closeSelector: '#btnCerrarModalVuelto'
+            });
+        }
+
+        this.registrarEventosDevolucion();
+        this.registrarEventosVentas();
+        this.registrarEventosDetallePago();
+        this.registrarEventosRecibo();
+    },
+
+    registrarEventosVentas() {
+        if (this._salesActionsBound) return;
+
+        document.body.addEventListener('click', event => {
+            const action = event.target.closest('[data-venta-action]');
+            if (!action) return;
+
+            const type = action.dataset.ventaAction;
+            if (type === 'return') {
+                const ventaId = Number(action.dataset.ventaId);
+                if (Number.isInteger(ventaId) && ventaId > 0) {
+                    this.abrirModalDevolucion(ventaId);
+                }
+                return;
+            }
+
+            const ventaJson = action.dataset.ventaJson;
+            const numeroVenta = Number(action.dataset.numeroVenta || 0) || action.dataset.numeroVenta;
+            if (!ventaJson) return;
+
+            let venta = null;
+            try {
+                venta = JSON.parse(ventaJson);
+            } catch (error) {
+                return;
+            }
+
+            if (type === 'payments') {
+                this.verDetallesPago(venta, numeroVenta);
+            } else if (type === 'receipt') {
+                this.verReciboCompleto(venta, numeroVenta);
+            }
+        });
+
+        this._salesActionsBound = true;
+    },
+
+    registrarEventosDevolucion() {
+        if (this._devolucionEventsBound) return;
+
+        document.getElementById('devolucionMonedaReintegro')?.addEventListener('change', () => this.sincronizarFormularioReintegro());
+        document.getElementById('devolucionTasaReintegro')?.addEventListener('input', () => this.actualizarVistaFormularioReintegro());
+        document.getElementById('devolucionMontoReintegro')?.addEventListener('input', () => this.actualizarVistaFormularioReintegro());
+        document.getElementById('btnAgregarReintegroDevolucion')?.addEventListener('click', () => this.agregarReintegroDevolucion());
+        document.getElementById('btnCancelarDevolucion')?.addEventListener('click', () => this.cerrarModalDevolucion());
+        document.getElementById('btnGuardarDevolucion')?.addEventListener('click', () => this.guardarDevolucionVenta());
+
+        document.getElementById('devolucionProductosLista')?.addEventListener('input', event => {
+            if (event.target.closest('.input-devolucion-cantidad')) {
+                this.actualizarResumenDevolucion();
+            }
+        });
+
+        document.getElementById('devolucionListaReintegros')?.addEventListener('click', event => {
+            const button = event.target.closest('[data-reintegro-index]');
+            if (!button) return;
+            const index = Number(button.dataset.reintegroIndex);
+            if (Number.isInteger(index) && index >= 0) {
+                this.eliminarReintegroDevolucion(index);
+            }
+        });
+
+        this._devolucionEventsBound = true;
+    },
+
+    registrarEventosDetallePago() {
+        if (this._paymentsDetailEventsBound) return;
+
+        document.body.addEventListener('click', event => {
+            if (event.target.closest('[data-detalle-pago-close]')) {
+                this.cerrarDetallePago();
+            }
+        });
+
+        this._paymentsDetailEventsBound = true;
+    },
+
+    registrarEventosRecibo() {
+        if (this._receiptEventsBound) return;
+
+        document.body.addEventListener('click', event => {
+            if (event.target.closest('[data-recibo-print]')) {
+                this.imprimirTicket();
+                return;
+            }
+
+            if (event.target.closest('[data-recibo-close]')) {
+                this.cerrarReciboCompleto();
+            }
+        });
+
+        this._receiptEventsBound = true;
+    },
+
     cerrarModalVuelto() {
-        document.getElementById('modalVuelto').style.display = 'none';
+        this.inicializarComponentesPostventa();
+        this._vueltoModal?.close();
         const info = document.getElementById('vueltoInfo');
         if (info) info.innerHTML = '';
 
@@ -54,15 +187,16 @@ const VentasPostventaFeature = {
 
     renderAccionesVentaInforme(venta, numeroVenta) {
         const tieneDisponible = (venta.productos || []).some(p => (p.cantidad_disponible_devolucion || 0) > 0);
+        const ventaPayload = this.escaparAtributoHtml(JSON.stringify(venta));
         return `
             <div style="display: flex; gap: 5px; justify-content: center; flex-wrap: wrap;">
-                <button onclick='verDetallesPago(${JSON.stringify(venta)}, ${numeroVenta})' class="btn-small" style="padding: 5px 10px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 0.85em;">
+                <button type="button" data-venta-action="payments" data-venta-json="${ventaPayload}" data-numero-venta="${numeroVenta}" class="btn-small" style="padding: 5px 10px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 0.85em;">
                     💳 Ver Pagos
                 </button>
-                <button onclick='verReciboCompleto(${JSON.stringify(venta)}, ${numeroVenta})' class="btn-small" style="padding: 5px 10px; background: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 0.85em;">
+                <button type="button" data-venta-action="receipt" data-venta-json="${ventaPayload}" data-numero-venta="${numeroVenta}" class="btn-small" style="padding: 5px 10px; background: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 0.85em;">
                     🧾 Ver Recibo
                 </button>
-                <button onclick="abrirModalDevolucion(${venta.id})" class="btn-small" ${tieneDisponible ? '' : 'disabled'} style="padding: 5px 10px; background: ${tieneDisponible ? '#f59e0b' : '#cbd5e1'}; color: white; border: none; border-radius: 5px; cursor: ${tieneDisponible ? 'pointer' : 'not-allowed'}; font-size: 0.85em;">
+                <button type="button" data-venta-action="return" data-venta-id="${venta.id}" class="btn-small" ${tieneDisponible ? '' : 'disabled'} style="padding: 5px 10px; background: ${tieneDisponible ? '#f59e0b' : '#cbd5e1'}; color: white; border: none; border-radius: 5px; cursor: ${tieneDisponible ? 'pointer' : 'not-allowed'}; font-size: 0.85em;">
                     ↩️ Devolución
                 </button>
             </div>
@@ -282,7 +416,7 @@ const VentasPostventaFeature = {
                 </table>
                 
                 <div style="margin-top: 20px; text-align: right;">
-                    <button onclick="cerrarDetallePago()" class="btn-primary" style="padding: 10px 20px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                    <button type="button" data-detalle-pago-close class="btn-primary" style="padding: 10px 20px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer;">
                         Cerrar
                     </button>
                 </div>
@@ -374,7 +508,6 @@ const VentasPostventaFeature = {
                         data-producto-id="${producto.producto_id || ''}"
                         data-nombre="${this.escaparAtributoHtml(producto.nombre)}"
                         data-precio="${producto.precio_unitario_dolares || 0}"
-                        oninput="actualizarResumenDevolucion()"
                     >
                 </div>
             </div>
@@ -383,11 +516,13 @@ const VentasPostventaFeature = {
         this.renderListaReintegrosDevolucion();
         this.sincronizarFormularioReintegro();
         this.actualizarResumenDevolucion();
-        document.getElementById('modalDevolucion').style.display = 'block';
+        this.inicializarComponentesPostventa();
+        this._devolucionModal?.open();
     },
 
     cerrarModalDevolucion() {
-        document.getElementById('modalDevolucion').style.display = 'none';
+        this.inicializarComponentesPostventa();
+        this._devolucionModal?.close();
         devolucionActiva = null;
         reintegrosDevolucion = [];
     },
@@ -462,7 +597,7 @@ const VentasPostventaFeature = {
                     <strong>${item.metodo}</strong><br>
                     <small>${item.moneda} ${item.monto.toFixed(2)}${item.moneda === 'BS' ? ` | Tasa ${item.tasa.toFixed(2)}` : ''} | Equiv. $${item.equivalente_usd.toFixed(2)}</small>
                 </div>
-                <button type="button" class="btn-secondary" onclick="eliminarReintegroDevolucion(${index})">🗑️</button>
+                <button type="button" class="btn-secondary" data-reintegro-index="${index}">🗑️</button>
             </div>
         `).join('');
     },
@@ -764,10 +899,10 @@ const VentasPostventaFeature = {
                 </div>
                 
                 <div style="display: flex; gap: 8px; justify-content: center; margin-top: 15px;">
-                    <button onclick="imprimirTicket()" title="F9" style="padding: 10px 20px; background: #ff9800; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 0.9em;">
+                    <button type="button" data-recibo-print title="F9" style="padding: 10px 20px; background: #ff9800; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 0.9em;">
                         🖨️ Imprimir
                     </button>
-                    <button onclick="cerrarReciboCompleto()" title="F10 o Enter" style="padding: 10px 20px; background: #6c757d; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 0.9em;">
+                    <button type="button" data-recibo-close title="F10 o Enter" style="padding: 10px 20px; background: #6c757d; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 0.9em;">
                         Cerrar (F10)
                     </button>
                 </div>
@@ -797,7 +932,7 @@ const VentasPostventaFeature = {
         };
 
         document.body.appendChild(modal);
-        const botonCerrar = modal.querySelector('button[onclick="cerrarReciboCompleto()"]');
+        const botonCerrar = modal.querySelector('[data-recibo-close]');
         botonCerrar?.focus();
     },
 
