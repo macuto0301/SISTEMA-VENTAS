@@ -122,7 +122,7 @@
         demoButton.id = 'btnLoginDemo';
         demoButton.textContent = 'Usar acceso demo';
         demoButton.addEventListener('click', function () {
-            userInput.value = 'admin';
+            userInput.value = 'demo-admin';
             passInput.value = '1234';
             feedback.textContent = 'Credenciales demo cargadas. Presiona entrar para continuar.';
             feedback.dataset.state = 'success';
@@ -136,8 +136,8 @@
         const note = createElement('div', 'login-panel-note');
         const noteTitle = createElement('strong', '', 'Accesos de prueba');
         const chips = createElement('div', 'login-demo-list');
-        const adminChip = createElement('span', 'login-demo-chip', 'admin / 1234');
-        const cashierChip = createElement('span', 'login-demo-chip', 'cajero / 1234');
+        const adminChip = createElement('span', 'login-demo-chip', 'demo-admin / 1234');
+        const cashierChip = createElement('span', 'login-demo-chip', 'demo-cajero / 1234');
         chips.append(adminChip, cashierChip);
         note.append(noteTitle, chips);
 
