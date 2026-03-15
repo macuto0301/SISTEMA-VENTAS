@@ -1,4 +1,20 @@
 const ConfigCore = {
+    obtenerModalConfiguracion() {
+        if (!window.SVModal) {
+            return null;
+        }
+
+        if (!this._settingsModal) {
+            this._settingsModal = window.SVModal.enhance('modalConfiguracion', {
+                dismissible: true,
+                backdropDismissible: true,
+                escapeDismissible: true
+            });
+        }
+
+        return this._settingsModal;
+    },
+
     async cargarConfiguracion() {
         const config = await window.ApiService.cargarConfiguracion();
 
@@ -52,10 +68,22 @@ const ConfigCore = {
         document.getElementById('configTelefonoEmpresa').value = window.AppState.telefonoEmpresa || '';
         document.getElementById('configCorreoEmpresa').value = window.AppState.correoEmpresa || '';
 
+        const modal = this.obtenerModalConfiguracion();
+        if (modal) {
+            modal.open().focusFirstField();
+            return;
+        }
+
         document.getElementById('modalConfiguracion').style.display = 'block';
     },
 
     cerrarModalConfiguracion() {
+        const modal = this.obtenerModalConfiguracion();
+        if (modal) {
+            modal.close();
+            return;
+        }
+
         document.getElementById('modalConfiguracion').style.display = 'none';
     },
 

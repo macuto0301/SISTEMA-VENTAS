@@ -31,15 +31,20 @@ const API = {
         return query ? `?${query}` : '';
     },
 
-    getAuthHeaders() {
+    getStoredSession() {
         try {
             const sesionGuardada = localStorage.getItem('sesion_ventas') || sessionStorage.getItem('sesion_ventas');
-            const sesion = JSON.parse(sesionGuardada || 'null');
-            if (sesion?.username) {
-                return { 'X-Auth-Username': sesion.username };
-            }
+            return JSON.parse(sesionGuardada || 'null');
         } catch (e) {
             console.warn('No se pudo leer la sesion local', e);
+            return null;
+        }
+    },
+
+    getAuthHeaders() {
+        const sesion = this.getStoredSession();
+        if (sesion?.token) {
+            return { Authorization: `Bearer ${sesion.token}` };
         }
         return {};
     },
@@ -58,6 +63,9 @@ const API = {
                 ...options,
                 headers
             });
+            if (res.status === 401) {
+                window.AuthCore?.manejarSesionExpirada?.();
+            }
             if (!res.ok) {
                 let mensaje = `HTTP ${res.status}`;
                 try {
@@ -464,9 +472,12 @@ const ApiService = {
 
     async getCompra(id) {
         try {
-            const res = await fetch(`http://localhost:5000/api/compras/${id}`, {
+            const res = await fetch(`${API.baseUrl}/compras/${id}`, {
                 headers: API.getAuthHeaders()
             });
+            if (res.status === 401) {
+                window.AuthCore?.manejarSesionExpirada?.();
+            }
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             return await res.json();
         } catch (e) {

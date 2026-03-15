@@ -5,6 +5,7 @@ from uuid import uuid4
 
 from flask import Blueprint, current_app, jsonify, request
 from PIL import Image, ImageOps
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy import or_
 from werkzeug.datastructures import FileStorage
 from werkzeug.utils import secure_filename
@@ -122,6 +123,15 @@ def serializar_cliente(cliente: Cliente) -> dict:
     }
 
 
+def build_cliente_integrity_error_message(error: IntegrityError) -> str:
+    detalle = str(getattr(error, 'orig', error)).lower()
+    if 'rif_cedula' in detalle and 'not-null' in detalle:
+        return 'El documento del cliente es obligatorio'
+    if 'rif_cedula' in detalle and 'duplicate' in detalle:
+        return 'Ya existe un cliente con ese documento'
+    return 'No se pudo guardar el cliente'
+
+
 @clientes_bp.route('/', methods=['GET'])
 def get_clientes():
     query = Cliente.query.filter_by(activo=True).order_by(Cliente.nombre.asc())
@@ -172,6 +182,9 @@ def crear_cliente():
     if not nombre:
         return jsonify({'error': 'El nombre del cliente es obligatorio'}), 400
 
+    if not documento:
+        return jsonify({'error': 'El documento del cliente es obligatorio'}), 400
+
     if documento and Cliente.query.filter_by(documento=documento).first():
         return jsonify({'error': 'Ya existe un cliente con ese documento'}), 400
 
@@ -194,6 +207,11 @@ def crear_cliente():
         db.session.add(nuevo)
         db.session.commit()
         return jsonify({'mensaje': 'Cliente creado', 'cliente': serializar_cliente(nuevo)}), 201
+    except IntegrityError as e:
+        db.session.rollback()
+        remove_cliente_image(foto_perfil_path)
+        remove_cliente_image(foto_cedula_path)
+        return jsonify({'error': build_cliente_integrity_error_message(e)}), 400
     except Exception as e:
         db.session.rollback()
         remove_cliente_image(foto_perfil_path)
@@ -213,6 +231,12 @@ def actualizar_cliente(cliente_id: int):
     cliente = Cliente.query.get_or_404(cliente_id)
     data, foto_perfil, foto_cedula = get_payload_and_images()
     documento = (data.get('documento') or '').strip() or None
+
+    if not (data.get('nombre') or '').strip():
+        return jsonify({'error': 'El nombre del cliente es obligatorio'}), 400
+
+    if not documento:
+        return jsonify({'error': 'El documento del cliente es obligatorio'}), 400
 
     if documento:
         existente = Cliente.query.filter(Cliente.documento == documento, Cliente.id != cliente.id).first()
@@ -252,6 +276,11 @@ def actualizar_cliente(cliente_id: int):
             remove_cliente_image(old_cedula)
 
         return jsonify({'mensaje': 'Cliente actualizado', 'cliente': serializar_cliente(cliente)})
+    except IntegrityError as e:
+        db.session.rollback()
+        remove_cliente_image(uploaded_perfil_path)
+        remove_cliente_image(uploaded_cedula_path)
+        return jsonify({'error': build_cliente_integrity_error_message(e)}), 400
     except Exception as e:
         db.session.rollback()
         remove_cliente_image(uploaded_perfil_path)

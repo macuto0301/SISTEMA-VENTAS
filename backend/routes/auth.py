@@ -1,4 +1,5 @@
 from flask import Blueprint, request, jsonify
+from auth_utils import create_access_token
 from models import Usuario
 from database import db
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -21,8 +22,14 @@ def password_matches(stored_password, provided_password):
 @auth_bp.route('/login', methods=['POST'])
 def login():
     data = request.get_json() or {}
-    username = data.get('username')
-    password = data.get('password')
+    username = (data.get('username') or '').strip()
+    password = str(data.get('password') or '')
+
+    if not username or not password:
+        return jsonify({
+            'success': False,
+            'message': 'Usuario y contrasena son obligatorios'
+        }), 400
 
     user = Usuario.query.filter_by(username=username).first()
 
@@ -31,10 +38,16 @@ def login():
             user.password = generate_password_hash(password)
             db.session.commit()
 
+        access_token, expires_at = create_access_token(user)
+
         return jsonify({
             'success': True,
             'message': 'Login exitoso',
+            'access_token': access_token,
+            'token_type': 'Bearer',
+            'expires_at': expires_at.isoformat(),
             'user': {
+                'id': user.id,
                 'username': user.username,
                 'rol': user.rol,
             }
@@ -42,7 +55,7 @@ def login():
     
     return jsonify({
         'success': False,
-        'message': 'Usuario o contraseña incorrectos'
+        'message': 'Usuario o contrasena incorrectos'
     }), 401
 
 @auth_bp.route('/init-admin', methods=['POST'])
@@ -51,7 +64,10 @@ def init_admin():
     if Usuario.query.filter_by(username='admin').first():
         return jsonify({'message': 'Admin ya existe'}), 200
     
-    admin = Usuario(username='admin', password=generate_password_hash('1234'), rol='admin')
+    admin = Usuario()
+    admin.username = 'admin'
+    admin.password = generate_password_hash('1234')
+    admin.rol = 'admin'
     db.session.add(admin)
     db.session.commit()
     return jsonify({'message': 'Admin creado exitosamente'}), 201

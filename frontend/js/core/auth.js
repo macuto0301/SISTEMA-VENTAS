@@ -1,12 +1,103 @@
 const AuthCore = {
     logoutConfirmacionActiva: false,
 
+    decodificarPayloadJwt(token) {
+        if (!token || typeof token !== 'string') {
+            return null;
+        }
+
+        const partes = token.split('.');
+        if (partes.length !== 3) {
+            return null;
+        }
+
+        try {
+            const base64 = partes[1].replace(/-/g, '+').replace(/_/g, '/');
+            const padding = '='.repeat((4 - (base64.length % 4)) % 4);
+            const json = atob(base64 + padding);
+            return JSON.parse(json);
+        } catch (error) {
+            console.warn('No se pudo decodificar el token local.', error);
+            return null;
+        }
+    },
+
+    obtenerSesionActual() {
+        const sesion = this.obtenerSesionPersistida();
+        if (!sesion) {
+            return null;
+        }
+
+        try {
+            return JSON.parse(sesion);
+        } catch (error) {
+            console.warn('Sesion local invalida, se limpiara el acceso guardado.', error);
+            this.limpiarSesionPersistida();
+            return null;
+        }
+    },
+
+    sesionEstaExpirada(sesion) {
+        const exp = Number(sesion?.exp || 0);
+        if (!exp) {
+            return true;
+        }
+        return Math.floor(Date.now() / 1000) >= exp;
+    },
+
+    tieneSesionActiva() {
+        const sesion = this.obtenerSesionActual();
+        if (!sesion?.token || !sesion?.user?.username) {
+            return false;
+        }
+
+        if (this.sesionEstaExpirada(sesion)) {
+            this.limpiarSesionPersistida();
+            return false;
+        }
+
+        return true;
+    },
+
+    obtenerModalCerrarSesion() {
+        if (!window.SVModal) {
+            return null;
+        }
+
+        if (!this._logoutModal) {
+            this._logoutModal = window.SVModal.enhance('modalCerrarSesion', {
+                dismissible: true,
+                backdropDismissible: true,
+                escapeDismissible: true,
+                onOpen: () => {
+                    this.logoutConfirmacionActiva = true;
+                },
+                onClose: () => {
+                    this.logoutConfirmacionActiva = false;
+                }
+            });
+        }
+
+        return this._logoutModal;
+    },
+
+    obtenerCamposLogin() {
+        if (!window.SVField) {
+            return { usuario: null, contrasena: null };
+        }
+
+        return {
+            usuario: window.SVField.get('loginUser') || null,
+            contrasena: window.SVField.get('loginPass') || null
+        };
+    },
+
     obtenerSesionPersistida() {
         return localStorage.getItem('sesion_ventas') || sessionStorage.getItem('sesion_ventas');
     },
 
-    guardarSesionPersistida(usuario) {
-        const valor = JSON.stringify(usuario || null);
+    guardarSesionPersistida(sesion) {
+        const valor = JSON.stringify(sesion || null);
         try {
             localStorage.setItem('sesion_ventas', valor);
         } catch (error) {
@@ -76,21 +167,12 @@ const AuthCore = {
     },
 
     verificarSesion() {
-        const sesion = this.obtenerSesionPersistida();
-        document.body.classList.toggle('login-active', !sesion);
+        const sesion = this.obtenerSesionActual();
+        const sesionActiva = this.tieneSesionActiva();
+        document.body.classList.toggle('login-active', !sesionActiva);
 
-        if (sesion) {
-            try {
-                window.usuarioLogueado = JSON.parse(sesion);
-            } catch (error) {
-                console.warn('Sesion local invalida, se limpiara el acceso guardado.', error);
-                this.limpiarSesionPersistida();
-                window.usuarioLogueado = null;
-                window.AppState.usuarioLogueado = null;
-                document.getElementById('panelLogin').style.display = 'flex';
-                document.getElementById('panelPrincipal').style.display = 'none';
-                return;
-            }
+        if (sesionActiva && sesion) {
+            window.usuarioLogueado = sesion.user;
             window.AppState.usuarioLogueado = window.usuarioLogueado;
             document.getElementById('panelLogin').style.display = 'none';
             document.getElementById('panelPrincipal').style.display = 'block';
@@ -100,6 +182,21 @@ const AuthCore = {
             document.getElementById('panelLogin').style.display = 'flex';
             document.getElementById('panelPrincipal').style.display = 'none';
         }
+    },
+
+    manejarSesionExpirada(notificar = true) {
+        const habiaSesion = Boolean(this.obtenerSesionPersistida());
+        this.limpiarSesionPersistida();
+        window.usuarioLogueado = null;
+        if (window.AppState) {
+            window.AppState.usuarioLogueado = null;
+        }
+
+        if (habiaSesion && notificar) {
+            window.mostrarNotificacion?.('⚠️ Tu sesion vencio. Ingresa nuevamente');
+        }
+
+        this.verificarSesion();
     },
 
     async manejarLogin(event) {
@@ -112,9 +209,29 @@ const AuthCore = {
         const btn = form?.querySelector('button[type="submit"], button');
         const feedback = document.getElementById('loginFeedback');
         const label = btn?.querySelector('.btn-login-label');
+        const campos = this.obtenerCamposLogin();
+
+        campos.usuario?.clearError();
+        campos.contrasena?.clearError();
 
         if (!btn) {
             console.warn('No se encontro el boton de login para procesar el acceso.');
+            return;
+        }
+
+        if (!username) {
+            campos.usuario?.setError('Ingresa tu usuario para continuar.');
+        }
+
+        if (!password) {
+            campos.contrasena?.setError('Ingresa tu contrasena para continuar.');
+        }
+
+        if (!username || !password) {
+            if (feedback) {
+                feedback.textContent = 'Completa tus credenciales para iniciar sesion.';
+                feedback.dataset.state = 'error';
+            }
             return;
         }
 
@@ -146,11 +263,24 @@ const AuthCore = {
             }
 
             if (res.ok && data.success) {
+                const payloadToken = this.decodificarPayloadJwt(data.access_token);
+                const sesion = {
+                    token: data.access_token,
+                    tokenType: data.token_type || 'Bearer',
+                    user: data.user,
+                    exp: Number(payloadToken?.exp || 0),
+                    expiresAt: data.expires_at || null
+                };
+
+                if (!sesion.token || !sesion.user?.username || !sesion.exp) {
+                    throw new Error('El servidor no devolvio una sesion valida.');
+                }
+
                 window.usuarioLogueado = data.user;
                 if (window.AppState) {
                     window.AppState.usuarioLogueado = window.usuarioLogueado;
                 }
-                this.guardarSesionPersistida(window.usuarioLogueado);
+                this.guardarSesionPersistida(sesion);
 
                 if (feedback) {
                     feedback.textContent = `Acceso aprobado para ${window.usuarioLogueado.username}`;
@@ -168,9 +298,12 @@ const AuthCore = {
                 window.mostrarVentas?.();
                 this.asegurarVistaInicialPorRol();
                 window.mostrarNotificacion?.('✅ Bienvenid@ al sistema');
-            } else if (feedback) {
-                feedback.textContent = data.message || 'No se pudo validar el acceso.';
-                feedback.dataset.state = 'error';
+            } else {
+                if (feedback) {
+                    feedback.textContent = data.message || 'No se pudo validar el acceso.';
+                    feedback.dataset.state = 'error';
+                }
+                campos.contrasena?.setError('Verifica tu usuario y contrasena.');
             }
         } catch (e) {
             console.error('Error en flujo de login:', e);
@@ -178,6 +311,7 @@ const AuthCore = {
                 feedback.textContent = 'No se pudo completar el inicio de sesion.';
                 feedback.dataset.state = 'error';
             }
+            campos.contrasena?.setError('Ocurrio un problema al validar el acceso.');
         } finally {
             btn.disabled = false;
             if (label) {
@@ -190,6 +324,7 @@ const AuthCore = {
 
     abrirModalCerrarSesion() {
         const modal = document.getElementById('modalCerrarSesion');
+        const modalApi = this.obtenerModalCerrarSesion();
 
         if (!modal) {
             this.cerrarSesionConfirmada();
@@ -197,12 +332,10 @@ const AuthCore = {
         }
 
         const usuario = document.getElementById('modalCerrarSesionUsuario');
-        this.logoutConfirmacionActiva = true;
         if (usuario) {
             usuario.textContent = window.usuarioLogueado?.username || 'este usuario';
         }
-        modal.style.display = 'block';
-        document.body.classList.add('modal-open');
+        modalApi?.open() || (modal.style.display = 'block');
 
         const btnConfirmar = document.getElementById('btnConfirmarCerrarSesion');
         btnConfirmar?.focus();
@@ -210,8 +343,14 @@ const AuthCore = {
 
     cerrarModalCerrarSesion() {
         const modal = document.getElementById('modalCerrarSesion');
+        const modalApi = this.obtenerModalCerrarSesion();
 
         if (!modal) {
+            return;
+        }
+
+        if (modalApi) {
+            modalApi.close();
             return;
         }
 
@@ -222,9 +361,7 @@ const AuthCore = {
 
     cerrarSesionConfirmada() {
         this.cerrarModalCerrarSesion();
-        this.limpiarSesionPersistida();
-        window.usuarioLogueado = null;
-        window.AppState.usuarioLogueado = null;
+        this.manejarSesionExpirada(false);
         window.location.reload();
     },
 

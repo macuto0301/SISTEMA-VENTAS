@@ -207,9 +207,9 @@ const ProductosFeature = {
             return API.getAuthHeaders();
         }
         try {
-            const sesion = JSON.parse(localStorage.getItem('sesion_ventas') || 'null');
-            if (sesion?.username) {
-                return { 'X-Auth-Username': sesion.username };
+            const sesion = JSON.parse(localStorage.getItem('sesion_ventas') || sessionStorage.getItem('sesion_ventas') || 'null');
+            if (sesion?.token) {
+                return { Authorization: `Bearer ${sesion.token}` };
             }
         } catch (error) {
             console.warn('No se pudo leer la sesion local', error);

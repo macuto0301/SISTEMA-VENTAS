@@ -27,6 +27,7 @@
     <script src="js/components/composite/entity-picker.js"></script>
     <script src="js/components/composite/media-uploader.js"></script>
     <script src="js/components/composite/summary-card.js"></script>
+    <script src="js/components/composite/login-screen.js"></script>
     <script src="js/core/state-cache.js"></script>
     <script src="js/features/clientes/media.js"></script>
     <script src="js/features/clientes/management.js"></script>
@@ -53,55 +54,7 @@
 
 <body>
     <!-- Pantalla de Login -->
-    <div id="panelLogin" class="login-screen">
-        <div class="login-shell">
-            <section class="login-showcase">
-                <span class="login-kicker">Sistema de Ventas</span>
-                <h2>Control comercial con una entrada clara, rapida y segura.</h2>
-                <p class="login-lead">Accede al panel operativo para gestionar inventario, caja, clientes e indicadores del dia desde una misma vista.</p>
-                <div class="login-showcase-grid">
-                    <article class="login-feature-card">
-                        <span class="login-feature-label">Operacion</span>
-                        <strong>Inventario, ventas y compras</strong>
-                        <p>Un flujo continuo para registrar movimientos sin perder contexto.</p>
-                    </article>
-                    <article class="login-feature-card login-feature-card-accent">
-                        <span class="login-feature-label">Visibilidad</span>
-                        <strong>Indicadores y trazabilidad</strong>
-                        <p>Consulta actividad diaria y usuarios activos desde el tablero principal.</p>
-                    </article>
-                </div>
-            </section>
-
-            <section class="login-panel" aria-labelledby="loginTitle">
-                <div class="login-brand-mark">
-                    <img src="assets/logo-sistema-ventas.webp" alt="Logo Sistema de Ventas" class="login-brand-logo">
-                </div>
-                <div class="login-panel-copy">
-                    <span class="login-panel-kicker">Acceso interno</span>
-                    <h1 id="loginTitle">Iniciar sesion</h1>
-                    <p>Ingresa tus credenciales para continuar al centro de operaciones.</p>
-                </div>
-
-                <form id="formLogin" class="login-form" onsubmit="event.preventDefault(); if (window.AuthCore && typeof window.AuthCore.manejarLogin === 'function') { window.AuthCore.manejarLogin(event); } return false;">
-                    <div class="form-group login-form-group">
-                        <label for="loginUser">Usuario</label>
-                        <input type="text" id="loginUser" required placeholder="Nombre de usuario" autocomplete="username" name="loginUser">
-                    </div>
-                    <div class="form-group login-form-group">
-                        <label for="loginPass">Contrasena</label>
-                        <input type="password" id="loginPass" required placeholder="••••••••" autocomplete="current-password" name="loginPass">
-                    </div>
-
-                    <div id="loginFeedback" class="login-feedback" aria-live="polite"></div>
-
-                    <button type="submit" class="btn-primary btn-login">
-                        <span class="btn-login-label">Entrar al sistema</span>
-                    </button>
-                </form>
-            </section>
-        </div>
-    </div>
+    <div id="panelLogin" class="login-screen"></div>
 
     <!-- Panel Principal (Sistema) -->
     <div id="panelPrincipal" class="container" style="display: none;">
@@ -123,7 +76,7 @@
                     <div class="usuario-info">
                         <span class="info-label">Sesión</span>
                         <span><strong id="nombreUsuarioDisplay">Admin</strong> <small id="rolUsuarioDisplay"></small></span>
-                        <button onclick="cerrarSesion()" class="btn-salir">Salir</button>
+                        <button id="btnCerrarSesionHeader" type="button" class="btn-salir">Salir</button>
                     </div>
                 </div>
             </div>
@@ -168,7 +121,7 @@
                 </div>
                 <div style="display: flex; gap: 10px; flex-wrap: wrap;">
                     <button id="btnListaPrecios" type="button" class="btn-secondary">📄 Lista de precios</button>
-                    <button id="btnNuevoProducto" type="button" class="btn-primary" onclick="window.ProductosFeature?.mostrarFormularioProducto?.()">➕ Nuevo Producto</button>
+                    <button id="btnNuevoProducto" type="button" class="btn-primary">➕ Nuevo Producto</button>
                 </div>
             </div>
 
@@ -978,10 +931,9 @@
         </div>
     </div>
 
-    <div id="modalCerrarSesion" class="modal"
-        onclick="if (event.target === this) window.AuthCore?.cerrarModalCerrarSesion?.()">
+    <div id="modalCerrarSesion" class="modal">
         <div class="modal-content modal-small modal-cerrar-sesion">
-            <span class="close" onclick="window.AuthCore?.cerrarModalCerrarSesion?.()">&times;</span>
+            <span id="btnCerrarModalCerrarSesion" class="close">&times;</span>
             <div class="modal-cerrar-sesion-badge">Sesion activa</div>
             <h2>Cerrar sesion</h2>
             <p class="modal-cerrar-sesion-texto">
@@ -991,8 +943,8 @@
                 Confirme solo si ya termino sus operaciones en el sistema.
             </p>
             <div class="modal-cerrar-sesion-acciones">
-                <button id="btnCancelarCerrarSesion" type="button" class="btn-secondary" onclick="window.AuthCore?.cerrarModalCerrarSesion?.()">Continuar en el sistema</button>
-                <button id="btnConfirmarCerrarSesion" type="button" class="btn-primary" onclick="window.AuthCore?.cerrarSesionConfirmada?.()">Si, cerrar sesion</button>
+                <button id="btnCancelarCerrarSesion" type="button" class="btn-secondary">Continuar en el sistema</button>
+                <button id="btnConfirmarCerrarSesion" type="button" class="btn-primary">Si, cerrar sesion</button>
             </div>
         </div>
     </div>
@@ -1000,7 +952,7 @@
     <!-- Modal Configuración -->
     <div id="modalConfiguracion" class="modal">
         <div class="modal-content" style="max-width: 600px;">
-            <span id="btnCerrarModalConfiguracion" class="close" onclick="if (window.ConfigCore?.cerrarModalConfiguracion) { window.ConfigCore.cerrarModalConfiguracion(); }">&times;</span>
+            <span id="btnCerrarModalConfiguracion" class="close">&times;</span>
             <h2 style="text-align: center; margin-bottom: 20px;">⚙️ Configuración</h2>
 
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
@@ -1048,7 +1000,7 @@
                         <div style="display: flex; gap: 8px;">
                             <input type="number" id="configTasaDolar" step="0.01"
                                 style="flex: 1; padding: 8px; font-size: 0.95em; border: 1px solid #ccc; border-radius: 5px;" name="configTasaDolar">
-                            <button id="btnConfigActualizarBcv" type="button" onclick="if (window.ConfigCore?.actualizarTasaBCV) { window.ConfigCore.actualizarTasaBCV(event); }" class="btn-secondary" title="Actualizar desde BCV"
+                            <button id="btnConfigActualizarBcv" type="button" class="btn-secondary" title="Actualizar desde BCV"
                                 style="padding: 0 12px; background: #e3f2fd; color: #1976d2; border-color: #bbdefb;">
                                 🔄
                             </button>
@@ -1084,8 +1036,8 @@
             </div>
 
             <div style="text-align: right; border-top: 1px solid #eee; padding-top: 15px; margin-top: 15px;">
-                <button id="btnConfigCancelar" type="button" class="btn-secondary" onclick="if (window.ConfigCore?.cerrarModalConfiguracion) { window.ConfigCore.cerrarModalConfiguracion(); }">Cancelar</button>
-                <button id="btnConfigGuardar" type="button" class="btn-primary" onclick="if (window.ConfigCore?.guardarConfiguracion) { window.ConfigCore.guardarConfiguracion(); }">💾 Guardar</button>
+                <button id="btnConfigCancelar" type="button" class="btn-secondary">Cancelar</button>
+                <button id="btnConfigGuardar" type="button" class="btn-primary">💾 Guardar</button>
             </div>
         </div>
     </div>

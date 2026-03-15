@@ -46,6 +46,8 @@ def create_app():
     app.config['PRODUCTOS_UPLOAD_FOLDER'] = PRODUCTOS_UPLOADS_PATH
     app.config['CLIENTES_UPLOAD_FOLDER'] = CLIENTES_UPLOADS_PATH
     app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024
+    app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY') or os.getenv('SECRET_KEY') or 'dev-change-this-jwt-secret'
+    app.config['JWT_ACCESS_TOKEN_EXPIRES_MINUTES'] = int(os.getenv('JWT_ACCESS_TOKEN_EXPIRES_MINUTES', '480'))
     os.makedirs(app.config['PRODUCTOS_UPLOAD_FOLDER'], exist_ok=True)
     os.makedirs(app.config['CLIENTES_UPLOAD_FOLDER'], exist_ok=True)
     
@@ -69,7 +71,7 @@ def create_app():
     )
     cors_headers = parse_env_list(
         'CORS_ALLOW_HEADERS',
-        ['Content-Type', 'Authorization', 'X-Auth-Username']
+        ['Content-Type', 'Authorization']
     )
 
     CORS(app, resources={

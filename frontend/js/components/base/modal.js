@@ -30,6 +30,8 @@
         const title = modal.querySelector(options.titleSelector || 'h2, h3');
         const closeButton = modal.querySelector(options.closeSelector || '.close');
         const dismissible = options.dismissible !== false;
+        const backdropDismissible = options.backdropDismissible !== false && dismissible;
+        const escapeDismissible = options.escapeDismissible !== false && dismissible;
 
         const api = {
             id: modalId,
@@ -84,7 +86,7 @@
             closeButton.addEventListener('click', () => api.close());
         }
 
-        if (dismissible) {
+        if (backdropDismissible) {
             modal.addEventListener('click', event => {
                 if (event.target === modal) {
                     api.close();
@@ -94,7 +96,7 @@
 
         document.addEventListener('keydown', event => {
             if (event.key !== 'Escape') return;
-            if (!dismissible || !api.isOpen()) return;
+            if (!escapeDismissible || !api.isOpen()) return;
             event.preventDefault();
             api.close();
         });

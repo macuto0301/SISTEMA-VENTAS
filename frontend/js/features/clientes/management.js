@@ -10,7 +10,8 @@ const ClientesFeature = {
         if (!this._clientModal && window.SVModal) {
             this._clientModal = window.SVModal.enhance('modalCliente', {
                 titleSelector: '#modalTituloCliente',
-                closeSelector: '#btnCerrarModalCliente'
+                closeSelector: '#btnCerrarModalCliente',
+                backdropDismissible: false
             });
         }
 
@@ -507,6 +508,12 @@ const ClientesFeature = {
         if (!String(payload.get('nombre') || '').trim()) {
             this.obtenerCampoCliente('nombre')?.setError('El nombre del cliente es obligatorio').focus();
             window.mostrarNotificacion('❌ El nombre del cliente es obligatorio');
+            return;
+        }
+
+        if (!String(payload.get('documento') || '').trim()) {
+            this.obtenerCampoCliente('documento')?.setError('El documento del cliente es obligatorio').focus();
+            window.mostrarNotificacion('❌ El documento del cliente es obligatorio');
             return;
         }
 

@@ -44,6 +44,7 @@ const NavigationCore = {
     },
 
     sincronizarTabConHash() {
+        if (!window.AuthCore?.tieneSesionActiva?.()) return;
         const tab = this.obtenerTabDesdeHash();
         if (!tab) return;
         if (typeof window.cambiarTab === 'function') {
@@ -52,6 +53,11 @@ const NavigationCore = {
     },
 
     cambiarTab(tabName, actualizarHash = true) {
+        if (!window.AuthCore?.tieneSesionActiva?.()) {
+            document.body.classList.add('login-active');
+            return;
+        }
+
         const tabsPermitidos = this.obtenerTabsPermitidosUsuario();
         if (window.usuarioLogueado && !tabsPermitidos.includes(tabName)) {
             window.mostrarNotificacion('🔒 Este usuario solo puede usar el POS de ventas');

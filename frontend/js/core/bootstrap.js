@@ -59,6 +59,7 @@ function registrarEventoElemento(id, tipoEvento, handler) {
 }
 
 function registrarEventosGeneralesApp() {
+    registrarEventoElemento('btnCerrarSesionHeader', 'click', () => window.AuthCore?.cerrarSesion?.());
     registrarEventoElemento('productoPrecioCosto', 'input', obtenerFuncionGlobal('recalcularPreciosProducto'));
     registrarEventoElemento('productoPrecioCosto', 'input', obtenerFuncionGlobal('actualizarResumenPreciosProducto'));
     registrarEventoElemento('productoPorcentajeGanancia1', 'input', () => obtenerFuncionGlobal('calcularPrecioVenta')?.(1));
@@ -99,6 +100,9 @@ function registrarEventosGeneralesApp() {
     });
 
     registrarEventoElemento('btnConfiguracion', 'click', () => window.ConfigCore?.abrirModalConfiguracion?.());
+    registrarEventoElemento('btnCerrarModalCerrarSesion', 'click', () => window.AuthCore?.cerrarModalCerrarSesion?.());
+    registrarEventoElemento('btnCancelarCerrarSesion', 'click', () => window.AuthCore?.cerrarModalCerrarSesion?.());
+    registrarEventoElemento('btnConfirmarCerrarSesion', 'click', () => window.AuthCore?.cerrarSesionConfirmada?.());
     registrarEventoElemento('btnToggleSidebar', 'click', () => window.NavigationCore?.toggleSidebar?.());
     registrarEventoElemento('btnCerrarModalConfiguracion', 'click', () => window.ConfigCore?.cerrarModalConfiguracion?.());
     registrarEventoElemento('btnConfigCancelar', 'click', () => window.ConfigCore?.cerrarModalConfiguracion?.());
@@ -197,6 +201,12 @@ async function inicializarDatosApp() {
     obtenerFuncionGlobal('aplicarEstadoSidebar')?.(localStorage.getItem('sidebar_collapsed') === 'true');
     obtenerFuncionGlobal('verificarSesion')?.();
 
+    if (!window.AuthCore?.tieneSesionActiva?.()) {
+        obtenerFuncionGlobal('actualizarFecha')?.();
+        setInterval(() => obtenerFuncionGlobal('actualizarFecha')?.(), 60000);
+        return;
+    }
+
     const cargasIniciales = [
         ['configuracion', obtenerFuncionGlobal('cargarConfiguracion')],
         ['productos', obtenerFuncionGlobal('cargarProductos')],
@@ -224,6 +234,7 @@ async function inicializarDatosApp() {
 }
 
 document.addEventListener('DOMContentLoaded', async function () {
+    window.LoginScreenComponent?.render?.();
     registrarEventosGeneralesApp();
     inicializarFechaInformes();
 

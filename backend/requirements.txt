@@ -3,6 +3,7 @@ requests
 flask
 flask-sqlalchemy
 flask-cors
+PyJWT
 python-dotenv
 psycopg2-binary
 mcp
