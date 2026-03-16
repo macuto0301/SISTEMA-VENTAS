@@ -356,6 +356,10 @@ const ApiService = {
         return API.post(`/cuentas-por-cobrar/${cuentaId}/abonos`, payload);
     },
 
+    async devolverSaldoFavorCliente(clienteId, payload) {
+        return API.post(`/clientes/${clienteId}/devolver-saldo-favor`, payload);
+    },
+
     async tasaBCV() {
         try {
             const res = await fetch('https://pydolarvenezuela-api.vercel.app/api/v1/dollar?moneda=bcv');

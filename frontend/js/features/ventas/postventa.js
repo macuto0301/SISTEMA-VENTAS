@@ -1,4 +1,6 @@
 const VentasPostventaFeature = {
+    _modalDevolucion: null,
+
     cerrarModalVuelto() {
         document.getElementById('modalVuelto').style.display = 'none';
         const info = document.getElementById('vueltoInfo');
@@ -17,6 +19,14 @@ const VentasPostventaFeature = {
 
     obtenerVentaPorId(ventaId) {
         return ventas.find(v => v.id === ventaId);
+    },
+
+    obtenerModalDevolucion() {
+        if (this._modalDevolucion) return this._modalDevolucion;
+        if (!window.SVModal?.enhance) return null;
+
+        this._modalDevolucion = window.SVModal.enhance('modalDevolucion');
+        return this._modalDevolucion;
     },
 
     escaparAtributoHtml(valor) {
@@ -383,11 +393,19 @@ const VentasPostventaFeature = {
         this.renderListaReintegrosDevolucion();
         this.sincronizarFormularioReintegro();
         this.actualizarResumenDevolucion();
-        document.getElementById('modalDevolucion').style.display = 'block';
+        const modalElement = document.getElementById('modalDevolucion');
+        const modalContent = modalElement?.querySelector('.modal-content');
+        if (modalElement) modalElement.scrollTop = 0;
+        if (modalContent) modalContent.scrollTop = 0;
+
+        const modal = this.obtenerModalDevolucion();
+        modal?.open() || (modalElement.style.display = 'block');
     },
 
     cerrarModalDevolucion() {
-        document.getElementById('modalDevolucion').style.display = 'none';
+        const modal = this.obtenerModalDevolucion();
+        const modalElement = document.getElementById('modalDevolucion');
+        modal?.close() || (modalElement.style.display = 'none');
         devolucionActiva = null;
         reintegrosDevolucion = [];
     },

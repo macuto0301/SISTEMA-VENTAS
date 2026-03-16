@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta
+
 from flask import Blueprint, jsonify, request
 from sqlalchemy import or_
 
@@ -9,6 +11,7 @@ from pagination import build_paginated_response, get_pagination_params, has_pagi
 
 
 cuentas_por_cobrar_bp = Blueprint('cuentas_por_cobrar', __name__)
+VENTANA_ABONO_DUPLICADO_SEGUNDOS = 8
 
 
 def serializar_abono(abono: AbonoCuentaPorCobrar) -> dict:
@@ -43,6 +46,30 @@ def serializar_cuenta(cuenta: CuentaPorCobrar) -> dict:
         'observacion': cuenta.observacion or '',
         'abonos': [serializar_abono(abono) for abono in cuenta.abonos],
     }
+
+
+def buscar_abono_duplicado_reciente(
+    cuenta_id: int,
+    medio: str,
+    moneda: str,
+    monto: float,
+    equivalente_usd: float,
+    usuario_username: str | None,
+) -> AbonoCuentaPorCobrar | None:
+    limite = datetime.utcnow() - timedelta(seconds=VENTANA_ABONO_DUPLICADO_SEGUNDOS)
+    query = AbonoCuentaPorCobrar.query.filter(
+        AbonoCuentaPorCobrar.cuenta_por_cobrar_id == cuenta_id,
+        AbonoCuentaPorCobrar.fecha >= limite,
+        AbonoCuentaPorCobrar.medio == medio,
+        AbonoCuentaPorCobrar.moneda == moneda,
+        AbonoCuentaPorCobrar.monto == monto,
+        AbonoCuentaPorCobrar.equivalente_usd == equivalente_usd,
+    )
+    if usuario_username:
+        query = query.filter(AbonoCuentaPorCobrar.usuario_username == usuario_username)
+    return query.order_by(AbonoCuentaPorCobrar.id.desc()).first()
+
+
 @cuentas_por_cobrar_bp.route('/', methods=['GET'])
 def get_cuentas_por_cobrar():
     query = CuentaPorCobrar.query.join(Cliente, CuentaPorCobrar.cliente_id == Cliente.id)
@@ -174,6 +201,8 @@ def registrar_abono(cuenta_id: int):
     if monto <= 0:
         return jsonify({'error': 'El monto del abono debe ser mayor a cero'}), 400
 
+    usuario_username = current_user.username if current_user else None
+
     if moneda == 'USD':
         tasa_usada = 1.0
         equivalente_usd = monto
@@ -184,6 +213,17 @@ def registrar_abono(cuenta_id: int):
             equivalente_usd = round(monto / tasa_usada, 2)
 
     try:
+        abono_duplicado = buscar_abono_duplicado_reciente(
+            cuenta_id=cuenta.id,
+            medio=medio,
+            moneda=moneda,
+            monto=monto,
+            equivalente_usd=equivalente_usd,
+            usuario_username=usuario_username,
+        )
+        if abono_duplicado:
+            return jsonify({'error': 'Ya se registro un abono igual hace unos segundos. Verifique antes de reintentar.'}), 409
+
         abono_aplicable = min(round(cuenta.saldo_pendiente_usd or 0.0, 2), equivalente_usd)
         excedente = round(max(0.0, equivalente_usd - abono_aplicable), 2)
 
@@ -195,7 +235,7 @@ def registrar_abono(cuenta_id: int):
             tasa_usada=tasa_usada,
             origen_tasa=origen_tasa,
             equivalente_usd=equivalente_usd,
-            usuario_username=current_user.username if current_user else None,
+            usuario_username=usuario_username,
             observacion=(data.get('observacion') or '').strip() or None,
         )
         db.session.add(abono)
@@ -217,7 +257,7 @@ def registrar_abono(cuenta_id: int):
             tasa_usada=tasa_usada,
             medio=medio,
             descripcion=(data.get('observacion') or '').strip() or 'Abono registrado a cuenta por cobrar',
-            usuario_username=current_user.username if current_user else None,
+            usuario_username=usuario_username,
         )
         db.session.add(movimiento_abono)
 
@@ -236,7 +276,7 @@ def registrar_abono(cuenta_id: int):
                 tasa_usada=tasa_usada,
                 medio=medio,
                 descripcion='Excedente generado al abonar una cuenta por cobrar',
-                usuario_username=current_user.username if current_user else None,
+                usuario_username=usuario_username,
             )
             db.session.add(movimiento_favor)
 

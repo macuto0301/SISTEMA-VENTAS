@@ -9,7 +9,7 @@ def reconciliar_saldos_a_favor_cliente(cliente_id: int) -> None:
 
     movimientos_aplicacion = MovimientoCuentaCliente.query.filter(
         MovimientoCuentaCliente.cliente_id == cliente_id,
-        MovimientoCuentaCliente.tipo_movimiento.in_(['aplicacion_saldo_favor', 'aplicacion_saldo_favor_venta']),
+        MovimientoCuentaCliente.tipo_movimiento.in_(['aplicacion_saldo_favor', 'aplicacion_saldo_favor_venta', 'devolucion_saldo_favor']),
     ).order_by(MovimientoCuentaCliente.fecha.asc(), MovimientoCuentaCliente.id.asc()).all()
 
     for movimiento in movimientos_favor:

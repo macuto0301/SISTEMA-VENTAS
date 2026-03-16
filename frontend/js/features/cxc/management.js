@@ -1,5 +1,8 @@
 const CxcFeature = {
     _clientPicker: null,
+    _guardandoAbonoCuenta: false,
+    _devolviendoSaldoFavor: false,
+    _modalDevolucionSaldoFavor: null,
 
     inicializarComponentesCxc() {
         if (!this._clientPicker && window.SVEntityPicker && document.getElementById('clienteCxcPicker')) {
@@ -230,7 +233,130 @@ const CxcFeature = {
             variant: 'success'
         });
 
-        return [clienteHtml, cobrarHtml, favorHtml].join('');
+        const accionesHtml = `
+            <div class="producto-acciones" style="grid-column: 1 / -1; margin-top: 6px;">
+                <button class="btn-secondary" onclick="window.CxcFeature?.abrirModalDevolucionSaldoFavor?.()" ${(cliente.saldo_a_favor_usd || 0) > 0.001 ? '' : 'disabled'}>
+                    Devolver saldo a favor
+                </button>
+            </div>
+        `;
+
+        return [clienteHtml, cobrarHtml, favorHtml, accionesHtml].join('');
+    },
+
+    obtenerModalDevolucionSaldoFavor() {
+        if (!window.SVModal) return null;
+        if (this._modalDevolucionSaldoFavor) return this._modalDevolucionSaldoFavor;
+
+        this._modalDevolucionSaldoFavor = window.SVModal.enhance('modalDevolucionSaldoFavor', {
+            dismissible: true,
+            backdropDismissible: true,
+            escapeDismissible: true,
+            onClose: () => {
+                this._devolviendoSaldoFavor = false;
+                const btnGuardar = document.getElementById('btnGuardarDevolucionSaldoFavor');
+                if (btnGuardar) {
+                    btnGuardar.disabled = false;
+                    btnGuardar.textContent = 'Registrar devolucion';
+                }
+            }
+        });
+
+        return this._modalDevolucionSaldoFavor;
+    },
+
+    abrirModalDevolucionSaldoFavor() {
+        const estado = window.AppState.estadoCuentaClienteActual;
+        const cliente = estado?.cliente;
+        if (!cliente) return;
+
+        const saldoDisponible = parseFloat(cliente.saldo_a_favor_usd || 0) || 0;
+        if (saldoDisponible <= 0.001) {
+            window.mostrarNotificacion('❌ Este cliente no tiene saldo a favor para devolver.');
+            return;
+        }
+
+        document.getElementById('devolucionSaldoClienteId').value = String(cliente.id);
+        document.getElementById('devolucionSaldoClienteNombre').textContent = cliente.nombre || 'Cliente';
+        document.getElementById('devolucionSaldoDisponible').textContent = `$${saldoDisponible.toFixed(2)}`;
+        document.getElementById('devolucionSaldoMonto').value = saldoDisponible.toFixed(2);
+        document.getElementById('devolucionSaldoMedio').value = 'Efectivo';
+        document.getElementById('devolucionSaldoObservacion').value = `Devolucion de saldo a favor al cliente ${cliente.nombre || ''}`;
+
+        const modal = this.obtenerModalDevolucionSaldoFavor();
+        if (modal) {
+            modal.open().focusFirstField();
+            return;
+        }
+        document.getElementById('modalDevolucionSaldoFavor').style.display = 'block';
+    },
+
+    cerrarModalDevolucionSaldoFavor() {
+        const modal = this.obtenerModalDevolucionSaldoFavor();
+        if (modal) {
+            modal.close();
+            return;
+        }
+        document.getElementById('modalDevolucionSaldoFavor').style.display = 'none';
+    },
+
+    async guardarDevolucionSaldoFavorDesdeModal() {
+        const estado = window.AppState.estadoCuentaClienteActual;
+        const cliente = estado?.cliente;
+        const clienteId = parseInt(document.getElementById('devolucionSaldoClienteId')?.value || '0', 10);
+        if (!cliente || !clienteId) return;
+        if (this._devolviendoSaldoFavor) return;
+
+        const saldoDisponible = parseFloat(cliente.saldo_a_favor_usd || 0) || 0;
+        const monto = parseFloat(String(document.getElementById('devolucionSaldoMonto')?.value || '0').replace(',', '.')) || 0;
+        const medio = (document.getElementById('devolucionSaldoMedio')?.value || '').trim();
+        const observacion = (document.getElementById('devolucionSaldoObservacion')?.value || '').trim();
+
+        if (!medio) {
+            window.mostrarNotificacion('❌ Debe indicar un medio de devolucion.');
+            return;
+        }
+        if (!Number.isFinite(monto) || monto <= 0) {
+            window.mostrarNotificacion('❌ Debe indicar un monto valido.');
+            return;
+        }
+        if (monto > saldoDisponible + 0.001) {
+            window.mostrarNotificacion('❌ El monto excede el saldo a favor disponible.');
+            return;
+        }
+
+        const btnGuardar = document.getElementById('btnGuardarDevolucionSaldoFavor');
+        this._devolviendoSaldoFavor = true;
+        if (btnGuardar) {
+            btnGuardar.disabled = true;
+            btnGuardar.textContent = 'Guardando...';
+        }
+
+        try {
+            await window.ApiService.devolverSaldoFavorCliente(clienteId, {
+                monto_usd: Number(monto.toFixed(2)),
+                medio,
+                observacion,
+            });
+
+            window.mostrarNotificacion('✅ Devolucion registrada');
+            this.cerrarModalDevolucionSaldoFavor();
+            await this.cargarClientesSeguras();
+            await this.cargarEstadoCuentaClienteSeleccionado(clienteId);
+            await this.cargarDatosVentasSeguras();
+        } catch (e) {
+            window.mostrarNotificacion(`❌ ${e.message || 'No se pudo registrar la devolucion'}`);
+        } finally {
+            this._devolviendoSaldoFavor = false;
+            if (btnGuardar) {
+                btnGuardar.disabled = false;
+                btnGuardar.textContent = 'Registrar devolucion';
+            }
+        }
+    },
+
+    async devolverSaldoFavorClientePrompt() {
+        return this.abrirModalDevolucionSaldoFavor();
     },
 
     renderCuentaCxc(cuenta) {
@@ -433,6 +559,15 @@ const CxcFeature = {
     async guardarAbonoCuentaDesdeModal() {
         const cuenta = this.obtenerCuentaAbonoActual();
         if (!cuenta) return;
+        if (this._guardandoAbonoCuenta) return;
+
+        const btnGuardar = document.getElementById('btnGuardarAbonoCuenta');
+        const textoOriginal = btnGuardar?.textContent || '💾 Guardar Abono';
+        this._guardandoAbonoCuenta = true;
+        if (btnGuardar) {
+            btnGuardar.disabled = true;
+            btnGuardar.textContent = 'Guardando...';
+        }
 
         const usarSaldoFavor = document.getElementById('abonoUsarSaldoFavor')?.checked;
 
@@ -488,6 +623,12 @@ const CxcFeature = {
             await this.cargarDatosVentasSeguras();
         } catch (e) {
             window.mostrarNotificacion(`❌ ${e.message || 'No se pudo registrar el abono'}`);
+        } finally {
+            this._guardandoAbonoCuenta = false;
+            if (btnGuardar) {
+                btnGuardar.disabled = false;
+                btnGuardar.textContent = textoOriginal;
+            }
         }
     }
 };

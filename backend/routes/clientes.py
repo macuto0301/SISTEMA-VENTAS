@@ -10,8 +10,8 @@ from sqlalchemy import or_
 from werkzeug.datastructures import FileStorage
 from werkzeug.utils import secure_filename
 
-from auth_utils import require_roles
-from cuenta_corriente_utils import reconciliar_saldos_a_favor_cliente
+from auth_utils import get_current_user, require_roles
+from cuenta_corriente_utils import obtener_saldos_a_favor_disponibles, reconciliar_saldos_a_favor_cliente
 from database import db
 from models import Cliente, CuentaPorCobrar, MovimientoCuentaCliente
 from pagination import build_paginated_response, get_pagination_params, has_pagination_args
@@ -354,7 +354,7 @@ def get_estado_cuenta(cliente_id: int):
             })
 
     for movimiento in movimientos:
-        if movimiento.tipo_movimiento not in ('aplicacion_saldo_favor', 'aplicacion_saldo_favor_venta', 'saldo_a_favor'):
+        if movimiento.tipo_movimiento not in ('aplicacion_saldo_favor', 'aplicacion_saldo_favor_venta', 'saldo_a_favor', 'devolucion_saldo_favor'):
             continue
         referencia = movimiento.movimiento_referencia
         numero_venta_origen = None
@@ -373,9 +373,11 @@ def get_estado_cuenta(cliente_id: int):
             elif movimiento.venta:
                 numero_destino = movimiento.venta.numero_venta or movimiento.venta_id
             descripcion = f'Saldo a favor aplicado desde venta #{numero_venta_origen}' + (f' a factura #{numero_destino}' if numero_destino else '')
+        elif movimiento.tipo_movimiento == 'devolucion_saldo_favor':
+            descripcion = movimiento.descripcion or 'Devolucion de saldo a favor al cliente'
 
         transacciones.append({
-            'tipo': 'SALDO' if movimiento.tipo_movimiento == 'saldo_a_favor' else 'APLICACION',
+            'tipo': 'SALDO' if movimiento.tipo_movimiento == 'saldo_a_favor' else ('DEVOLUCION' if movimiento.tipo_movimiento == 'devolucion_saldo_favor' else 'APLICACION'),
             'fecha': movimiento.fecha.strftime('%d/%m/%Y %H:%M') if movimiento.fecha else '',
             'cuenta_id': movimiento.cuenta_por_cobrar_id,
             'venta_id': movimiento.venta_id,
@@ -395,3 +397,71 @@ def get_estado_cuenta(cliente_id: int):
         'cuentas_por_cobrar': cuentas_payload,
         'transacciones': transacciones,
     })
+
+
+@clientes_bp.route('/<int:cliente_id>/devolver-saldo-favor', methods=['POST'])
+@require_roles('admin', 'cajero')
+def devolver_saldo_a_favor(cliente_id: int):
+    cliente = Cliente.query.get_or_404(cliente_id)
+    data = request.get_json() or {}
+    current_user = get_current_user()
+
+    monto_usd = round(float(data.get('monto_usd') or 0), 2)
+    medio = (data.get('medio') or '').strip() or 'Efectivo'
+    observacion = (data.get('observacion') or '').strip()
+
+    if monto_usd <= 0:
+        return jsonify({'error': 'El monto a devolver debe ser mayor a cero'}), 400
+
+    saldo_actual = round(cliente.saldo_a_favor_usd or 0.0, 2)
+    if saldo_actual <= 0.001:
+        return jsonify({'error': 'El cliente no tiene saldo a favor para devolver'}), 400
+    if monto_usd > saldo_actual + 0.001:
+        return jsonify({'error': 'El monto excede el saldo a favor disponible'}), 400
+
+    try:
+        restante_por_devolver = monto_usd
+        fuentes_saldo = obtener_saldos_a_favor_disponibles(cliente.id)
+
+        for fuente in fuentes_saldo:
+            if restante_por_devolver <= 0.001:
+                break
+            disponible = round(fuente.saldo_disponible_usd or 0.0, 2)
+            if disponible <= 0.001:
+                continue
+
+            monto_desde_fuente = round(min(disponible, restante_por_devolver), 2)
+            fuente.saldo_disponible_usd = round(disponible - monto_desde_fuente, 2)
+
+            movimiento = MovimientoCuentaCliente(
+                cliente_id=cliente.id,
+                venta_id=fuente.venta_id,
+                movimiento_referencia_id=fuente.id,
+                tipo_movimiento='devolucion_saldo_favor',
+                monto_usd=monto_desde_fuente,
+                saldo_disponible_usd=0.0,
+                moneda_origen='USD',
+                monto_origen=monto_desde_fuente,
+                tasa_usada=1.0,
+                medio=medio,
+                descripcion=observacion or 'Devolucion de saldo a favor al cliente',
+                usuario_username=current_user.username if current_user else None,
+            )
+            db.session.add(movimiento)
+            restante_por_devolver = round(restante_por_devolver - monto_desde_fuente, 2)
+
+        if restante_por_devolver > 0.001:
+            db.session.rollback()
+            return jsonify({'error': 'No se pudo rastrear el origen del saldo a favor para la devolucion'}), 400
+
+        cliente.saldo_a_favor_usd = round(max(0.0, saldo_actual - monto_usd), 2)
+        db.session.commit()
+
+        return jsonify({
+            'mensaje': 'Devolucion de saldo a favor registrada con exito',
+            'cliente': serializar_cliente(cliente),
+            'monto_devuelto_usd': monto_usd,
+        }), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 400
