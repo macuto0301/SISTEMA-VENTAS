@@ -9,8 +9,8 @@ from sqlalchemy import or_
 from werkzeug.datastructures import FileStorage
 from werkzeug.utils import secure_filename
 
-from auth_utils import require_roles
-from models import Producto, HistorialPrecio
+from auth_utils import get_current_user, require_roles
+from models import Compra, DetalleCompra, DetalleVenta, HistorialPrecio, MovimientoInventario, Producto, Venta
 from database import db
 from pagination import build_paginated_response, get_pagination_params, has_pagination_args
 
@@ -99,6 +99,12 @@ def parse_float(value, default: float = 0.0) -> float:
     if value in (None, ''):
         return default
     return float(value)
+
+
+def parse_int(value, default: int = 0) -> int:
+    if value in (None, ''):
+        return default
+    return int(float(value))
 
 
 def extract_price_values(data: dict, producto: Producto | None = None) -> dict:
@@ -435,3 +441,206 @@ def get_historial_precios(id):
         'motivo': h.motivo,
         'fecha': h.fecha_cambio.strftime('%d/%m/%Y %H:%M')
     } for h in historial])
+
+
+@productos_bp.route('/<int:id>/ajustar-stock', methods=['POST'])
+@require_roles('admin')
+def ajustar_stock_producto(id):
+    data = request.get_json() or {}
+    producto = Producto.query.get_or_404(id)
+
+    if not producto.maneja_existencia:
+        return jsonify({'error': 'Este item no maneja existencia'}), 400
+
+    tipo_movimiento = str(data.get('tipo_movimiento') or data.get('tipo') or '').strip().lower()
+    if tipo_movimiento not in {'entrada', 'salida'}:
+        return jsonify({'error': 'Tipo de movimiento invalido. Usa entrada o salida'}), 400
+
+    try:
+        cantidad = parse_int(data.get('cantidad'), 0)
+    except Exception:
+        return jsonify({'error': 'La cantidad debe ser numerica'}), 400
+
+    if cantidad <= 0:
+        return jsonify({'error': 'La cantidad debe ser mayor a cero'}), 400
+
+    motivo = str(data.get('motivo') or '').strip()
+    observacion = str(data.get('observacion') or '').strip() or None
+
+    if not motivo:
+        return jsonify({'error': 'El motivo es obligatorio'}), 400
+
+    stock_anterior = int(producto.cantidad or 0)
+    delta = cantidad if tipo_movimiento == 'entrada' else -cantidad
+    stock_nuevo = stock_anterior + delta
+
+    if stock_nuevo < 0:
+        return jsonify({'error': 'No hay suficiente stock para realizar el descargo'}), 400
+
+    current_user = get_current_user()
+
+    try:
+        producto.cantidad = stock_nuevo
+        movimiento = MovimientoInventario(
+            producto_id=producto.id,
+            tipo_movimiento=tipo_movimiento,
+            cantidad=cantidad,
+            stock_anterior=stock_anterior,
+            stock_nuevo=stock_nuevo,
+            motivo=motivo,
+            observacion=observacion,
+            usuario_username=current_user.username if current_user else None,
+        )
+        db.session.add(movimiento)
+        db.session.commit()
+        return jsonify({
+            'mensaje': 'Stock actualizado',
+            'producto_id': producto.id,
+            'cantidad_anterior': stock_anterior,
+            'cantidad_nueva': stock_nuevo,
+            'movimiento': {
+                'id': movimiento.id,
+                'tipo_movimiento': movimiento.tipo_movimiento,
+                'cantidad': movimiento.cantidad,
+                'motivo': movimiento.motivo,
+                'observacion': movimiento.observacion,
+                'usuario_username': movimiento.usuario_username,
+                'fecha': movimiento.fecha.strftime('%d/%m/%Y %H:%M') if movimiento.fecha else ''
+            }
+        })
+    except Exception as exc:
+        db.session.rollback()
+        return jsonify({'error': str(exc)}), 400
+
+
+@productos_bp.route('/<int:id>/movimientos-stock', methods=['GET'])
+@require_roles('admin')
+def get_movimientos_stock_producto(id):
+    Producto.query.get_or_404(id)
+    movimientos = (
+        MovimientoInventario.query
+        .filter_by(producto_id=id)
+        .order_by(MovimientoInventario.fecha.desc())
+        .limit(100)
+        .all()
+    )
+    return jsonify([{
+        'id': mov.id,
+        'producto_id': mov.producto_id,
+        'tipo_movimiento': mov.tipo_movimiento,
+        'cantidad': mov.cantidad,
+        'stock_anterior': mov.stock_anterior,
+        'stock_nuevo': mov.stock_nuevo,
+        'motivo': mov.motivo,
+        'observacion': mov.observacion,
+        'usuario_username': mov.usuario_username,
+        'fecha': mov.fecha.strftime('%d/%m/%Y %H:%M') if mov.fecha else ''
+    } for mov in movimientos])
+
+
+@productos_bp.route('/<int:id>/historial-completo', methods=['GET'])
+@require_roles('admin')
+def get_historial_completo_producto(id):
+    import traceback
+    producto = Producto.query.get_or_404(id)
+    eventos = []
+
+    try:
+        # Compras: dc.compra está disponible vía relationship definido en DetalleCompra
+        detalles_compra = (
+            db.session.query(DetalleCompra, Compra)
+            .join(Compra, Compra.id == DetalleCompra.compra_id)
+            .filter(DetalleCompra.producto_id == id)
+            .all()
+        )
+        for dc, c in detalles_compra:
+            fecha_raw = c.fecha
+            fecha_dt = None
+            if fecha_raw and hasattr(fecha_raw, 'strftime'):
+                from datetime import datetime as _dt
+                fecha_dt = _dt(fecha_raw.year, fecha_raw.month, fecha_raw.day)
+            eventos.append({
+                'tipo': 'compra',
+                'fecha_iso': fecha_dt.isoformat() if fecha_dt else '',
+                'fecha': fecha_dt.strftime('%d/%m/%Y') if fecha_dt else '-',
+                'cantidad': dc.cantidad,
+                'referencia': f'Compra #{c.numero_compra or c.id}',
+                'referencia_id': c.id,
+                'detalle': f'Factura: {c.nro_factura or "-"}',
+                'proveedor': c.proveedor.nombre if c.proveedor else '-',
+                'precio_unitario': dc.precio_unitario,
+                'subtotal': dc.subtotal,
+                'usuario': None,
+                'motivo': None,
+                'observacion': None,
+            })
+    except Exception:
+        print('historial-completo / compras:', traceback.format_exc())
+
+    try:
+        # Ventas: DetalleVenta no tiene relacion definida hacia Venta,
+        # por eso se usa tuple-join para obtener ambos objetos.
+        detalles_venta = (
+            db.session.query(DetalleVenta, Venta)
+            .join(Venta, Venta.id == DetalleVenta.venta_id)
+            .filter(DetalleVenta.producto_id == id)
+            .all()
+        )
+        for dv, v in detalles_venta:
+            fecha_dt = v.fecha
+            eventos.append({
+                'tipo': 'venta',
+                'fecha_iso': fecha_dt.isoformat() if fecha_dt else '',
+                'fecha': fecha_dt.strftime('%d/%m/%Y %H:%M') if fecha_dt else '-',
+                'cantidad': dv.cantidad,
+                'referencia': f'Venta #{v.numero_venta or v.id}',
+                'referencia_id': v.id,
+                'detalle': f'Cliente: {v.cliente or "General"}',
+                'proveedor': None,
+                'precio_unitario': dv.precio_unitario,
+                'subtotal': dv.subtotal,
+                'usuario': v.usuario_username,
+                'motivo': None,
+                'observacion': None,
+            })
+    except Exception:
+        print('historial-completo / ventas:', traceback.format_exc())
+
+    try:
+        movimientos = (
+            MovimientoInventario.query
+            .filter_by(producto_id=id)
+            .all()
+        )
+        for mov in movimientos:
+            fecha_dt = mov.fecha
+            tipo_label = 'entrada_manual' if mov.tipo_movimiento == 'entrada' else 'salida_manual'
+            eventos.append({
+                'tipo': tipo_label,
+                'fecha_iso': fecha_dt.isoformat() if fecha_dt else '',
+                'fecha': fecha_dt.strftime('%d/%m/%Y %H:%M') if fecha_dt else '-',
+                'cantidad': mov.cantidad,
+                'referencia': f'Ajuste #{mov.id}',
+                'referencia_id': mov.id,
+                'detalle': f'{mov.stock_anterior} -> {mov.stock_nuevo} uds.',
+                'proveedor': None,
+                'precio_unitario': None,
+                'subtotal': None,
+                'usuario': mov.usuario_username,
+                'motivo': mov.motivo,
+                'observacion': mov.observacion,
+            })
+    except Exception:
+        print('historial-completo / movimientos:', traceback.format_exc())
+
+    eventos.sort(key=lambda e: e.get('fecha_iso') or '', reverse=True)
+
+    return jsonify({
+        'producto': {
+            'id': producto.id,
+            'codigo': producto.codigo,
+            'nombre': producto.nombre,
+            'cantidad': producto.cantidad,
+        },
+        'eventos': eventos
+    })

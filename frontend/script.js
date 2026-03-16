@@ -415,7 +415,31 @@ function editarProducto(index) {
     return window.ProductosFeature?.editarProducto(index);
 }
 
+function ajustarStockProducto(index, tipoMovimiento = 'entrada') {
+    return window.ProductosFeature?.abrirModalAjusteStock(index, tipoMovimiento);
+}
 
+function cerrarModalAjusteStock() {
+    return window.ProductosFeature?.cerrarModalAjusteStock();
+}
+
+function confirmarAjusteStock() {
+    return window.ProductosFeature?.confirmarAjusteStock();
+}
+
+function abrirHistorialProducto(index) {
+    return window.ProductosFeature?.abrirHistorialProducto(index);
+}
+
+function cerrarModalHistorialProducto() {
+    return window.ProductosFeature?.cerrarModalHistorialProducto();
+}
+
+
+
+function verReciboDesdeHistorial(tipo, referencia_id) {
+    return window.ProductosFeature?.verReciboDesdeHistorial(tipo, referencia_id);
+}
 
 function cerrarModalProducto() {
     return window.ProductosFeature?.cerrarModalProducto();

@@ -586,3 +586,47 @@ def get_ventas():
         return jsonify(response)
 
     return jsonify(res)
+
+
+@ventas_bp.route('/<int:id>', methods=['GET'])
+@require_roles('admin', 'cajero')
+def get_venta_por_id(id):
+    v = Venta.query.get_or_404(id)
+    cantidades_devueltas = obtener_cantidades_devueltas(v.id)
+    detalles = DetalleVenta.query.filter_by(venta_id=v.id).all()
+    productos_list = [
+        serializar_detalle_venta(d, cantidades_devueltas.get(d.id, 0))
+        for d in detalles
+    ]
+    pagos = PagoVenta.query.filter_by(venta_id=v.id).all()
+    pagos_list = [{
+        'medio': p.medio,
+        'monto': p.monto,
+        'moneda': p.moneda,
+        'valor_reconocido': p.valor_reconocido_usd,
+        'descuento_aplicado': p.descuento_aplicado,
+    } for p in pagos]
+    devoluciones = DevolucionVenta.query.filter_by(venta_id=v.id).order_by(DevolucionVenta.fecha.desc()).all()
+    devoluciones_list = [serializar_devolucion(d) for d in devoluciones]
+    return jsonify({
+        'id': v.id,
+        'numero_venta': v.numero_venta or v.id,
+        'fecha': v.fecha.strftime('%d/%m/%Y %H:%M') if v.fecha else '-',
+        'cliente_id': v.cliente_id,
+        'cliente': v.cliente,
+        'usuario_username': v.usuario_username,
+        'usuario_rol': v.usuario_rol,
+        'tipo_venta': v.tipo_venta or 'contado',
+        'total_dolares': v.total_dolares,
+        'total_bolivares': v.total_bolivares,
+        'descuento_dolares': v.descuento_total,
+        'saldo_pendiente_usd': round(v.saldo_pendiente_usd or 0.0, 2),
+        'saldo_a_favor_generado_usd': round(v.saldo_a_favor_generado_usd or 0.0, 2),
+        'productos': productos_list,
+        'pagos': pagos_list,
+        'vueltos_entregados': v.vuelto_entregado or [],
+        'devoluciones': devoluciones_list,
+        'total_devuelto_dolares': round(sum(d.total_reintegrado_dolares for d in devoluciones), 2),
+        'total_devuelto_bolivares': round(sum(d.total_reintegrado_bolivares for d in devoluciones), 2),
+        'cantidad_items_devueltos': sum(det.get('cantidad', 0) for d in devoluciones_list for det in d['detalles']),
+    })

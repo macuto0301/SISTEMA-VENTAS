@@ -427,7 +427,28 @@ def create_app():
 
             db.session.execute(text("UPDATE usuario SET rol='admin' WHERE rol IS NULL OR rol = ''"))
             db.session.commit()
-                 
+
+            # Tabla movimiento_inventario (ajustes manuales de stock)
+            result = db.session.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name='movimiento_inventario'"))
+            columnas_mov_inv = [row[0] for row in result.fetchall()]
+            if not columnas_mov_inv:
+                db.session.execute(text("""
+                    CREATE TABLE IF NOT EXISTS movimiento_inventario (
+                        id SERIAL PRIMARY KEY,
+                        producto_id INTEGER NOT NULL REFERENCES producto(id),
+                        tipo_movimiento VARCHAR(20) NOT NULL,
+                        cantidad INTEGER NOT NULL,
+                        stock_anterior INTEGER NOT NULL DEFAULT 0,
+                        stock_nuevo INTEGER NOT NULL DEFAULT 0,
+                        motivo VARCHAR(100) NOT NULL,
+                        observacion TEXT,
+                        usuario_username VARCHAR(50),
+                        fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """))
+                db.session.commit()
+                print("Tabla movimiento_inventario creada")
+
         except Exception as e:
             print(f"Error verificando columnas: {e}")
         

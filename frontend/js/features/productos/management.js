@@ -1,3 +1,22 @@
+const MOTIVOS_ENTRADA = [
+    'Ajuste manual',
+    'Inventario inicial',
+    'Produccion propia',
+    'Devolucion de proveedor',
+    'Donacion',
+    'Otro'
+];
+
+const MOTIVOS_SALIDA = [
+    'Merma por vencimiento',
+    'Dano o deterioro',
+    'Rotura',
+    'Consumo interno',
+    'Muestra o regalo',
+    'Perdida',
+    'Otro'
+];
+
 const ProductosFeature = {
     _productModal: null,
     _priceModal: null,
@@ -8,6 +27,12 @@ const ProductosFeature = {
     _priceActions: null,
     _priceListActions: null,
     _productSearchBox: null,
+    _ajusteStockModal: null,
+    _ajusteStockFields: null,
+    _ajusteStockActions: null,
+    _historialModal: null,
+    _historialEventos: [],
+    _historialFiltroActivo: 'todos',
 
     inicializarComponentesProducto() {
         if (!this._productModal && window.SVModal) {
@@ -814,6 +839,174 @@ const ProductosFeature = {
         }
     },
 
+    ajustarStockProducto(index, tipoMovimiento = 'entrada') {
+        this.abrirModalAjusteStock(index, tipoMovimiento);
+    },
+
+    inicializarComponentesAjusteStock() {
+        if (!this._ajusteStockModal && window.SVModal) {
+            this._ajusteStockModal = window.SVModal.enhance('modalAjusteStock', {
+                closeSelector: '#btnCerrarModalAjusteStock',
+                backdropDismissible: false
+            });
+        }
+        if (!this._ajusteStockFields && window.SVField) {
+            this._ajusteStockFields = {
+                cantidad: window.SVField.enhance('ajusteStockCantidad'),
+                motivo: window.SVField.enhance('ajusteStockMotivo'),
+                motivoOtro: window.SVField.enhance('ajusteStockMotivoOtro'),
+                observacion: window.SVField.enhance('ajusteStockObservacion')
+            };
+        }
+        if (!this._ajusteStockActions && window.SVButtonGroup) {
+            this._ajusteStockActions = window.SVButtonGroup.enhance(
+                document.getElementById('ajusteStockFormActions')
+            );
+        }
+    },
+
+    abrirModalAjusteStock(index, tipoMovimiento = 'entrada') {
+        this.inicializarComponentesAjusteStock();
+        const producto = window.productos[index];
+        if (!producto?.id) {
+            window.mostrarNotificacion('⚠️ El producto no existe en el servidor');
+            return;
+        }
+        if (!this.productoManejaExistencia(producto)) {
+            window.mostrarNotificacion('⚠️ Este item no maneja existencia');
+            return;
+        }
+
+        document.getElementById('ajusteStockProductoId').value = producto.id;
+        document.getElementById('ajusteStockCacheIndex').value = index;
+        document.getElementById('ajusteStockNombreProducto').textContent = producto.nombre;
+        document.getElementById('ajusteStockCodigoProducto').textContent = producto.codigo || '-';
+        document.getElementById('ajusteStockCantidadActual').textContent = Number(producto.cantidad || 0);
+
+        this._ajusteStockFields?.cantidad?.setValue('1');
+        this._ajusteStockFields?.cantidad?.clearError?.();
+        this._ajusteStockFields?.observacion?.setValue('');
+        document.getElementById('ajusteStockObservacion').value = '';
+        document.getElementById('ajusteStockMotivoOtroGroup').style.display = 'none';
+        this._ajusteStockActions?.setLoading('btnConfirmarAjusteStock', false);
+
+        this.seleccionarTipoAjusteStock(String(tipoMovimiento || 'entrada').toLowerCase() === 'salida' ? 'salida' : 'entrada');
+        this._ajusteStockModal?.open()?.focusFirstField();
+    },
+
+    seleccionarTipoAjusteStock(tipo) {
+        const tipoNorm = tipo === 'salida' ? 'salida' : 'entrada';
+        document.getElementById('ajusteStockTipo').value = tipoNorm;
+
+        const btnEntrada = document.getElementById('btnAjusteTipoEntrada');
+        const btnSalida = document.getElementById('btnAjusteTipoSalida');
+        if (btnEntrada && btnSalida) {
+            if (tipoNorm === 'entrada') {
+                btnEntrada.style.border = '2px solid #16a34a';
+                btnEntrada.style.background = '#f0fdf4';
+                btnEntrada.style.color = '#15803d';
+                btnSalida.style.border = '2px solid #e5e7eb';
+                btnSalida.style.background = '#fff';
+                btnSalida.style.color = '#374151';
+            } else {
+                btnSalida.style.border = '2px solid #dc2626';
+                btnSalida.style.background = '#fef2f2';
+                btnSalida.style.color = '#dc2626';
+                btnEntrada.style.border = '2px solid #e5e7eb';
+                btnEntrada.style.background = '#fff';
+                btnEntrada.style.color = '#374151';
+            }
+        }
+
+        const tituloEl = document.getElementById('tituloModalAjusteStock');
+        if (tituloEl) tituloEl.textContent = tipoNorm === 'entrada' ? 'Carga de Stock' : 'Descargo de Stock';
+
+        const motivos = tipoNorm === 'entrada' ? MOTIVOS_ENTRADA : MOTIVOS_SALIDA;
+        const select = document.getElementById('ajusteStockMotivo');
+        if (select) {
+            select.innerHTML = motivos.map(m => `<option value="${this.escaparHtml(m)}">${this.escaparHtml(m)}</option>`).join('');
+        }
+        document.getElementById('ajusteStockMotivoOtroGroup').style.display = 'none';
+        this._ajusteStockFields?.motivoOtro?.clearError?.();
+    },
+
+    manejarMotivoAjusteStock() {
+        const select = document.getElementById('ajusteStockMotivo');
+        const otroGroup = document.getElementById('ajusteStockMotivoOtroGroup');
+        if (!select || !otroGroup) return;
+        const esOtro = select.value === 'Otro';
+        otroGroup.style.display = esOtro ? '' : 'none';
+        if (!esOtro) {
+            this._ajusteStockFields?.motivoOtro?.setValue('');
+            this._ajusteStockFields?.motivoOtro?.clearError?.();
+        }
+    },
+
+    cerrarModalAjusteStock() {
+        this.inicializarComponentesAjusteStock();
+        this._ajusteStockActions?.setLoading('btnConfirmarAjusteStock', false);
+        this._ajusteStockModal?.close();
+    },
+
+    async confirmarAjusteStock() {
+        this.inicializarComponentesAjusteStock();
+
+        const productoId = Number(document.getElementById('ajusteStockProductoId').value);
+        const tipo = document.getElementById('ajusteStockTipo').value || 'entrada';
+        const cantidadVal = document.getElementById('ajusteStockCantidad').value;
+        const cantidad = Math.floor(Number(cantidadVal));
+        const motivoSelect = document.getElementById('ajusteStockMotivo').value;
+        const motivoOtro = (document.getElementById('ajusteStockMotivoOtro')?.value || '').trim();
+        const motivo = motivoSelect === 'Otro' ? motivoOtro : motivoSelect;
+        const observacion = (document.getElementById('ajusteStockObservacion')?.value || '').trim();
+
+        this._ajusteStockFields?.cantidad?.clearError?.();
+        this._ajusteStockFields?.motivoOtro?.clearError?.();
+
+        if (!Number.isFinite(cantidad) || cantidad <= 0) {
+            this._ajusteStockFields?.cantidad?.setError('La cantidad debe ser mayor a cero').focus();
+            return;
+        }
+        if (!motivo) {
+            if (motivoSelect === 'Otro') {
+                this._ajusteStockFields?.motivoOtro?.setError('Especifica el motivo').focus();
+            }
+            return;
+        }
+
+        this._ajusteStockActions?.setLoading('btnConfirmarAjusteStock', true, 'Guardando...');
+        this._ajusteStockModal?.setBusy?.(true, 'Registrando ajuste...');
+
+        try {
+            const apiBase = this.getApiBase();
+            const res = await fetch(`${apiBase}/productos/${productoId}/ajustar-stock`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', ...this.getAuthHeaders() },
+                body: JSON.stringify({ tipo_movimiento: tipo, cantidad, motivo, observacion })
+            });
+
+            if (!res.ok) {
+                const err = await res.json().catch(() => null);
+                window.mostrarNotificacion(`⚠️ ${err?.error || 'No se pudo ajustar el stock'}`);
+                this._ajusteStockActions?.setLoading('btnConfirmarAjusteStock', false);
+                this._ajusteStockModal?.setBusy?.(false);
+                return;
+            }
+
+            const data = await res.json();
+            this.cerrarModalAjusteStock();
+            await this.cargarProductos();
+            window.mostrarNotificacion(
+                `✅ Stock actualizado: ${data?.cantidad_anterior ?? '-'} → ${data?.cantidad_nueva ?? '-'} unidades`
+            );
+        } catch (error) {
+            console.error('No se pudo ajustar el stock', error);
+            window.mostrarNotificacion('⚠️ No se pudo ajustar el stock');
+            this._ajusteStockActions?.setLoading('btnConfirmarAjusteStock', false);
+            this._ajusteStockModal?.setBusy?.(false);
+        }
+    },
+
     mostrarProductos(productosAMostrar = null) {
         this.inicializarComponentesProducto();
         const grid = document.getElementById('productosGrid');
@@ -977,6 +1170,11 @@ const ProductosFeature = {
                     render: row => row.__cacheIndex < 0 ? '-' : `
                         <div style="display: flex; align-items: center; justify-content: center; gap: 6px; flex-wrap: nowrap;">
                             <button onclick="agregarAlCarrito(${row.__cacheIndex})" class="btn-small" style="background: #2563eb; color: white; min-height: 30px; padding: 4px 8px; font-size: 12px; border-radius: 10px;" title="Agregar al carrito">🛒</button>
+                            ${this.productoManejaExistencia(row)
+                                ? `<button onclick="ajustarStockProducto(${row.__cacheIndex}, 'entrada')" class="btn-small" style="background: #16a34a; color: white; min-height: 30px; padding: 4px 8px; font-size: 12px; border-radius: 10px;" title="Carga manual de stock">📥</button>
+                                   <button onclick="ajustarStockProducto(${row.__cacheIndex}, 'salida')" class="btn-small" style="background: #ef4444; color: white; min-height: 30px; padding: 4px 8px; font-size: 12px; border-radius: 10px;" title="Descargo por merma o dano">📤</button>`
+                                : ''}
+                            <button onclick="abrirHistorialProducto(${row.__cacheIndex})" class="btn-small" style="background: #7c3aed; color: white; min-height: 30px; padding: 4px 8px; font-size: 12px; border-radius: 10px;" title="Ver historial del producto">📅</button>
                             <button onclick="editarProducto(${row.__cacheIndex})" class="btn-small" style="background: #f59e0b; color: white; min-height: 30px; padding: 4px 8px; font-size: 12px; border-radius: 10px;" title="Editar producto">✏️</button>
                             <button onclick="eliminarProducto(${row.__cacheIndex})" class="btn-small" style="background: #dc2626; color: white; min-height: 30px; padding: 4px 8px; font-size: 12px; border-radius: 10px;" title="Eliminar producto">🗑️</button>
                         </div>
@@ -1150,6 +1348,188 @@ const ProductosFeature = {
         this._productActions?.setLoading('btnGuardarProducto', false);
         this._productModal?.close();
         this.cerrarModalPreciosProducto();
+    },
+
+    // ─── Historial completo del producto ───────────────────────────────
+
+    inicializarComponentesHistorialProducto() {
+        if (!this._historialModal && window.SVModal) {
+            this._historialModal = window.SVModal.enhance('modalHistorialProducto', {
+                closeSelector: '#btnCerrarModalHistorialProducto'
+            });
+        }
+    },
+
+    async abrirHistorialProducto(index) {
+        this.inicializarComponentesHistorialProducto();
+        const producto = window.productos[index];
+        if (!producto?.id) {
+            window.mostrarNotificacion('⚠️ El producto no existe en el servidor');
+            return;
+        }
+
+        document.getElementById('tituloModalHistorialProducto').textContent =
+            `Historial: ${producto.nombre}`;
+        document.getElementById('historialProductoCodigo').textContent = producto.codigo || '-';
+        document.getElementById('historialProductoStock').textContent = Number(producto.cantidad || 0);
+        document.getElementById('historialProductoLista').innerHTML =
+            '<div class="mensaje-vacio">Cargando historial...</div>';
+
+        this._historialEventos = [];
+        this._historialFiltroActivo = 'todos';
+        this._actualizarBotonesHistorial('todos');
+        this._historialModal?.open();
+
+        try {
+            const apiBase = this.getApiBase();
+            const res = await fetch(`${apiBase}/productos/${producto.id}/historial-completo`, {
+                headers: this.getAuthHeaders()
+            });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json();
+            this._historialEventos = data.eventos || [];
+            this.filtrarHistorialProducto('todos');
+        } catch (err) {
+            console.error('Error cargando historial', err);
+            document.getElementById('historialProductoLista').innerHTML =
+                '<div class="mensaje-vacio">⚠️ No se pudo cargar el historial</div>';
+        }
+    },
+
+    cerrarModalHistorialProducto() {
+        this.inicializarComponentesHistorialProducto();
+        this._historialModal?.close();
+    },
+
+    async verReciboDesdeHistorial(tipo, referencia_id) {
+        const apiBase = this.getApiBase();
+        const headers = this.getAuthHeaders();
+        if (tipo === 'compra') {
+            if (typeof window.verDetalleCompra === 'function') {
+                await window.verDetalleCompra(referencia_id);
+            }
+        } else if (tipo === 'venta') {
+            try {
+                const res = await fetch(`${apiBase}/ventas/${referencia_id}`, { headers });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const venta = await res.json();
+                window.VentasPostventaFeature?.verReciboCompleto(venta, venta.numero_venta);
+            } catch (err) {
+                console.error('Error cargando recibo de venta', err);
+                window.mostrarNotificacion?.('⚠️ No se pudo cargar el recibo de venta');
+            }
+        } else {
+            // entrada_manual o salida_manual
+            const ev = this._historialEventos.find(
+                e => e.referencia_id === referencia_id && (e.tipo === 'entrada_manual' || e.tipo === 'salida_manual')
+            );
+            if (!ev) return;
+            const esEntrada = ev.tipo === 'entrada_manual';
+            const color = esEntrada ? '#166534' : '#991b1b';
+            const titulo = esEntrada ? 'RECIBO DE CARGA' : 'RECIBO DE DESCARGO';
+            const icono = esEntrada ? '📥' : '📤';
+            const reciboHTML = `
+                <div style="background:white;padding:24px;border-radius:12px;max-width:340px;font-family:'Courier New',monospace;box-shadow:0 10px 40px rgba(0,0,0,0.2);">
+                    <div style="text-align:center;border-bottom:2px dashed #ccc;padding-bottom:12px;margin-bottom:12px;">
+                        <div style="font-size:2em;">${icono}</div>
+                        <div style="font-size:1.2em;font-weight:bold;color:${color};">${titulo}</div>
+                        <div style="font-size:0.85em;color:#555;margin-top:4px;">Ajuste #${referencia_id}</div>
+                    </div>
+                    <div style="font-size:0.9em;line-height:1.8;">
+                        <div><strong>Fecha:</strong> ${this.escaparHtml(ev.fecha)}</div>
+                        <div><strong>Cantidad:</strong> <span style="font-weight:bold;color:${color};">${esEntrada ? '+' : '-'}${ev.cantidad}</span></div>
+                        <div><strong>Stock anterior:</strong> ${this.escaparHtml(ev.detalle?.split('->')[0]?.trim() ?? '-')}</div>
+                        <div><strong>Stock nuevo:</strong> ${this.escaparHtml(ev.detalle?.split('->')[1]?.replace('uds.','')?.trim() ?? '-')}</div>
+                        <div><strong>Motivo:</strong> ${this.escaparHtml(ev.motivo || '-')}</div>
+                        ${ev.observacion ? `<div><strong>Observacion:</strong> ${this.escaparHtml(ev.observacion)}</div>` : ''}
+                        ${ev.usuario ? `<div><strong>Usuario:</strong> ${this.escaparHtml(ev.usuario)}</div>` : ''}
+                    </div>
+                    <div style="border-top:2px dashed #ccc;margin-top:14px;padding-top:12px;text-align:center;">
+                        <button id="btnCerrarReciboAjuste" style="padding:10px 24px;background:#6c757d;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:bold;">Cerrar</button>
+                    </div>
+                </div>`;
+            const overlay = document.createElement('div');
+            overlay.id = 'modalReciboAjuste';
+            overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);display:flex;justify-content:center;align-items:center;z-index:15000;overflow-y:auto;padding:20px;';
+            overlay.innerHTML = reciboHTML;
+            overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
+            document.body.appendChild(overlay);
+            overlay.querySelector('#btnCerrarReciboAjuste').onclick = () => overlay.remove();
+        }
+    },
+
+    filtrarHistorialProducto(filtro) {
+        this._historialFiltroActivo = filtro || 'todos';
+        this._actualizarBotonesHistorial(this._historialFiltroActivo);
+        const lista = filtro === 'todos'
+            ? this._historialEventos
+            : this._historialEventos.filter(e => e.tipo === filtro);
+        this._renderHistorialLista(lista);
+    },
+
+    _actualizarBotonesHistorial(filtroActivo) {
+        const contenedor = document.getElementById('historialFiltrosBotones');
+        if (!contenedor) return;
+        contenedor.querySelectorAll('button[data-filtro]').forEach(btn => {
+            const activo = btn.dataset.filtro === filtroActivo;
+            btn.style.background = activo ? '#1d4ed8' : '#fff';
+            btn.style.color = activo ? '#fff' : '#374151';
+            btn.style.border = activo ? 'none' : '1px solid #d1d5db';
+        });
+    },
+
+    _renderHistorialLista(eventos) {
+        const contenedor = document.getElementById('historialProductoLista');
+        if (!contenedor) return;
+
+        if (!eventos.length) {
+            contenedor.innerHTML = '<div class="mensaje-vacio">No hay registros para este filtro</div>';
+            return;
+        }
+
+        const CONFIG = {
+            compra:        { icono: '🛒', etiqueta: 'Compra',   delta: '+', color: '#166534', bg: '#f0fdf4', borde: '#bbf7d0' },
+            venta:         { icono: '💰', etiqueta: 'Venta',    delta: '−', color: '#7c2d12', bg: '#fff7ed', borde: '#fed7aa' },
+            entrada_manual:{ icono: '📥', etiqueta: 'Carga',    delta: '+', color: '#1e40af', bg: '#eff6ff', borde: '#bfdbfe' },
+            salida_manual: { icono: '📤', etiqueta: 'Descargo', delta: '−', color: '#991b1b', bg: '#fef2f2', borde: '#fecaca' },
+        };
+
+        contenedor.innerHTML = eventos.map(ev => {
+            const cfg = CONFIG[ev.tipo] || { icono: '📌', etiqueta: ev.tipo, delta: '', color: '#374151', bg: '#f9fafb', borde: '#e5e7eb' };
+            const cantidad = `<span style="font-weight:bold;color:${cfg.color}">${cfg.delta}${ev.cantidad ?? '-'}</span>`;
+            const lineas = [
+                ev.referencia,
+                ev.detalle,
+                ev.proveedor ? `Proveedor: ${this.escaparHtml(ev.proveedor)}` : null,
+                ev.motivo    ? `Motivo: ${this.escaparHtml(ev.motivo)}` : null,
+                ev.observacion ? `Obs: ${this.escaparHtml(ev.observacion)}` : null,
+                ev.usuario   ? `Usuario: ${this.escaparHtml(ev.usuario)}` : null,
+                ev.precio_unitario != null ? `P.Unit: $${Number(ev.precio_unitario).toFixed(2)}` : null,
+            ].filter(Boolean);
+
+            return `
+                <div style="display:flex;gap:12px;align-items:flex-start;padding:10px 12px;margin-bottom:8px;
+                    border-radius:10px;border:1px solid ${cfg.borde};background:${cfg.bg};">
+                    <div style="font-size:1.4em;flex-shrink:0;margin-top:2px;">${cfg.icono}</div>
+                    <div style="flex:1;min-width:0;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">
+                            <span style="font-weight:bold;color:${cfg.color};">${cfg.etiqueta}</span>
+                            <div style="display:flex;align-items:center;gap:6px;">
+                                <span style="font-size:11px;color:#6b7280;">${this.escaparHtml(ev.fecha)}</span>
+                                <button onclick="verReciboDesdeHistorial('${ev.tipo}', ${ev.referencia_id})"
+                                    style="padding:2px 8px;font-size:11px;background:#475569;color:white;border:none;border-radius:6px;cursor:pointer;"
+                                    title="Ver recibo">🧾 Ver</button>
+                            </div>
+                        </div>
+                        <div style="margin-top:4px;font-size:13px;">
+                            Cantidad: ${cantidad}
+                        </div>
+                        <div style="margin-top:4px;font-size:12px;color:#4b5563;">
+                            ${lineas.map(l => `<div>${this.escaparHtml(l)}</div>`).join('')}
+                        </div>
+                    </div>
+                </div>`;
+        }).join('');
     }
 };
 

@@ -465,7 +465,7 @@
                 <div class="form-group">
                     <label for="productoCantidad">Cantidad en Stock:</label>
                     <input type="number" id="productoCantidad" min="0" value="0" readonly disabled name="productoCantidad">
-                    <small style="display: block; margin-top: 4px; color: #666;">Los servicios no manejan stock. En productos, el stock se actualiza solo desde compras.</small>
+                    <small style="display: block; margin-top: 4px; color: #666;">Los servicios no manejan stock. En productos, el stock se actualiza desde compras o ajustes manuales (carga/descargo) en la tabla.</small>
                 </div>
 
                 <div class="form-group producto-precios-resumen-box">
@@ -1590,6 +1590,105 @@
         </div>
 
     </div> <!-- Cierre panelPrincipal -->
+
+    <!-- Modal Historial Completo del Producto -->
+    <div id="modalHistorialProducto" class="modal">
+        <div class="modal-content" style="max-width: 780px; max-height: 85vh; display: flex; flex-direction: column;">
+            <span id="btnCerrarModalHistorialProducto" class="close" onclick="cerrarModalHistorialProducto()">&times;</span>
+            <h2 id="tituloModalHistorialProducto" style="text-align: center; margin-bottom: 6px;">Historial del Producto</h2>
+            <div id="historialProductoInfoBar" style="background: #f8fafc; border-radius: 10px; padding: 12px 16px; margin-bottom: 14px; display: flex; gap: 24px; flex-wrap: wrap; border: 1px solid #e5e7eb;">
+                <div><small style="color: #6b7280;">Código</small><br><strong id="historialProductoCodigo">-</strong></div>
+                <div><small style="color: #6b7280;">Stock actual</small><br><strong id="historialProductoStock">0</strong></div>
+            </div>
+
+            <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px;" id="historialFiltrosBotones">
+                <button type="button" data-filtro="todos" onclick="window.ProductosFeature?.filtrarHistorialProducto?.('todos')"
+                    class="btn-small" style="border-radius: 20px; padding: 5px 14px; font-size: 12px; background: #1d4ed8; color: #fff; border: none;">Todos</button>
+                <button type="button" data-filtro="compra" onclick="window.ProductosFeature?.filtrarHistorialProducto?.('compra')"
+                    class="btn-small" style="border-radius: 20px; padding: 5px 14px; font-size: 12px; background: #fff; color: #374151; border: 1px solid #d1d5db;">🛒 Compras</button>
+                <button type="button" data-filtro="venta" onclick="window.ProductosFeature?.filtrarHistorialProducto?.('venta')"
+                    class="btn-small" style="border-radius: 20px; padding: 5px 14px; font-size: 12px; background: #fff; color: #374151; border: 1px solid #d1d5db;">💰 Ventas</button>
+                <button type="button" data-filtro="entrada_manual" onclick="window.ProductosFeature?.filtrarHistorialProducto?.('entrada_manual')"
+                    class="btn-small" style="border-radius: 20px; padding: 5px 14px; font-size: 12px; background: #fff; color: #374151; border: 1px solid #d1d5db;">📥 Cargas</button>
+                <button type="button" data-filtro="salida_manual" onclick="window.ProductosFeature?.filtrarHistorialProducto?.('salida_manual')"
+                    class="btn-small" style="border-radius: 20px; padding: 5px 14px; font-size: 12px; background: #fff; color: #374151; border: 1px solid #d1d5db;">📤 Descargas</button>
+            </div>
+
+            <div id="historialProductoLista" style="overflow-y: auto; flex: 1; min-height: 0; padding-right: 4px;">
+                <div class="mensaje-vacio">Cargando historial...</div>
+            </div>
+
+            <div style="text-align: right; border-top: 1px solid #eee; padding-top: 14px; margin-top: 10px;">
+                <button type="button" class="btn-secondary" onclick="cerrarModalHistorialProducto()">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Ajuste de Stock Manual -->
+    <div id="modalAjusteStock" class="modal">
+        <div class="modal-content" style="max-width: 500px;">
+            <span id="btnCerrarModalAjusteStock" class="close" onclick="cerrarModalAjusteStock()">&times;</span>
+            <h2 id="tituloModalAjusteStock" style="text-align: center; margin-bottom: 18px;">Ajuste de Stock</h2>
+
+            <input type="hidden" id="ajusteStockProductoId" name="ajusteStockProductoId">
+            <input type="hidden" id="ajusteStockCacheIndex" name="ajusteStockCacheIndex">
+            <input type="hidden" id="ajusteStockTipo" value="entrada">
+
+            <div id="ajusteStockInfoProducto" style="background: #f8fafc; border-radius: 10px; padding: 14px; margin-bottom: 16px; border: 1px solid #e5e7eb;">
+                <div id="ajusteStockNombreProducto" style="font-weight: bold; font-size: 1.05em; margin-bottom: 8px;"></div>
+                <div style="display: flex; gap: 24px;">
+                    <div><small style="color: #6b7280;">Código</small><br><strong id="ajusteStockCodigoProducto">-</strong></div>
+                    <div><small style="color: #6b7280;">Stock actual</small><br><strong id="ajusteStockCantidadActual" style="font-size: 1.1em;">0</strong></div>
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 18px;">
+                <button id="btnAjusteTipoEntrada" type="button"
+                    onclick="window.ProductosFeature?.seleccionarTipoAjusteStock?.('entrada')"
+                    style="padding: 13px 10px; border-radius: 10px; border: 2px solid #16a34a; background: #f0fdf4; color: #15803d; font-weight: bold; cursor: pointer; text-align: center;">
+                    📥 Carga
+                    <small style="display: block; font-weight: normal; color: #4b5563; margin-top: 3px; font-size: 11px;">Inventario, produccion, etc.</small>
+                </button>
+                <button id="btnAjusteTipoSalida" type="button"
+                    onclick="window.ProductosFeature?.seleccionarTipoAjusteStock?.('salida')"
+                    style="padding: 13px 10px; border-radius: 10px; border: 2px solid #e5e7eb; background: #fff; color: #374151; font-weight: bold; cursor: pointer; text-align: center;">
+                    📤 Descargo
+                    <small style="display: block; font-weight: normal; color: #4b5563; margin-top: 3px; font-size: 11px;">Merma, daño, vencimiento, etc.</small>
+                </button>
+            </div>
+
+            <div class="form-group">
+                <label for="ajusteStockCantidad">Cantidad:</label>
+                <input type="number" id="ajusteStockCantidad" min="1" step="1" value="1"
+                    name="ajusteStockCantidad" placeholder="1">
+            </div>
+
+            <div class="form-group">
+                <label for="ajusteStockMotivo">Motivo:</label>
+                <select id="ajusteStockMotivo" name="ajusteStockMotivo"
+                    onchange="window.ProductosFeature?.manejarMotivoAjusteStock?.()">
+                </select>
+            </div>
+
+            <div class="form-group" id="ajusteStockMotivoOtroGroup" style="display: none;">
+                <label for="ajusteStockMotivoOtro">Especificar motivo:</label>
+                <input type="text" id="ajusteStockMotivoOtro" name="ajusteStockMotivoOtro"
+                    placeholder="Describe el motivo...">
+            </div>
+
+            <div class="form-group">
+                <label for="ajusteStockObservacion">Observacion (opcional):</label>
+                <textarea id="ajusteStockObservacion" rows="2" name="ajusteStockObservacion"
+                    placeholder="Informacion adicional..." style="resize: vertical;"></textarea>
+            </div>
+
+            <div class="form-actions" id="ajusteStockFormActions">
+                <button id="btnConfirmarAjusteStock" type="button" class="btn-primary" onclick="confirmarAjusteStock()">✅ Confirmar Ajuste</button>
+                <button id="btnCancelarAjusteStock" type="button" class="btn-secondary" onclick="cerrarModalAjusteStock()">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
 </body>
 
 </html>

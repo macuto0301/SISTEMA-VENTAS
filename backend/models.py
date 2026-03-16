@@ -110,6 +110,20 @@ class HistorialPrecio(db.Model):
     fecha_cambio = db.Column(db.DateTime, default=datetime.utcnow)
     producto = db.relationship('Producto', backref='historial_precios')
 
+
+class MovimientoInventario(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    producto_id = db.Column(db.Integer, db.ForeignKey('producto.id'), nullable=False)
+    tipo_movimiento = db.Column(db.String(20), nullable=False)  # entrada, salida
+    cantidad = db.Column(db.Integer, nullable=False)
+    stock_anterior = db.Column(db.Integer, nullable=False, default=0)
+    stock_nuevo = db.Column(db.Integer, nullable=False, default=0)
+    motivo = db.Column(db.String(100), nullable=False)
+    observacion = db.Column(db.Text)
+    usuario_username = db.Column(db.String(50))
+    fecha = db.Column(db.DateTime, default=datetime.utcnow)
+    producto = db.relationship('Producto', backref='movimientos_inventario')
+
 class Venta(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     numero_venta = db.Column(db.Integer, unique=True, index=True)

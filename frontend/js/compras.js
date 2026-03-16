@@ -954,7 +954,11 @@ async function verDetalleCompra(id) {
             </table>
         `;
         
-        document.getElementById('modalDetalleCompra').style.display = 'block';
+        const modalDetalleCompra = document.getElementById('modalDetalleCompra');
+        if (modalDetalleCompra) {
+            modalDetalleCompra.style.zIndex = '13000';
+            modalDetalleCompra.style.display = 'block';
+        }
     } catch (e) {
         console.error('Error al cargar detalle:', e);
         alert('Error al cargar los detalles de la compra');
@@ -962,7 +966,10 @@ async function verDetalleCompra(id) {
 }
 
 function cerrarModalDetalleCompra() {
-    document.getElementById('modalDetalleCompra').style.display = 'none';
+    const modalDetalleCompra = document.getElementById('modalDetalleCompra');
+    if (!modalDetalleCompra) return;
+    modalDetalleCompra.style.display = 'none';
+    modalDetalleCompra.style.zIndex = '';
 }
 
 async function marcarCompraPagada(id) {
