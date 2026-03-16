@@ -2257,6 +2257,7 @@ body.modo-cajero .venta-resumen-rapido {
 .carrito-col-codigo,
 .carrito-col-cantidad,
 .carrito-col-precio,
+.carrito-col-precio-bs,
 .carrito-col-total {
     white-space: nowrap;
 }
@@ -2297,7 +2298,7 @@ body.modo-cajero .venta-resumen-rapido {
 }
 
 .carrito-col-precio {
-    width: 76px;
+    width: 134px;
 }
 
 .carrito-col-total {
@@ -2307,6 +2308,25 @@ body.modo-cajero .venta-resumen-rapido {
 
 .carrito-cantidad-input {
     text-align: center;
+}
+
+.carrito-precio-input {
+    width: 100%;
+    min-width: 120px;
+    text-align: right;
+    padding: 6px 10px;
+    border-radius: 5px;
+    border: 1px solid rgba(29, 79, 95, 0.25);
+    background: rgba(255, 255, 255, 0.92);
+    color: var(--accent-strong);
+    font-weight: 700;
+    font-size: 1rem;
+}
+
+.carrito-precio-input:focus {
+    outline: none;
+    border-color: var(--accent-strong);
+    box-shadow: 0 0 0 2px rgba(29, 79, 95, 0.15);
 }
 
 .btn-selector-precio-carrito:hover {

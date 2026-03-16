@@ -374,7 +374,7 @@ const VentasCartFeature = {
         let totalDolares = 0;
 
         if (carrito.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 20px;">🛒 Carrito vacío</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px;">🛒 Carrito vacío</td></tr>';
             indiceCarritoSeleccionado = -1;
         } else {
             this.normalizarIndiceCarrito();
@@ -402,8 +402,13 @@ const VentasCartFeature = {
                         </td>
                         <td class="carrito-col-precio">
                             ${precioEditable
-                                ? `<button type="button" class="btn-selector-precio-carrito" onclick="event.stopPropagation(); abrirSelectorPrecioCarrito(${index})">$${item.precio_dolares.toFixed(2)}</button>`
+                                ? `<input type="number" min="0" step="0.01" value="${item.precio_dolares.toFixed(2)}" class="carrito-precio-input" onclick="event.stopPropagation()" onchange="actualizarPrecioCarrito(${index}, this.value)">`
                                 : `$${item.precio_dolares.toFixed(2)}`}
+                        </td>
+                        <td class="carrito-col-precio-bs">
+                            ${precioEditable
+                                ? `<input type="number" min="0" step="0.01" value="${this.aplicarRedondeoBsSeguro(item.precio_dolares * tasaDolar, prodOriginal?.metodo_redondeo || 'none').toFixed(2)}" class="carrito-precio-input" onclick="event.stopPropagation()" onchange="actualizarPrecioCarritoDesdebs(${index}, this.value)">`
+                                : `Bs ${this.aplicarRedondeoBsSeguro(item.precio_dolares * tasaDolar, prodOriginal?.metodo_redondeo || 'none').toFixed(2)}`}
                         </td>
                         <td class="carrito-col-total">$${item.subtotal_dolares.toFixed(2)}</td>
                     </tr>
@@ -449,6 +454,25 @@ const VentasCartFeature = {
         carrito[index].cantidad = cantidad;
         carrito[index].subtotal_dolares = carrito[index].precio_dolares * cantidad;
         this.actualizarCarrito();
+    },
+
+    actualizarPrecioCarritoDesdebs(index, precioBs) {
+        if (!this.puedeEditarPrecioVentaSeguro() || !carrito[index]) {
+            this.actualizarCarrito();
+            return;
+        }
+        const tasa = tasaDolar || window.AppState?.tasaDolar || 1;
+        if (!tasa || tasa <= 0) {
+            this.mostrarNotificacionSegura('❌ Tasa del dolar no disponible');
+            return;
+        }
+        const usd = parseFloat(precioBs) / tasa;
+        if (Number.isNaN(usd) || usd < 0) {
+            this.mostrarNotificacionSegura('❌ Ingrese un precio valido en Bs');
+            this.actualizarCarrito();
+            return;
+        }
+        this.actualizarPrecioCarrito(index, usd);
     },
 
     actualizarPrecioCarrito(index, precio) {

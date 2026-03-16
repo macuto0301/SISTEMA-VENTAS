@@ -578,6 +578,10 @@ function actualizarPrecioCarrito(index, precio) {
     return window.VentasCartFeature?.actualizarPrecioCarrito(index, precio);
 }
 
+function actualizarPrecioCarritoDesdebs(index, precioBs) {
+    return window.VentasCartFeature?.actualizarPrecioCarritoDesdebs(index, precioBs);
+}
+
 function eliminarDelCarrito(index) {
     return window.VentasCartFeature?.eliminarDelCarrito(index);
 }
