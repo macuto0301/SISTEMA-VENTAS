@@ -37,6 +37,7 @@ def serializar_detalle_venta(detalle: DetalleVenta, cantidad_devuelta: int = 0) 
         'cantidad_devuelta': cantidad_devuelta,
         'cantidad_disponible_devolucion': cantidad_disponible,
         'precio_unitario_dolares': detalle.precio_unitario,
+        'costo_unitario': detalle.costo_unitario,
         'subtotal_dolares': detalle.subtotal,
         'lista_precio': detalle.lista_precio or 1,
     }
@@ -199,6 +200,7 @@ def registrar_venta():
                 producto_nombre=item['nombre'],
                 cantidad=item['cantidad'],
                 precio_unitario=item['precio_unitario_dolares'],
+                costo_unitario=(prod.precio_costo if prod else 0.0),
                 subtotal=item['subtotal_dolares'],
                 lista_precio=int(item.get('lista_precio') or 1),
             )
@@ -515,6 +517,13 @@ def get_ventas():
         func.coalesce(func.sum(Venta.total_bolivares), 0.0),
     ).first()
 
+    # Calcular el costo total sumando los costos de los productos vendidos en el rango filtrado
+    ventas_ids = [v.id for v in query.all()]
+    total_costo = 0.0
+    if ventas_ids:
+        detalles = DetalleVenta.query.filter(DetalleVenta.venta_id.in_(ventas_ids)).all()
+        total_costo = sum((d.costo_unitario or 0.0) * (d.cantidad or 0) for d in detalles)
+
     total_ventas = int(total_ventas or 0)
     total_dolares = float(total_dolares or 0.0)
     total_bolivares = float(total_bolivares or 0.0)
@@ -522,6 +531,7 @@ def get_ventas():
         'total_ventas': total_ventas,
         'total_dolares': round(total_dolares, 2),
         'total_bolivares': round(total_bolivares, 2),
+        'total_costo': round(total_costo, 2),
         'promedio_dolares': round((total_dolares / total_ventas) if total_ventas else 0.0, 2),
         'promedio_bolivares': round((total_bolivares / total_ventas) if total_ventas else 0.0, 2),
     }

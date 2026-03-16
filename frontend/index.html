@@ -1,3 +1,7 @@
+    <!-- Botón flotante para mostrar header cuando está oculto -->
+    <button id="btnShowHeader" type="button" class="header-show-btn" title="Mostrar encabezado">
+        <span>▼</span>
+    </button>
 <!DOCTYPE html>
 <html lang="es">
 
@@ -60,6 +64,9 @@
     <div id="panelPrincipal" class="container" style="display: none;">
         <header class="dashboard-header">
             <div class="header-top-row">
+                <button id="btnToggleHeader" type="button" class="header-toggle-btn" title="Ocultar encabezado" style="position: absolute; top: 12px; right: 18px; z-index: 10; background: rgba(255,255,255,0.12); border: none; border-radius: 8px; color: #fff; font-size: 1.2em; padding: 6px 12px; cursor: pointer;">
+                    <span id="headerToggleIcon">▲</span>
+                </button>
                 <div class="brand-block">
                     <img src="assets/logo-sistema-ventas.webp" alt="Logo Sistema de Ventas" class="header-brand-logo">
                 </div>

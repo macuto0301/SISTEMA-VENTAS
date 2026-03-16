@@ -1,3 +1,88 @@
+/* Scroll solo en los paneles internos, no en el panel principal completo */
+.tab-panel {
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+/* El primer hijo suele ser el header, el segundo el contenido scrollable */
+.tab-panel > .panel-header,
+.tab-panel > .panel-header-surface,
+.tab-panel > .panel-header-ventas {
+    flex: 0 0 auto;
+}
+
+/* Quitar scroll a productos-grid y similares */
+.productos-grid,
+.productos-grid-tabla,
+.ventas-header-layout,
+.ventas-summary-column {
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+}
+}
+
+/* Paneles internos con scroll si el contenido lo requiere */
+.tab-panel > .panel-header,
+.tab-panel > .productos-grid,
+.tab-panel > .ventas-header-layout,
+.tab-panel > .ventas-summary-column,
+.tab-panel > .panel-header-ventas,
+.tab-panel > .panel-header-surface {
+    max-height: 100%;
+    overflow: auto;
+}
+/* Botón flotante para mostrar header */
+.header-show-btn {
+    display: none;
+    position: fixed;
+    top: 18px;
+    right: 24px;
+    z-index: 1001;
+    background: #1d4f5f;
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    font-size: 1.3em;
+    padding: 8px 16px;
+    box-shadow: 0 4px 18px rgba(18,28,36,0.13);
+    cursor: pointer;
+    font-family: inherit;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    transition: background 0.18s, color 0.18s;
+}
+.header-show-btn:hover {
+    background: #133844;
+    color: #ffe6b0;
+}
+body.header-hidden .header-show-btn {
+    display: block;
+}
+.header-toggle-btn {
+    transition: background 0.18s, color 0.18s;
+}
+.header-toggle-btn:hover {
+    background: rgba(255,255,255,0.22);
+    color: #ffe6b0;
+}
+
+.header-hidden .dashboard-header {
+    display: none !important;
+}
+.header-hidden .app-shell {
+    margin-top: 0 !important;
+}
+.header-hidden .header-toggle-btn {
+    top: 8px;
+}
+.header-toggle-btn {
+    /* already inlined for fallback */
+}
 @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap');
 
 :root {
@@ -39,8 +124,13 @@ body {
         radial-gradient(circle at top right, rgba(29, 79, 95, 0.14), transparent 20%),
         linear-gradient(180deg, #f1ecdf 0%, #dde6df 100%);
     min-height: 100vh;
-    padding: 24px;
+    height: 100vh;
+    padding-top: 1.5vh;
+    padding-right: 1.5vw;
+    padding-bottom: 1.5vh;
+    padding-left: 1.5vw;
     color: var(--text-main);
+    overflow: hidden;
 }
 
 body.login-active {
@@ -414,24 +504,37 @@ body.login-active {
 }
 
 .container {
-    max-width: 1500px;
-    margin: 0 auto;
+    width: 100vw;
+    height: 100vh;
+    max-width: none;
+    max-height: none;
+    margin: 0;
+    padding: 0;
     background: linear-gradient(180deg, rgba(255, 255, 255, 0.8), rgba(247, 244, 236, 0.94));
     border-radius: var(--radius-2xl);
     box-shadow: var(--shadow-soft);
     overflow: hidden;
     border: 1px solid rgba(255, 255, 255, 0.7);
+    display: flex;
+    flex-direction: column;
 }
 
 .app-shell {
     display: grid;
     grid-template-columns: 250px minmax(0, 1fr);
-    min-height: calc(100vh - 220px);
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    min-width: 0;
     transition: grid-template-columns 0.28s ease;
 }
 
 .content-area {
     min-width: 0;
+    width: 100%;
+    height: 100%;
+    overflow-y: auto;
+    overflow-x: hidden;
 }
 
 .dashboard-header {
@@ -739,10 +842,15 @@ header h1 {
     box-shadow: 0 12px 24px rgba(29, 79, 95, 0.22);
 }
 
+/* Paneles principales ocupan todo el espacio y permiten scroll interno */
 .tab-panel {
     display: none;
     padding: 28px;
     background: linear-gradient(180deg, rgba(250, 247, 241, 0.78), rgba(244, 241, 234, 0.96));
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+    overflow: auto;
 }
 
 .tab-panel.active,
@@ -3760,7 +3868,8 @@ body.modal-open {
 }
 
 .tabla-informes {
-    background: rgba(255, 255, 255, 0.9);
+    background: transparent;
+    padding: 12px 18px;
     border-radius: 20px;
     overflow: hidden;
     box-shadow: var(--shadow-card);
@@ -3794,36 +3903,41 @@ body.modal-open {
 .resumen-ventas-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-    gap: 16px;
-    margin-bottom: 22px;
-}
-
+    display: grid;
+    grid-template-columns: repeat(5, minmax(120px, 1fr));
+    gap: 10px;
+    margin-bottom: 18px;
 .resumen-ventas-grid--compact {
     gap: 14px;
 }
-
+    gap: 8px;
 .tarjeta-resumen--ventas {
     background: linear-gradient(135deg, #2f6f86 0%, #133844 100%);
 }
-
-.tarjeta-resumen--dolares {
-    background: linear-gradient(135deg, #2d8f57 0%, #1a5f42 100%);
-}
-
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent-strong) 100%);
+    color: white;
+    padding: 10px 6px;
+    border-radius: 14px;
+    box-shadow: 0 8px 18px rgba(29, 79, 95, 0.16);
+    min-width: 0;
 .tarjeta-resumen--bolivares {
     background: linear-gradient(135deg, #0c7b93 0%, #155e75 100%);
 }
-
-.tarjeta-resumen--promedio {
+    font-size: 0.92rem;
+    margin-bottom: 6px;
     background: linear-gradient(135deg, #b78a49 0%, #7a541d 100%);
 }
 
 .tarjeta-resumen--pendientes {
     background: linear-gradient(135deg, #ce9a2a 0%, #9f6b0f 100%);
 }
-
-.tarjeta-resumen--pagadas {
+    font-size: 1.1rem;
+    font-weight: 800;
     background: linear-gradient(135deg, #2c8b5f 0%, #176245 100%);
+
+.tarjeta-resumen--ganancia {
+    background: linear-gradient(135deg, #2d8f57 0%, #b78a49 100%);
+}
 }
 
 .tarjeta-resumen small {

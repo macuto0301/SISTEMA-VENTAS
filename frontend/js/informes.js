@@ -87,24 +87,30 @@ const InformesService = {
             const totalVentas = Math.max(0, Math.trunc(this.normalizarNumero(resumenBackend.total_ventas)));
             const totalDolares = this.normalizarNumero(resumenBackend.total_dolares);
             const totalBs = this.normalizarNumero(resumenBackend.total_bolivares);
+            const totalCosto = this.normalizarNumero(resumenBackend.total_costo ?? 0);
+            const ganancia = totalDolares - totalCosto;
             return {
                 totalVentas,
                 totalDolares,
                 totalBs,
                 promedioDolares: totalVentas > 0 ? totalDolares / totalVentas : 0,
-                promedioBs: totalVentas > 0 ? totalBs / totalVentas : 0
+                promedioBs: totalVentas > 0 ? totalBs / totalVentas : 0,
+                ganancia
             };
         }
 
         const totalDolares = ventasLista.reduce((sum, v) => sum + this.normalizarNumero(v.total_dolares), 0);
         const totalBs = ventasLista.reduce((sum, v) => sum + this.normalizarNumero(v.total_bolivares), 0);
+        const totalCosto = ventasLista.reduce((sum, v) => sum + this.normalizarNumero(v.total_costo), 0);
         const totalVentas = ventasLista.length;
+        const ganancia = totalDolares - totalCosto;
         return {
             totalVentas,
             totalDolares,
             totalBs,
             promedioDolares: totalVentas > 0 ? totalDolares / totalVentas : 0,
-            promedioBs: totalVentas > 0 ? totalBs / totalVentas : 0
+            promedioBs: totalVentas > 0 ? totalBs / totalVentas : 0,
+            ganancia
         };
     },
 
@@ -209,23 +215,27 @@ const InformesService = {
         if (resumenDiv) {
             resumenDiv.innerHTML = `
                 <h3>${titulo}</h3>
-                <div class="resumen-ventas-grid">
+                <div class="resumen-ventas-grid resumen-ventas-grid--compact">
                     <div class="tarjeta-resumen tarjeta-resumen--ventas">
                         <h3>Total Ventas</h3>
                         <div class="valor">${resumen.totalVentas}</div>
                     </div>
                     <div class="tarjeta-resumen tarjeta-resumen--dolares">
-                        <h3>Total en Dolares</h3>
+                        <h3>Total en Dólares</h3>
                         <div class="valor">$${resumen.totalDolares.toFixed(2)}</div>
                     </div>
                     <div class="tarjeta-resumen tarjeta-resumen--bolivares">
-                        <h3>Total en Bolivares</h3>
+                        <h3>Total en Bolívares</h3>
                         <div class="valor">Bs ${resumen.totalBs.toFixed(2)}</div>
                     </div>
                     <div class="tarjeta-resumen tarjeta-resumen--promedio">
                         <h3>Promedio por Venta</h3>
                         <div class="valor">$${resumen.promedioDolares.toFixed(2)}</div>
                         <small>Bs ${resumen.promedioBs.toFixed(2)}</small>
+                    </div>
+                    <div class="tarjeta-resumen tarjeta-resumen--ganancia">
+                        <h3>Ganancia</h3>
+                        <div class="valor">$${resumen.ganancia.toFixed(2)}</div>
                     </div>
                 </div>
             `;

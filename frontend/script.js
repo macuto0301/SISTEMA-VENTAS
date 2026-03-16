@@ -1,3 +1,37 @@
+// --- Header toggle y persistencia de estado ---
+document.addEventListener('DOMContentLoaded', function () {
+    const btnShowHeader = document.getElementById('btnShowHeader');
+    const btnToggleHeader = document.getElementById('btnToggleHeader');
+    const icon = document.getElementById('headerToggleIcon');
+    if (!btnShowHeader || !btnToggleHeader || !icon) return;
+
+    // Restaurar estado guardado
+    let hidden = localStorage.getItem('header_hidden') === 'true';
+    if (hidden) {
+        document.body.classList.add('header-hidden');
+        icon.textContent = '▼';
+        btnToggleHeader.title = 'Mostrar encabezado';
+    } else {
+        document.body.classList.remove('header-hidden');
+        icon.textContent = '▲';
+        btnToggleHeader.title = 'Ocultar encabezado';
+    }
+
+    btnToggleHeader.addEventListener('click', function () {
+        hidden = !document.body.classList.contains('header-hidden');
+        document.body.classList.toggle('header-hidden', hidden);
+        localStorage.setItem('header_hidden', hidden ? 'true' : 'false');
+        icon.textContent = hidden ? '▼' : '▲';
+        btnToggleHeader.title = hidden ? 'Mostrar encabezado' : 'Ocultar encabezado';
+    });
+
+    btnShowHeader.addEventListener('click', function () {
+        document.body.classList.remove('header-hidden');
+        localStorage.setItem('header_hidden', 'false');
+        icon.textContent = '▲';
+        btnToggleHeader.title = 'Ocultar encabezado';
+    });
+});
 // Sistema de Ventas con Pagos Múltiples
 // Este archivo ahora usa módulos separados en js/
 const API_URL = (window.API?.baseUrl || (() => {

@@ -160,6 +160,7 @@ class DetalleVenta(db.Model):
     producto_nombre = db.Column(db.String(100), nullable=False)
     cantidad = db.Column(db.Integer, nullable=False)
     precio_unitario = db.Column(db.Float, nullable=False)
+    costo_unitario = db.Column(db.Float, nullable=False, default=0.0)  # Costo del producto al momento de la venta
     subtotal = db.Column(db.Float, nullable=False)
     lista_precio = db.Column(db.Integer, default=1)
 
