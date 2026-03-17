@@ -364,7 +364,7 @@ body.login-active {
     align-items: center;
     justify-content: center;
     align-self: center;
-    background: rgba(255, 255, 255, 0.96);
+    background: rgba(173, 144, 144, 0.96);
     box-shadow: 0 18px 34px rgba(29, 79, 95, 0.22);
     padding: 10px 14px;
 }
@@ -1395,8 +1395,8 @@ body.modo-cajero .venta-resumen-rapido {
 .btn-secondary,
 .btn-small,
 .btn-imprimir {
-    min-height: 44px;
-    border-radius: 999px;
+    min-height: 15px;
+    border-radius: 24px;
     font-family: inherit;
     font-weight: 800;
     transition: all 0.25s ease;
@@ -1447,7 +1447,7 @@ body.modo-cajero .venta-resumen-rapido {
 }
 
 .btn-small {
-    padding: 8px 15px;
+    padding: 5px 10px;
     background: var(--success);
     color: white;
     border: none;
@@ -4179,7 +4179,7 @@ body.modal-open {
 
 .sv-table th,
 .sv-table td {
-    padding: 14px 15px;
+    padding: 3px 5px;
     border-bottom: 1px solid rgba(19, 32, 43, 0.07);
     vertical-align: top;
 }
@@ -4257,7 +4257,7 @@ body.modal-open {
     display: inline-flex;
     flex-wrap: wrap;
     justify-content: center;
-    gap: 6px;
+    gap: 5px;
 }
 
 .sv-table-badge {

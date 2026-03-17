@@ -359,13 +359,13 @@ function editarProveedor(id) {
 
 async function eliminarProveedor(id) {
     if (confirm('¿Está seguro de eliminar este proveedor?')) {
-        const eliminado = await ApiService.eliminarProveedor(id);
-        if (!eliminado) {
-            mostrarNotificacion('⚠️ No se pudo eliminar el proveedor');
-            return;
+        try {
+            await ApiService.eliminarProveedor(id);
+            await ProveedoresModule.cargarProveedores();
+            mostrarNotificacion('✅ Proveedor eliminado');
+        } catch (error) {
+            mostrarNotificacion(`⚠️ ${error.message}`);
         }
-        await ProveedoresModule.cargarProveedores();
-        mostrarNotificacion('✅ Proveedor eliminado');
     }
 }
 

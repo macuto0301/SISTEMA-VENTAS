@@ -117,6 +117,12 @@ def actualizar_proveedor(id):
 @require_roles('admin')
 def eliminar_proveedor(id):
     proveedor = Proveedor.query.get_or_404(id)
+    
+    # Verificar si el proveedor tiene compras asociadas
+    compras_count = Compra.query.filter_by(proveedor_id=id).count()
+    if compras_count > 0:
+        return jsonify({'error': 'No se puede eliminar el proveedor porque tiene compras registradas'}), 400
+    
     proveedor.activo = False
     db.session.commit()
     return jsonify({'mensaje': 'Proveedor eliminado'})

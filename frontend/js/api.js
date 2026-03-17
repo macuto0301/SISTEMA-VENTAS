@@ -423,7 +423,10 @@ const ApiService = {
             return true;
         } catch (e) {
             console.error('No se pudo eliminar el proveedor en el backend', e);
-            return false;
+            if (e.response && e.response.data && e.response.data.error) {
+                throw new Error(e.response.data.error);
+            }
+            throw new Error('No se pudo eliminar el proveedor');
         }
     },
 
