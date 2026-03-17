@@ -40,15 +40,15 @@
 .header-show-btn {
     display: none;
     position: fixed;
-    top: 18px;
-    right: 24px;
+    top: 10px;
+    right: 16px;
     z-index: 1001;
     background: #1d4f5f;
     color: #fff;
     border: none;
-    border-radius: 10px;
-    font-size: 1.3em;
-    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 1.1em;
+    padding: 5px 10px;
     box-shadow: 0 4px 18px rgba(18,28,36,0.13);
     cursor: pointer;
     font-family: inherit;
@@ -78,7 +78,7 @@ body.header-hidden .header-show-btn {
     margin-top: 0 !important;
 }
 .header-hidden .header-toggle-btn {
-    top: 8px;
+    top: 6px;
 }
 .header-toggle-btn {
     /* already inlined for fallback */
@@ -125,10 +125,10 @@ body {
         linear-gradient(180deg, #f1ecdf 0%, #dde6df 100%);
     min-height: 100vh;
     height: 100vh;
-    padding-top: 1.5vh;
-    padding-right: 1.5vw;
-    padding-bottom: 1.5vh;
-    padding-left: 1.5vw;
+    padding-top: 0;
+    padding-right: 1vw;
+    padding-bottom: 1vh;
+    padding-left: 0;
     color: var(--text-main);
     overflow: hidden;
 }
@@ -543,7 +543,7 @@ body.login-active {
         linear-gradient(135deg, rgba(14, 42, 49, 0.98), rgba(23, 60, 67, 0.94)),
         linear-gradient(135deg, #1d4f5f, #133844);
     color: #f7f2e7;
-    padding: 30px;
+    padding: 12px 30px;
     overflow: hidden;
 }
 
@@ -567,7 +567,7 @@ body.login-active {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    gap: 24px;
+    gap: 8px;
     flex-wrap: wrap;
 }
 
@@ -580,15 +580,16 @@ body.login-active {
 }
 
 .header-brand-logo {
-    width: min(100%, 240px);
+    width: min(100%, 160px);
+    max-height: 36px;
     height: auto;
     object-fit: contain;
     display: block;
-    border-radius: 20px;
+    border-radius: 10px;
     background: rgba(255, 248, 239, 0.96);
-    padding: 10px 14px;
-    box-shadow: 0 12px 24px rgba(9, 22, 28, 0.18);
-    filter: drop-shadow(0 10px 22px rgba(9, 22, 28, 0.18));
+    padding: 3px 6px;
+    box-shadow: 0 4px 8px rgba(9, 22, 28, 0.08);
+    filter: drop-shadow(0 3px 6px rgba(9, 22, 28, 0.08));
 }
 
 .brand-kicker,
@@ -617,8 +618,8 @@ header h1 {
     align-items: stretch;
     justify-content: flex-end;
     flex: 1 1 auto;
-    min-width: 560px;
-    gap: 14px;
+    min-width: 380px;
+    gap: 6px;
     flex-wrap: wrap;
 }
 
@@ -637,35 +638,37 @@ header h1 {
     display: inline-flex;
     flex-direction: column;
     align-items: flex-start;
-    gap: 6px;
-    border-radius: 18px;
-    padding: 14px 16px;
+    gap: 2px;
+    border-radius: 10px;
+    padding: 6px 8px;
 }
 
 .empresa-info {
-    min-width: 250px;
+    min-width: 180px;
+    position: relative;
+    padding-right: 32px;
 }
 
 .empresa-nombre {
-    font-size: 1rem;
+    font-size: 0.85rem;
     font-weight: 800;
     color: #ffffff;
 }
 
 .empresa-rif {
-    font-size: 0.82rem;
+    font-size: 0.7rem;
     color: rgba(255, 245, 231, 0.8);
 }
 
 .fecha-actual {
-    min-width: 190px;
-    font-size: 0.94rem;
+    min-width: 140px;
+    font-size: 0.8rem;
     font-weight: 700;
 }
 
 .usuario-info {
-    min-width: 185px;
-    font-size: 0.86rem;
+    min-width: 140px;
+    font-size: 0.75rem;
 }
 
 .info-label {
@@ -687,6 +690,30 @@ header h1 {
 
 .tab-btn-config {
     margin-top: 8px;
+}
+
+.btn-config-empresa {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 6px;
+    color: #fff;
+    cursor: pointer;
+    font-size: 0.8rem;
+    padding: 3px 6px;
+    transition: background 0.18s, border-color 0.18s;
+}
+
+.btn-config-empresa:hover {
+    background: rgba(255, 255, 255, 0.25);
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
+.config-icon {
+    display: inline-block;
+    font-size: 0.9rem;
 }
 
 .tabs {
@@ -845,7 +872,7 @@ header h1 {
 /* Paneles principales ocupan todo el espacio y permiten scroll interno */
 .tab-panel {
     display: none;
-    padding: 28px;
+    padding: 28px 28px 28px 28px;
     background: linear-gradient(180deg, rgba(250, 247, 241, 0.78), rgba(244, 241, 234, 0.96));
     width: 100%;
     height: 100%;
@@ -875,7 +902,7 @@ body.modo-cajero .container {
 }
 
 body.modo-cajero .dashboard-header {
-    padding: 14px 18px 10px;
+    padding: 10px 16px 8px;
 }
 
 body.modo-cajero .header-top-row {
@@ -959,7 +986,7 @@ body.modo-cajero .tab-panel {
     width: 100%;
     max-width: 1680px;
     margin: 0 auto;
-    padding: 16px 0 0;
+    padding: 16px 0 0 0;
 }
 
 body.modo-cajero #panelVentas.tab-panel.active,
@@ -4405,11 +4432,18 @@ body.modal-open {
     }
 
     body {
-        padding: 16px;
+        padding: 12px;
     }
 
     .dashboard-header {
-        padding: 24px 20px;
+        padding: 12px 16px;
+    }
+
+    .header-brand-logo {
+        width: min(100%, 150px);
+        max-height: 32px;
+        padding: 3px 6px;
+        border-radius: 10px;
     }
 
     .app-shell {
@@ -4419,12 +4453,14 @@ body.modal-open {
     .header-top-row {
         flex-direction: column;
         align-items: stretch;
+        gap: 12px;
     }
 
     .header-right-group {
         flex-direction: column;
         align-items: stretch;
         min-width: 0;
+        gap: 10px;
     }
 
     .empresa-info,
@@ -4433,6 +4469,7 @@ body.modal-open {
     .header-status-card {
         width: 100%;
         min-width: 0;
+        padding: 5px 7px;
     }
 
     .venta-container {
@@ -4737,7 +4774,7 @@ body.modal-open {
 
     .login-screen {
         align-items: stretch;
-        padding: 12px;
+        padding: 10px;
     }
 
     .login-shell {
@@ -4764,8 +4801,30 @@ body.modal-open {
         border-radius: 24px;
     }
 
+    .dashboard-header {
+        padding: 8px 12px;
+    }
+
+    .empresa-info,
+    .fecha-actual,
+    .usuario-info {
+        padding: 4px 6px;
+        font-size: 0.8rem;
+        padding-right: 28px;
+    }
+    
+    .btn-config-empresa {
+        top: 4px;
+        right: 4px;
+        padding: 2px 4px;
+        font-size: 0.7rem;
+    }
+
     .header-brand-logo {
-        width: min(100%, 240px);
+        width: min(100%, 130px);
+        max-height: 28px;
+        padding: 3px 5px;
+        border-radius: 8px;
     }
 
     .login-feature-card {
