@@ -343,10 +343,11 @@ const VentasCartFeature = {
                 existente.cantidad++;
                 existente.subtotal_dolares = existente.precio_dolares * existente.cantidad;
             } else {
+                const stockLabel = producto.permite_decimal ? producto.cantidad.toFixed(3) : producto.cantidad;
                 this.mostrarAlertaSegura('No hay suficiente stock para agregar otra unidad.', {
                     titulo: 'Stock insuficiente',
                     variante: 'warning',
-                    detalle: `Disponibles: ${producto.cantidad}`
+                    detalle: `Disponibles: ${stockLabel}`
                 });
                 return;
             }
@@ -384,6 +385,9 @@ const VentasCartFeature = {
                 const precioEditable = this.puedeEditarPrecioVentaSeguro();
                 const codigo = prodOriginal?.codigo || '-';
                 const maxCantidad = this.productoManejaExistencia(prodOriginal) ? ` max="${prodOriginal.cantidad}"` : '';
+                const esDecimal = prodOriginal?.permite_decimal;
+                const stepAttr = esDecimal ? ' step="0.001"' : ' step="1"';
+                const minCantidad = esDecimal ? '0.001' : '1';
 
                 return `
                     <tr data-carrito-index="${index}" class="${index === indiceCarritoSeleccionado ? 'carrito-seleccionado' : ''}" onclick="seleccionarFilaCarrito(${index})">
@@ -396,7 +400,7 @@ const VentasCartFeature = {
                             <button class="btn-eliminar-item" onclick="event.stopPropagation(); eliminarDelCarrito(${index})" aria-label="Eliminar producto">x</button>
                         </td>
                         <td class="carrito-col-cantidad">
-                            <input type="number" min="1"${maxCantidad} 
+                            <input type="number" min="${minCantidad}"${maxCantidad}${stepAttr}
                                    value="${item.cantidad}" onchange="actualizarCantidadCarrito(${index}, this.value)" onclick="event.stopPropagation()"
                                    class="carrito-cantidad-input">
                         </td>
@@ -421,7 +425,10 @@ const VentasCartFeature = {
             return sum + this.aplicarRedondeoBsSeguro(item.subtotal_dolares * tasaDolar, prodOriginal.metodo_redondeo || 'none');
         }, 0);
 
-        const totalCantidad = carrito.reduce((sum, item) => sum + (item.cantidad || 0), 0);
+        const totalCantidad = carrito.reduce((sum, item) => {
+            const prod = productos[item.productoIndex];
+            return sum + (prod?.permite_decimal ? 1 : (item.cantidad || 0));
+        }, 0);
         document.getElementById('totalDolares').textContent = `$${totalDolares.toFixed(2)}`;
         this.renderResumenPos(totalCantidad, totalDolares, totalBs);
 
@@ -435,18 +442,38 @@ const VentasCartFeature = {
     },
 
     actualizarCantidadCarrito(index, cantidad) {
-        cantidad = parseInt(cantidad, 10);
         const producto = productos[carrito[index].productoIndex];
+        const esDecimal = producto?.permite_decimal;
+        cantidad = esDecimal ? parseFloat(cantidad) : parseInt(cantidad, 10);
+
+        if (isNaN(cantidad) || cantidad <= 0) {
+            this.eliminarDelCarrito(index);
+            return;
+        }
+
+        if (!esDecimal && cantidad !== Math.floor(cantidad)) {
+            this.mostrarAlertaSegura('Este producto no permite cantidades decimales.', {
+                titulo: 'Cantidad invalida',
+                variante: 'warning'
+            });
+            cantidad = Math.floor(cantidad);
+            if (cantidad < 1) {
+                this.eliminarDelCarrito(index);
+                return;
+            }
+        }
 
         if (this.productoManejaExistencia(producto) && cantidad > producto.cantidad) {
-            this.mostrarAlertaSegura(`Solo hay ${producto.cantidad} unidades disponibles.`, {
+            const stockLabel = esDecimal ? producto.cantidad.toFixed(3) : producto.cantidad;
+            this.mostrarAlertaSegura(`Solo hay ${stockLabel} disponibles.`, {
                 titulo: 'Stock insuficiente',
                 variante: 'warning'
             });
             cantidad = producto.cantidad;
         }
 
-        if (cantidad < 1) {
+        const minCantidad = esDecimal ? 0.001 : 1;
+        if (cantidad < minCantidad) {
             this.eliminarDelCarrito(index);
             return;
         }

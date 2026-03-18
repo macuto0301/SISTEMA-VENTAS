@@ -722,6 +722,7 @@ const ProductosFeature = {
         const modelo = document.getElementById('productoModelo').value;
         const unidad = document.getElementById('productoUnidad').value;
         const metodoRedondeo = document.getElementById('productoMetodoRedondeo').value;
+        const permiteDecimal = document.getElementById('productoPermiteDecimal').checked;
         const fotos = (window.ProductosMediaFeature?.productoFotosSeleccionadas || []).map(item => item.file);
         const removePhoto = document.getElementById('productoFotoEliminar').value === 'true';
 
@@ -773,6 +774,7 @@ const ProductosFeature = {
         formData.append('modelo', modelo);
         formData.append('unidad', unidad);
         formData.append('metodo_redondeo', metodoRedondeo);
+        formData.append('permite_decimal', permiteDecimal ? 'true' : 'false');
         formData.append('remove_photo', removePhoto ? 'true' : 'false');
 
         formData.append('fotos_existentes', JSON.stringify((window.ProductosMediaFeature?.productoFotosExistentes || []).map(foto => foto.path)));
@@ -881,7 +883,16 @@ const ProductosFeature = {
         document.getElementById('ajusteStockCacheIndex').value = index;
         document.getElementById('ajusteStockNombreProducto').textContent = producto.nombre;
         document.getElementById('ajusteStockCodigoProducto').textContent = producto.codigo || '-';
-        document.getElementById('ajusteStockCantidadActual').textContent = Number(producto.cantidad || 0);
+        document.getElementById('ajusteStockCantidadActual').textContent = producto.permite_decimal ? Number(producto.cantidad || 0).toFixed(3) : Number(producto.cantidad || 0);
+
+        const cantidadInput = document.getElementById('ajusteStockCantidad');
+        if (producto.permite_decimal) {
+            cantidadInput.step = '0.001';
+            cantidadInput.min = '0.001';
+        } else {
+            cantidadInput.step = '1';
+            cantidadInput.min = '1';
+        }
 
         this._ajusteStockFields?.cantidad?.setValue('1');
         this._ajusteStockFields?.cantidad?.clearError?.();
@@ -952,9 +963,12 @@ const ProductosFeature = {
         this.inicializarComponentesAjusteStock();
 
         const productoId = Number(document.getElementById('ajusteStockProductoId').value);
+        const cacheIndex = Number(document.getElementById('ajusteStockCacheIndex').value);
+        const producto = window.productos[cacheIndex];
+        const esDecimal = producto?.permite_decimal;
         const tipo = document.getElementById('ajusteStockTipo').value || 'entrada';
         const cantidadVal = document.getElementById('ajusteStockCantidad').value;
-        const cantidad = Math.floor(Number(cantidadVal));
+        const cantidad = esDecimal ? parseFloat(cantidadVal) : Math.floor(Number(cantidadVal));
         const motivoSelect = document.getElementById('ajusteStockMotivo').value;
         const motivoOtro = (document.getElementById('ajusteStockMotivoOtro')?.value || '').trim();
         const motivo = motivoSelect === 'Otro' ? motivoOtro : motivoSelect;
@@ -997,7 +1011,7 @@ const ProductosFeature = {
             this.cerrarModalAjusteStock();
             await this.cargarProductos();
             window.mostrarNotificacion(
-                `✅ Stock actualizado: ${data?.cantidad_anterior ?? '-'} → ${data?.cantidad_nueva ?? '-'} unidades`
+                `✅ Stock actualizado: ${data?.cantidad_anterior ?? '-'} → ${data?.cantidad_nueva ?? '-'}`
             );
         } catch (error) {
             console.error('No se pudo ajustar el stock', error);
@@ -1076,6 +1090,7 @@ const ProductosFeature = {
                     render: row => {
                         const nombre = this.escaparHtml(row.nombre || 'Sin nombre');
                         const detalle = this.escaparHtml(row.__detalleTecnico || row.__detalleInventario || 'Sin detalles');
+                        const badgePesable = row.permite_decimal ? '<span style="display: inline-block; background: #dbeafe; color: #1d4ed8; font-size: 9px; padding: 1px 5px; border-radius: 4px; margin-left: 4px; vertical-align: middle; font-weight: 600;">Pesable</span>' : '';
                         const imagen = row.__fotoPrincipalUrl && row.__cacheIndex >= 0
                             ? `<button type="button" onclick="abrirGaleriaProductoPorIndice(${row.__cacheIndex}, 0)" style="width: 36px; height: 36px; border: 0; border-radius: 10px; overflow: hidden; padding: 0; cursor: pointer; background: #f3f4f6; flex-shrink: 0;"><img src="${this.escaparHtml(row.__fotoPrincipalUrl)}" alt="${nombre}" loading="lazy" style="width: 100%; height: 100%; object-fit: cover;"></button>`
                             : '<div style="width: 36px; height: 36px; border-radius: 10px; background: #f3f4f6; display: flex; align-items: center; justify-content: center; color: #6b7280; font-size: 9px; flex-shrink: 0;">Foto</div>';
@@ -1083,7 +1098,7 @@ const ProductosFeature = {
                             <div style="display: flex; gap: 8px; align-items: center; min-width: 220px;">
                                 ${imagen}
                                 <div class="sv-table-stack sv-table-stack--dense" style="min-width: 0;">
-                                    <strong style="line-height: 1.2;">${nombre}</strong>
+                                    <strong style="line-height: 1.2;">${nombre}${badgePesable}</strong>
                                     <small style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${detalle}</small>
                                 </div>
                             </div>
@@ -1121,7 +1136,7 @@ const ProductosFeature = {
                     key: 'cantidad',
                     align: 'center',
                     filterable: true,
-                    render: row => this.productoManejaExistencia(row) ? Number(row.cantidad || 0) : 'N/A'
+                    render: row => this.productoManejaExistencia(row) ? (row.permite_decimal ? Number(row.cantidad || 0).toFixed(3) : Number(row.cantidad || 0)) : 'N/A'
                 },
                 {
                     id: 'precio1',
@@ -1224,6 +1239,7 @@ const ProductosFeature = {
         document.getElementById('productoPrecioDolares3').value = '';
         document.getElementById('productoTipo').value = 'producto';
         document.getElementById('productoMetodoRedondeo').value = 'none';
+        document.getElementById('productoPermiteDecimal').checked = false;
         document.getElementById('productoCantidad').value = 0;
         document.getElementById('productoCodigo').disabled = false;
         document.getElementById('productoPrecioBolivares').value = '';
@@ -1327,6 +1343,7 @@ const ProductosFeature = {
         document.getElementById('productoMarca').value = producto.marca || '';
         document.getElementById('productoModelo').value = producto.modelo || '';
         document.getElementById('productoUnidad').value = producto.unidad || '';
+        document.getElementById('productoPermiteDecimal').checked = !!producto.permite_decimal;
         this.limpiarErroresProducto();
         this.limpiarErroresPrecios();
         this._productActions?.setLoading('btnGuardarProducto', false);
@@ -1371,7 +1388,7 @@ const ProductosFeature = {
         document.getElementById('tituloModalHistorialProducto').textContent =
             `Historial: ${producto.nombre}`;
         document.getElementById('historialProductoCodigo').textContent = producto.codigo || '-';
-        document.getElementById('historialProductoStock').textContent = Number(producto.cantidad || 0);
+        document.getElementById('historialProductoStock').textContent = producto.permite_decimal ? Number(producto.cantidad || 0).toFixed(3) : Number(producto.cantidad || 0);
         document.getElementById('historialProductoLista').innerHTML =
             '<div class="mensaje-vacio">Cargando historial...</div>';
 

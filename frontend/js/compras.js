@@ -39,6 +39,7 @@ function construirItemCompra(producto, cantidad = 1) {
     return {
         producto_id: producto.id,
         producto_nombre: producto.nombre,
+        permite_decimal: !!producto.permite_decimal,
         cantidad,
         precio_unitario: precioCosto,
         subtotal: redondearMontoCompra(cantidad * precioCosto),
@@ -53,7 +54,7 @@ function construirItemCompra(producto, cantidad = 1) {
 }
 
 function recalcularSubtotalCompra(item) {
-    item.subtotal = redondearMontoCompra((parseInt(item.cantidad, 10) || 0) * (parseFloat(item.precio_unitario) || 0));
+    item.subtotal = redondearMontoCompra((parseFloat(item.cantidad) || 0) * (parseFloat(item.precio_unitario) || 0));
 }
 
 function recalcularPrecioCompraDesdePorcentaje(lista = 1) {
@@ -722,7 +723,7 @@ async function filtrarProductosCompra(e) {
                     </div>
                     <div style="text-align: right;">
                         <div style="color: #28a745; font-weight: bold;">$${p.precio_costo.toFixed(2)}</div>
-                        <small style="color: #666;">Stock: ${p.cantidad}</small>
+                        <small style="color: #666;">Stock: ${p.permite_decimal ? Number(p.cantidad).toFixed(3) : p.cantidad}</small>
                     </div>
                 </div>
             </div>
@@ -807,9 +808,9 @@ function mostrarProductosCompra() {
                     <tr style="border-bottom: 1px solid #eee;">
                         <td style="padding: 10px;">${p.producto_nombre}</td>
                         <td style="padding: 5px; text-align: center;">
-                            <input type="number" min="1" value="${p.cantidad}" 
+                            <input type="number" min="${p.permite_decimal ? '0.001' : '1'}" step="${p.permite_decimal ? '0.001' : '1'}" value="${p.permite_decimal ? p.cantidad : Math.floor(p.cantidad)}" 
                                 onchange="actualizarProductoCompra(${idx}, 'cantidad', this.value)"
-                                style="width: 70px; padding: 5px; text-align: center; border: 1px solid #ddd; border-radius: 4px;">
+                                style="width: 80px; padding: 5px; text-align: center; border: 1px solid #ddd; border-radius: 4px;">
                         </td>
                         <td style="padding: 5px; text-align: center;">
                             <input type="number" step="0.01" min="0" value="${p.precio_unitario.toFixed(2)}"
@@ -832,7 +833,7 @@ function mostrarProductosCompra() {
 
 function actualizarProductoCompra(index, campo, valor) {
     if (campo === 'cantidad') {
-        ComprasModule.productosCompra[index].cantidad = parseInt(valor) || 1;
+        ComprasModule.productosCompra[index].cantidad = parseFloat(valor) || 1;
     } else if (campo === 'costo') {
         ComprasModule.productosCompra[index].precio_unitario = redondearMontoCompra(valor);
     }
@@ -1073,10 +1074,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
                 
                 const texto = this.value.toLowerCase().trim();
-                const matchRapido = texto.match(/^(\d+)[*\s]+(.+)$/);
+                const matchRapido = texto.match(/^([\d.]+)[*\s]+(.+)$/);
                 
                 if (matchRapido) {
-                    const cantidad = parseInt(matchRapido[1]);
+                    const cantidad = parseFloat(matchRapido[1]);
                     const buscar = matchRapido[2].toLowerCase();
                     
                     const resultados = typeof buscarProductosRemotos === 'function'

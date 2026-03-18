@@ -82,7 +82,7 @@ def serializar_devolucion(devolucion: DevolucionVenta) -> dict:
     }
 
 
-def obtener_cantidades_devueltas(venta_id: int) -> dict[int, int]:
+def obtener_cantidades_devueltas(venta_id: int) -> dict[int, float]:
     detalles_devueltos = (
         db.session.query(
             DetalleDevolucionVenta.detalle_venta_id,
@@ -93,7 +93,7 @@ def obtener_cantidades_devueltas(venta_id: int) -> dict[int, int]:
         .group_by(DetalleDevolucionVenta.detalle_venta_id)
         .all()
     )
-    return {detalle_venta_id: int(total or 0) for detalle_venta_id, total in detalles_devueltos if detalle_venta_id}
+    return {detalle_venta_id: float(total or 0) for detalle_venta_id, total in detalles_devueltos if detalle_venta_id}
 
 
 def crear_movimiento_cliente(
@@ -188,17 +188,28 @@ def registrar_venta():
             if not prod:
                 prod = Producto.query.filter_by(nombre=item['nombre']).first()
 
+            cantidad_item = float(item['cantidad'])
+
+            # Validar decimales: solo permitir si el producto tiene permite_decimal
+            if prod and not prod.permite_decimal and cantidad_item != int(cantidad_item):
+                db.session.rollback()
+                return jsonify({'error': f'El producto {prod.nombre} no permite cantidades decimales'}), 400
+
+            if cantidad_item <= 0:
+                db.session.rollback()
+                return jsonify({'error': f'La cantidad debe ser mayor a cero para: {item["nombre"]}'}), 400
+
             if producto_maneja_existencia(prod):
-                if prod.cantidad < item['cantidad']:
+                if prod.cantidad < cantidad_item:
                     db.session.rollback()
                     return jsonify({'error': f'Stock insuficiente para: {prod.nombre}'}), 400
-                prod.cantidad -= item['cantidad']
+                prod.cantidad -= cantidad_item
 
             detalle = DetalleVenta(
                 venta_id=nueva_venta.id,
                 producto_id=prod.id if prod else producto_id,
                 producto_nombre=item['nombre'],
-                cantidad=item['cantidad'],
+                cantidad=cantidad_item,
                 precio_unitario=item['precio_unitario_dolares'],
                 costo_unitario=(prod.precio_costo if prod else 0.0),
                 subtotal=item['subtotal_dolares'],
@@ -348,7 +359,7 @@ def registrar_devolucion(venta_id: int):
 
         for item in items:
             detalle_venta_id = item.get('detalle_venta_id')
-            cantidad = int(item.get('cantidad') or 0)
+            cantidad = float(item.get('cantidad') or 0)
 
             if not detalle_venta_id or detalle_venta_id not in detalles_venta:
                 return jsonify({'error': 'Producto de venta no válido para devolución'}), 400
@@ -356,6 +367,15 @@ def registrar_devolucion(venta_id: int):
                 return jsonify({'error': 'La cantidad a devolver debe ser mayor a cero'}), 400
 
             detalle_venta = detalles_venta[detalle_venta_id]
+
+            # Validar decimales segun producto
+            if detalle_venta.producto_id:
+                producto_dev = Producto.query.get(detalle_venta.producto_id)
+                if producto_dev and not producto_dev.permite_decimal and cantidad != int(cantidad):
+                    return jsonify({
+                        'error': f'El producto {detalle_venta.producto_nombre} no permite cantidades decimales'
+                    }), 400
+
             cantidad_ya_devuelta = cantidades_devueltas.get(detalle_venta_id, 0)
             cantidad_disponible = detalle_venta.cantidad - cantidad_ya_devuelta
 

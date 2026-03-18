@@ -2353,7 +2353,7 @@ body.modo-cajero .venta-resumen-rapido {
 }
 
 #tablaCarrito input[type="number"] {
-    width: 44px !important;
+    width: 100% !important;
     min-height: 24px;
     padding: 2px 4px !important;
     border-radius: 6px;
@@ -2395,6 +2395,7 @@ body.modo-cajero .venta-resumen-rapido {
 .carrito-col-precio-bs,
 .carrito-col-total {
     white-space: nowrap;
+  
 }
 
 .carrito-col-codigo {
@@ -2429,7 +2430,7 @@ body.modo-cajero .venta-resumen-rapido {
 }
 
 .carrito-col-cantidad {
-    width: 52px;
+    width: 104px;
 }
 
 .carrito-col-precio {
@@ -2442,7 +2443,16 @@ body.modo-cajero .venta-resumen-rapido {
 }
 
 .carrito-cantidad-input {
+    width: 100%;
     text-align: center;
+    padding: 6px 10px;
+    border-radius: 5px;
+    border: 1px solid rgba(29, 79, 95, 0.25);
+    background: rgba(255, 255, 255, 0.92);
+    color: var(--accent-strong);
+    font-weight: 700;
+    font-size: 1rem;
+    box-sizing: border-box;
 }
 
 .carrito-precio-input {

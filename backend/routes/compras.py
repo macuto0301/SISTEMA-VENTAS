@@ -136,17 +136,22 @@ def crear_compra():
         nueva.numero_compra = nueva.id
 
         for item in data.get('detalles', []):
+            cantidad_item = float(item.get('cantidad', 0))
+            producto = Producto.query.get(item.get('producto_id'))
+
+            if producto and not producto.permite_decimal and cantidad_item != int(cantidad_item):
+                return jsonify({'error': f'El producto "{producto.nombre}" no permite cantidades decimales'}), 400
+
             detalle = DetalleCompra(
                 compra_id=nueva.id,
                 producto_id=item.get('producto_id'),
                 producto_nombre=item['producto_nombre'],
-                cantidad=item['cantidad'],
+                cantidad=cantidad_item,
                 precio_unitario=item['precio_unitario'],
                 subtotal=item['subtotal']
             )
             db.session.add(detalle)
 
-            producto = Producto.query.get(item.get('producto_id'))
             if producto:
                 precios_anteriores = {
                     'precio_1_dolares': producto.precio_1_dolares,
@@ -155,7 +160,7 @@ def crear_compra():
                 }
                 precio_anterior = producto.precio_costo
                 if producto_maneja_existencia(producto):
-                    producto.cantidad += item['cantidad']
+                    producto.cantidad += cantidad_item
                 producto.precio_costo = item['precio_unitario']
 
                 for precio_field, porcentaje_field, _ in PRICE_FIELDS:

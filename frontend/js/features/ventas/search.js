@@ -114,7 +114,7 @@ const VentasSearchFeature = {
                     <strong>${item.producto.nombre}</strong> <small>(${item.producto.codigo})</small>
                     <div style="display: flex; justify-content: space-between; margin-top: 5px;">
                         <span style="color: #28a745;">${this.obtenerEtiquetaListaPrecioSegura(listaPrecio)}: $${this.obtenerPrecioProductoSeguro(item.producto, listaPrecio).toFixed(2)}</span>
-                        <span style="color: ${this.productoManejaExistencia(item.producto) ? (item.producto.cantidad > 0 ? '#6c757d' : '#c05621') : '#1f6feb'};">${this.productoManejaExistencia(item.producto) ? (item.producto.cantidad > 0 ? `Stock: ${item.producto.cantidad}` : 'Sin stock') : 'Servicio sin stock'}</span>
+                        <span style="color: ${this.productoManejaExistencia(item.producto) ? (item.producto.cantidad > 0 ? '#6c757d' : '#c05621') : '#1f6feb'};">${this.productoManejaExistencia(item.producto) ? (item.producto.cantidad > 0 ? `Stock: ${item.producto.permite_decimal ? Number(item.producto.cantidad).toFixed(3) : item.producto.cantidad}` : 'Sin stock') : 'Servicio sin stock'}</span>
                     </div>
                 </div>
             `).join('');

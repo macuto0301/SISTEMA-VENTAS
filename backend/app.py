@@ -437,9 +437,9 @@ def create_app():
                         id SERIAL PRIMARY KEY,
                         producto_id INTEGER NOT NULL REFERENCES producto(id),
                         tipo_movimiento VARCHAR(20) NOT NULL,
-                        cantidad INTEGER NOT NULL,
-                        stock_anterior INTEGER NOT NULL DEFAULT 0,
-                        stock_nuevo INTEGER NOT NULL DEFAULT 0,
+                        cantidad DOUBLE PRECISION NOT NULL,
+                        stock_anterior DOUBLE PRECISION NOT NULL DEFAULT 0,
+                        stock_nuevo DOUBLE PRECISION NOT NULL DEFAULT 0,
                         motivo VARCHAR(100) NOT NULL,
                         observacion TEXT,
                         usuario_username VARCHAR(50),
@@ -448,6 +448,53 @@ def create_app():
                 """))
                 db.session.commit()
                 print("Tabla movimiento_inventario creada")
+
+            # -- Soporte para cantidades decimales (productos pesables) --
+            if columnas_producto and 'permite_decimal' not in columnas_producto:
+                db.session.execute(text("ALTER TABLE producto ADD COLUMN permite_decimal BOOLEAN DEFAULT FALSE"))
+                db.session.commit()
+                print("Columna permite_decimal agregada a tabla producto")
+
+            # Migrar columnas de cantidad de INTEGER a DOUBLE PRECISION
+            cantidad_migrations = [
+                ("producto", "cantidad"),
+                ("detalle_venta", "cantidad"),
+                ("detalle_compra", "cantidad"),
+                ("detalle_devolucion_venta", "cantidad"),
+            ]
+            for tabla, columna in cantidad_migrations:
+                try:
+                    tipo_result = db.session.execute(text(
+                        f"SELECT data_type FROM information_schema.columns WHERE table_name='{tabla}' AND column_name='{columna}'"
+                    ))
+                    tipo_row = tipo_result.fetchone()
+                    if tipo_row and tipo_row[0] == 'integer':
+                        db.session.execute(text(
+                            f"ALTER TABLE {tabla} ALTER COLUMN {columna} TYPE DOUBLE PRECISION USING {columna}::double precision"
+                        ))
+                        db.session.commit()
+                        print(f"Columna {tabla}.{columna} migrada de INTEGER a DOUBLE PRECISION")
+                except Exception as col_err:
+                    db.session.rollback()
+                    print(f"Error migrando {tabla}.{columna}: {col_err}")
+
+            # Migrar columnas de movimiento_inventario
+            if columnas_mov_inv:
+                for columna in ('cantidad', 'stock_anterior', 'stock_nuevo'):
+                    try:
+                        tipo_result = db.session.execute(text(
+                            f"SELECT data_type FROM information_schema.columns WHERE table_name='movimiento_inventario' AND column_name='{columna}'"
+                        ))
+                        tipo_row = tipo_result.fetchone()
+                        if tipo_row and tipo_row[0] == 'integer':
+                            db.session.execute(text(
+                                f"ALTER TABLE movimiento_inventario ALTER COLUMN {columna} TYPE DOUBLE PRECISION USING {columna}::double precision"
+                            ))
+                            db.session.commit()
+                            print(f"Columna movimiento_inventario.{columna} migrada de INTEGER a DOUBLE PRECISION")
+                    except Exception as col_err:
+                        db.session.rollback()
+                        print(f"Error migrando movimiento_inventario.{columna}: {col_err}")
 
         except Exception as e:
             print(f"Error verificando columnas: {e}")

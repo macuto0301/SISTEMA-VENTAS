@@ -82,6 +82,7 @@ def serialize_producto(producto: Producto) -> dict:
         'porcentaje_ganancia_3': producto.porcentaje_ganancia_3,
         'precios': precios,
         'cantidad': producto.cantidad,
+        'permite_decimal': bool(producto.permite_decimal),
         'categoria': producto.categoria,
         'metodo_redondeo': producto.metodo_redondeo,
         'foto_path': producto.foto_path,
@@ -348,6 +349,7 @@ def crear_producto():
         nuevo.porcentaje_ganancia_2 = price_values['porcentaje_ganancia_2']
         nuevo.porcentaje_ganancia_3 = price_values['porcentaje_ganancia_3']
         nuevo.cantidad = 0
+        nuevo.permite_decimal = parse_bool(data.get('permite_decimal'))
         nuevo.categoria = data.get('categoria')
         nuevo.metodo_redondeo = data.get('metodo_redondeo', 'none')
         uploaded_photo_paths = [save_producto_image(image_file) for image_file in image_files]
@@ -397,6 +399,8 @@ def editar_producto(id):
         prod.porcentaje_ganancia_3 = price_values['porcentaje_ganancia_3']
         prod.categoria = data.get('categoria', prod.categoria)
         prod.metodo_redondeo = data.get('metodo_redondeo', prod.metodo_redondeo)
+        if 'permite_decimal' in data:
+            prod.permite_decimal = parse_bool(data.get('permite_decimal'))
 
         fotos_finales, uploaded_photo_paths = build_updated_photos(prod, data, image_files)
         prod.fotos = fotos_finales
@@ -457,12 +461,15 @@ def ajustar_stock_producto(id):
         return jsonify({'error': 'Tipo de movimiento invalido. Usa entrada o salida'}), 400
 
     try:
-        cantidad = parse_int(data.get('cantidad'), 0)
+        cantidad = parse_float(data.get('cantidad'), 0)
     except Exception:
         return jsonify({'error': 'La cantidad debe ser numerica'}), 400
 
     if cantidad <= 0:
         return jsonify({'error': 'La cantidad debe ser mayor a cero'}), 400
+
+    if not producto.permite_decimal and cantidad != int(cantidad):
+        return jsonify({'error': 'Este producto no permite cantidades decimales'}), 400
 
     motivo = str(data.get('motivo') or '').strip()
     observacion = str(data.get('observacion') or '').strip() or None
@@ -470,7 +477,7 @@ def ajustar_stock_producto(id):
     if not motivo:
         return jsonify({'error': 'El motivo es obligatorio'}), 400
 
-    stock_anterior = int(producto.cantidad or 0)
+    stock_anterior = float(producto.cantidad or 0)
     delta = cantidad if tipo_movimiento == 'entrada' else -cantidad
     stock_nuevo = stock_anterior + delta
 
