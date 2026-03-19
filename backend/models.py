@@ -1,6 +1,13 @@
 from database import db
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 import json
+
+# Zona horaria de Venezuela (UTC-4)
+VET = timezone(timedelta(hours=-4))
+
+def ahora_local():
+    """Retorna la fecha y hora actual en la zona horaria local (Venezuela UTC-4)."""
+    return datetime.now(VET).replace(tzinfo=None)
 
 
 class Cliente(db.Model):
@@ -14,7 +21,7 @@ class Cliente(db.Model):
     foto_cedula_path = db.Column(db.String(255))
     activo = db.Column(db.Boolean, default=True)
     saldo_a_favor_usd = db.Column(db.Float, default=0.0)
-    fecha_creado = db.Column(db.DateTime, default=datetime.utcnow)
+    fecha_creado = db.Column(db.DateTime, default=ahora_local)
 
 class Producto(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -75,19 +82,19 @@ class Proveedor(db.Model):
     email = db.Column(db.String(100))
     direccion = db.Column(db.Text)
     activo = db.Column(db.Boolean, default=True)
-    fecha_creado = db.Column(db.DateTime, default=datetime.utcnow)
+    fecha_creado = db.Column(db.DateTime, default=ahora_local)
 
 class Compra(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     numero_compra = db.Column(db.Integer, unique=True, index=True)
-    fecha = db.Column(db.Date, default=datetime.utcnow)
+    fecha = db.Column(db.Date, default=ahora_local)
     nro_factura = db.Column(db.String(50), nullable=True)
     fecha_libro = db.Column(db.Date, nullable=True)
     proveedor_id = db.Column(db.Integer, db.ForeignKey('proveedor.id'), nullable=False)
     total_dolares = db.Column(db.Float, default=0.0)
     total_bs = db.Column(db.Float, default=0.0)
     estado = db.Column(db.String(20), default='pendiente')  # pendiente, pagada, cancelada
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=ahora_local)
     proveedor = db.relationship('Proveedor', backref='compras')
 
 class DetalleCompra(db.Model):
@@ -108,7 +115,7 @@ class HistorialPrecio(db.Model):
     precio_nuevo = db.Column(db.Float, nullable=False)
     tipo_precio = db.Column(db.String(20), default='precio_1')
     motivo = db.Column(db.String(50), nullable=False)  # compra, ajuste_manual
-    fecha_cambio = db.Column(db.DateTime, default=datetime.utcnow)
+    fecha_cambio = db.Column(db.DateTime, default=ahora_local)
     producto = db.relationship('Producto', backref='historial_precios')
 
 
@@ -122,13 +129,13 @@ class MovimientoInventario(db.Model):
     motivo = db.Column(db.String(100), nullable=False)
     observacion = db.Column(db.Text)
     usuario_username = db.Column(db.String(50))
-    fecha = db.Column(db.DateTime, default=datetime.utcnow)
+    fecha = db.Column(db.DateTime, default=ahora_local)
     producto = db.relationship('Producto', backref='movimientos_inventario')
 
 class Venta(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     numero_venta = db.Column(db.Integer, unique=True, index=True)
-    fecha = db.Column(db.DateTime, default=datetime.utcnow)
+    fecha = db.Column(db.DateTime, default=ahora_local)
     cliente_id = db.Column(db.Integer, db.ForeignKey('cliente.id'))
     cliente = db.Column(db.String(100), default='Cliente General')
     usuario_username = db.Column(db.String(50))
@@ -171,7 +178,7 @@ class CuentaPorCobrar(db.Model):
     cliente_id = db.Column(db.Integer, db.ForeignKey('cliente.id'), nullable=False)
     venta_id = db.Column(db.Integer, db.ForeignKey('venta.id'), nullable=False)
     numero_venta = db.Column(db.Integer, index=True)
-    fecha_emision = db.Column(db.DateTime, default=datetime.utcnow)
+    fecha_emision = db.Column(db.DateTime, default=ahora_local)
     fecha_vencimiento = db.Column(db.DateTime)
     monto_original_usd = db.Column(db.Float, nullable=False)
     monto_abonado_usd = db.Column(db.Float, default=0.0)
@@ -185,7 +192,7 @@ class CuentaPorCobrar(db.Model):
 class AbonoCuentaPorCobrar(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     cuenta_por_cobrar_id = db.Column(db.Integer, db.ForeignKey('cuenta_por_cobrar.id'), nullable=False)
-    fecha = db.Column(db.DateTime, default=datetime.utcnow)
+    fecha = db.Column(db.DateTime, default=ahora_local)
     medio = db.Column(db.String(50), nullable=False)
     moneda = db.Column(db.String(10), nullable=False)
     monto = db.Column(db.Float, nullable=False)
@@ -204,7 +211,7 @@ class MovimientoCuentaCliente(db.Model):
     cuenta_por_cobrar_id = db.Column(db.Integer, db.ForeignKey('cuenta_por_cobrar.id'))
     abono_id = db.Column(db.Integer, db.ForeignKey('abono_cuenta_por_cobrar.id'))
     movimiento_referencia_id = db.Column(db.Integer, db.ForeignKey('movimiento_cuenta_cliente.id'))
-    fecha = db.Column(db.DateTime, default=datetime.utcnow)
+    fecha = db.Column(db.DateTime, default=ahora_local)
     tipo_movimiento = db.Column(db.String(50), nullable=False)
     monto_usd = db.Column(db.Float, nullable=False)
     saldo_disponible_usd = db.Column(db.Float, default=0.0)
@@ -223,7 +230,7 @@ class MovimientoCuentaCliente(db.Model):
 class DevolucionVenta(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     venta_id = db.Column(db.Integer, db.ForeignKey('venta.id'), nullable=False)
-    fecha = db.Column(db.DateTime, default=datetime.utcnow)
+    fecha = db.Column(db.DateTime, default=ahora_local)
     cliente = db.Column(db.String(100), default='Cliente General')
     motivo = db.Column(db.Text)
     reintegros_entregados = db.Column(db.JSON)

@@ -6,7 +6,7 @@ from sqlalchemy import or_
 from auth_utils import get_current_user, require_roles
 from cuenta_corriente_utils import obtener_saldos_a_favor_disponibles
 from database import db
-from models import AbonoCuentaPorCobrar, Cliente, CuentaPorCobrar, MovimientoCuentaCliente
+from models import AbonoCuentaPorCobrar, Cliente, CuentaPorCobrar, MovimientoCuentaCliente, ahora_local
 from pagination import build_paginated_response, get_pagination_params, has_pagination_args
 
 
@@ -56,7 +56,7 @@ def buscar_abono_duplicado_reciente(
     equivalente_usd: float,
     usuario_username: str | None,
 ) -> AbonoCuentaPorCobrar | None:
-    limite = datetime.utcnow() - timedelta(seconds=VENTANA_ABONO_DUPLICADO_SEGUNDOS)
+    limite = ahora_local() - timedelta(seconds=VENTANA_ABONO_DUPLICADO_SEGUNDOS)
     query = AbonoCuentaPorCobrar.query.filter(
         AbonoCuentaPorCobrar.cuenta_por_cobrar_id == cuenta_id,
         AbonoCuentaPorCobrar.fecha >= limite,

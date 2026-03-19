@@ -3,7 +3,7 @@ from datetime import datetime
 from sqlalchemy import or_
 from auth_utils import require_roles
 from database import db
-from models import Compra, DetalleCompra, HistorialPrecio, Producto, Proveedor
+from models import Compra, DetalleCompra, HistorialPrecio, Producto, Proveedor, ahora_local
 from pagination import build_paginated_response, get_pagination_params, has_pagination_args
 
 compras_bp = Blueprint('compras', __name__)
@@ -125,7 +125,7 @@ def crear_compra():
         nueva = Compra(
             proveedor_id=proveedor_id,
             nro_factura=nro_factura,
-            fecha=datetime.strptime(data['fecha'], '%Y-%m-%d').date() if data.get('fecha') else datetime.utcnow().date(),
+            fecha=datetime.strptime(data['fecha'], '%Y-%m-%d').date() if data.get('fecha') else ahora_local().date(),
             fecha_libro=datetime.strptime(data['fecha_libro'], '%Y-%m-%d').date() if data.get('fecha_libro') else None,
             total_dolares=data['total_dolares'],
             total_bs=data.get('total_bs', 0),

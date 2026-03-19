@@ -36,7 +36,8 @@ const VentasCheckoutFeature = {
         const totalVenta = carrito.reduce((sum, item) => sum + item.subtotal_dolares, 0);
         const totalVentaBs = carrito.reduce((sum, item) => {
             const prodOriginal = productos[item.productoIndex];
-            return sum + this.aplicarRedondeoBsSeguro(item.subtotal_dolares * tasaDolar, prodOriginal.metodo_redondeo || 'none');
+            const metodoRedondeo = item.lista_precio === 0 ? 'none' : (prodOriginal.metodo_redondeo || 'none');
+            return sum + this.aplicarRedondeoBsSeguro(item.subtotal_dolares * tasaDolar, metodoRedondeo);
         }, 0);
 
         const tasaEfectiva = totalVenta > 0 ? (totalVentaBs / totalVenta) : tasaDolar;

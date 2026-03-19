@@ -17,6 +17,7 @@ from models import (
     PagoVenta,
     Producto,
     Venta,
+    ahora_local,
 )
 
 ventas_bp = Blueprint('ventas', __name__)
@@ -160,6 +161,7 @@ def registrar_venta():
                 return jsonify({'error': 'El cliente no tiene suficiente saldo a favor'}), 400
 
         nueva_venta = Venta(
+            fecha=ahora_local(),
             cliente_id=cliente.id if cliente else None,
             cliente=cliente.nombre if cliente else cliente_nombre,
             usuario_username=current_user.username,

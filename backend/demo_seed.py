@@ -16,6 +16,7 @@ from models import (
     Proveedor,
     Usuario,
     Venta,
+    ahora_local,
 )
 
 
@@ -191,9 +192,9 @@ def ensure_demo_dataset() -> None:
     if not compra:
         compra = Compra(
             numero_compra=1001,
-            fecha=datetime.utcnow().date() - timedelta(days=10),
+            fecha=ahora_local().date() - timedelta(days=10),
             nro_factura='DEMO-COMPRA-001',
-            fecha_libro=datetime.utcnow().date() - timedelta(days=10),
+            fecha_libro=ahora_local().date() - timedelta(days=10),
             proveedor_id=proveedor.id,
             total_dolares=110.0,
             total_bs=0.0,
@@ -221,7 +222,7 @@ def ensure_demo_dataset() -> None:
     venta_contado = Venta.query.filter_by(usuario_username='demo-cajero', total_dolares=18.5).first()
     if not venta_contado:
         venta_contado = Venta(
-            fecha=datetime.utcnow() - timedelta(days=3),
+            fecha=ahora_local() - timedelta(days=3),
             cliente_id=cliente_contado.id,
             cliente=cliente_contado.nombre,
             usuario_username=demo_cajero.username,
@@ -270,7 +271,7 @@ def ensure_demo_dataset() -> None:
     venta_credito = Venta.query.filter_by(usuario_username='demo-admin', total_dolares=52.0).first()
     if not venta_credito:
         venta_credito = Venta(
-            fecha=datetime.utcnow() - timedelta(days=2),
+            fecha=ahora_local() - timedelta(days=2),
             cliente_id=cliente_credito.id,
             cliente=cliente_credito.nombre,
             usuario_username=demo_admin.username,
@@ -312,7 +313,7 @@ def ensure_demo_dataset() -> None:
             venta_id=venta_credito.id,
             numero_venta=venta_credito.numero_venta,
             fecha_emision=venta_credito.fecha,
-            fecha_vencimiento=datetime.utcnow() + timedelta(days=15),
+            fecha_vencimiento=ahora_local() + timedelta(days=15),
             monto_original_usd=40.0,
             monto_abonado_usd=15.0,
             saldo_pendiente_usd=25.0,
@@ -340,7 +341,7 @@ def ensure_demo_dataset() -> None:
 
         abono = AbonoCuentaPorCobrar(
             cuenta_por_cobrar_id=cuenta.id,
-            fecha=datetime.utcnow() - timedelta(days=1),
+            fecha=ahora_local() - timedelta(days=1),
             medio='Efectivo USD',
             moneda='USD',
             monto=15.0,

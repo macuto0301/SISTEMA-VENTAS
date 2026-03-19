@@ -102,7 +102,8 @@ const AppState = {
 
     getTotalCarritoBs() {
         return this.carrito.reduce((sum, item) => {
-            const precioBs = Utils.aplicarRedondeoBs(item.precio_dolares * this.tasaDolar, item.metodo_redondeo);
+            const metodoRedondeo = item.lista_precio === 0 ? 'none' : (item.metodo_redondeo || 'none');
+            const precioBs = Utils.aplicarRedondeoBs(item.precio_dolares * this.tasaDolar, metodoRedondeo);
             return sum + (precioBs * item.cantidad);
         }, 0);
     },

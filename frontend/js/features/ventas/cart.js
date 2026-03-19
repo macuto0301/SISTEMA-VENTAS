@@ -411,8 +411,8 @@ const VentasCartFeature = {
                         </td>
                         <td class="carrito-col-precio-bs">
                             ${precioEditable
-                                ? `<input type="number" min="0" step="0.01" value="${this.aplicarRedondeoBsSeguro(item.precio_dolares * tasaDolar, prodOriginal?.metodo_redondeo || 'none').toFixed(2)}" class="carrito-precio-input" onclick="event.stopPropagation()" onchange="actualizarPrecioCarritoDesdebs(${index}, this.value)">`
-                                : `Bs ${this.aplicarRedondeoBsSeguro(item.precio_dolares * tasaDolar, prodOriginal?.metodo_redondeo || 'none').toFixed(2)}`}
+                                ? `<input type="number" min="0" step="0.01" value="${this.aplicarRedondeoBsSeguro(item.precio_dolares * tasaDolar, item.lista_precio === 0 ? 'none' : (prodOriginal?.metodo_redondeo || 'none')).toFixed(2)}" class="carrito-precio-input" onclick="event.stopPropagation()" onchange="actualizarPrecioCarritoDesdebs(${index}, this.value)">`
+                                : `Bs ${this.aplicarRedondeoBsSeguro(item.precio_dolares * tasaDolar, item.lista_precio === 0 ? 'none' : (prodOriginal?.metodo_redondeo || 'none')).toFixed(2)}`}
                         </td>
                         <td class="carrito-col-total">$${item.subtotal_dolares.toFixed(2)}</td>
                     </tr>
@@ -422,7 +422,8 @@ const VentasCartFeature = {
 
         const totalBs = carrito.reduce((sum, item) => {
             const prodOriginal = productos[item.productoIndex];
-            return sum + this.aplicarRedondeoBsSeguro(item.subtotal_dolares * tasaDolar, prodOriginal.metodo_redondeo || 'none');
+            const metodoRedondeo = item.lista_precio === 0 ? 'none' : (prodOriginal.metodo_redondeo || 'none');
+            return sum + this.aplicarRedondeoBsSeguro(item.subtotal_dolares * tasaDolar, metodoRedondeo);
         }, 0);
 
         const totalCantidad = carrito.reduce((sum, item) => {
