@@ -128,11 +128,17 @@ const NavigationCore = {
             case 'informes':
                 panelId = 'panelInformes';
                 setTimeout(() => {
-                    if (typeof window.cargarTodasLasVentas === 'function') {
-                        window.cargarTodasLasVentas();
-                        return;
+                    // Cargar datos del sub-panel activo
+                    const capitalActivo = document.querySelector('.informes-subtab[data-subtab="capital"]')?.classList.contains('active');
+                    if (capitalActivo) {
+                        window.InformesCapitalService?.cargarInforme?.();
+                    } else {
+                        if (typeof window.cargarTodasLasVentas === 'function') {
+                            window.cargarTodasLasVentas();
+                            return;
+                        }
+                        window.InformesService?.cargarTodasLasVentas?.();
                     }
-                    window.InformesService?.cargarTodasLasVentas?.();
                 }, 100);
                 break;
         }

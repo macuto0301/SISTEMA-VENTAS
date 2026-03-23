@@ -284,6 +284,16 @@ def create_app():
                 db.session.commit()
                 print("Columna tipo agregada a tabla producto")
 
+            if columnas_producto and 'almacen' not in columnas_producto:
+                db.session.execute(text("ALTER TABLE producto ADD COLUMN almacen VARCHAR(100)"))
+                db.session.commit()
+                print("Columna almacen agregada a tabla producto")
+
+            if columnas_producto and 'fecha_creado' not in columnas_producto:
+                db.session.execute(text("ALTER TABLE producto ADD COLUMN fecha_creado TIMESTAMP DEFAULT CURRENT_TIMESTAMP"))
+                db.session.commit()
+                print("Columna fecha_creado agregada a tabla producto")
+
             if columnas_producto:
                 db.session.execute(text("UPDATE producto SET fotos_json = CONCAT('[\"', foto_path, '\"]') WHERE foto_path IS NOT NULL AND foto_path <> '' AND (fotos_json IS NULL OR fotos_json = '')"))
                 db.session.execute(text("UPDATE producto SET precio_1_dolares = precio_dolares WHERE precio_1_dolares IS NULL OR precio_1_dolares = 0"))

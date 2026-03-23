@@ -3983,6 +3983,97 @@ body.modal-open {
     opacity: 0.86;
 }
 
+/* ============================================
+   SUB-TABS DE INFORMES (Ventas | Capital)
+   ============================================ */
+
+.informes-subtab-bar {
+    display: flex;
+    gap: 4px;
+    padding: 4px;
+    background: var(--bg-muted);
+    border-radius: 16px;
+    margin-bottom: 20px;
+    width: fit-content;
+}
+
+.informes-subtab {
+    padding: 8px 22px;
+    border: none;
+    border-radius: 12px;
+    background: transparent;
+    color: var(--text-muted);
+    font-family: 'Manrope', sans-serif;
+    font-size: 0.88rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.informes-subtab:hover {
+    color: var(--text-main);
+    background: rgba(255, 255, 255, 0.5);
+}
+
+.informes-subtab.active {
+    background: var(--bg-card);
+    color: var(--accent);
+    box-shadow: 0 4px 12px rgba(18, 28, 36, 0.08);
+}
+
+.informes-subpanel {
+    display: none;
+}
+
+.informes-subpanel.active {
+    display: block;
+}
+
+/* Capital invertido tarjeta variants */
+.tarjeta-resumen--capital {
+    background: linear-gradient(135deg, #1d6b4f 0%, #0f3d2e 100%);
+}
+
+.tarjeta-resumen--productos-total {
+    background: linear-gradient(135deg, #2f6f86 0%, #133844 100%);
+}
+
+.tarjeta-resumen--unidades {
+    background: linear-gradient(135deg, #4a6fa5 0%, #2a4a7f 100%);
+}
+
+.tarjeta-resumen--venta-potencial {
+    background: linear-gradient(135deg, #b78a49 0%, #7a541d 100%);
+}
+
+.tarjeta-resumen--ganancia-potencial {
+    background: linear-gradient(135deg, #2d8f57 0%, #1a6b3a 100%);
+}
+
+.resumen-capital-grid {
+    grid-template-columns: repeat(5, minmax(140px, 1fr));
+}
+
+@media (max-width: 900px) {
+    .resumen-capital-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    .informes-subtab-bar {
+        width: 100%;
+    }
+    .informes-subtab {
+        flex: 1;
+        text-align: center;
+    }
+}
+
+@media (max-width: 520px) {
+    .resumen-capital-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
 .sv-sr-only {
     position: absolute;
     width: 1px;

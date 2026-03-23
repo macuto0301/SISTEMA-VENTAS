@@ -1,11 +1,13 @@
 import os
 import json
+import traceback
 from io import BytesIO
 from uuid import uuid4
+from datetime import datetime
 
 from flask import Blueprint, current_app, jsonify, request
 from PIL import Image, ImageOps
-from sqlalchemy import or_
+from sqlalchemy import or_, func
 from werkzeug.datastructures import FileStorage
 from werkzeug.utils import secure_filename
 
@@ -84,6 +86,8 @@ def serialize_producto(producto: Producto) -> dict:
         'cantidad': producto.cantidad,
         'permite_decimal': bool(producto.permite_decimal),
         'categoria': producto.categoria,
+        'almacen': producto.almacen,
+        'fecha_creado': producto.fecha_creado.strftime('%d/%m/%Y %H:%M') if producto.fecha_creado else None,
         'metodo_redondeo': producto.metodo_redondeo,
         'foto_path': producto.foto_path,
         'foto_url': build_producto_foto_url(producto.foto_path),
@@ -351,6 +355,7 @@ def crear_producto():
         nuevo.cantidad = 0
         nuevo.permite_decimal = parse_bool(data.get('permite_decimal'))
         nuevo.categoria = data.get('categoria')
+        nuevo.almacen = data.get('almacen')
         nuevo.metodo_redondeo = data.get('metodo_redondeo', 'none')
         uploaded_photo_paths = [save_producto_image(image_file) for image_file in image_files]
         nuevo.fotos = uploaded_photo_paths
@@ -398,6 +403,7 @@ def editar_producto(id):
         prod.porcentaje_ganancia_2 = price_values['porcentaje_ganancia_2']
         prod.porcentaje_ganancia_3 = price_values['porcentaje_ganancia_3']
         prod.categoria = data.get('categoria', prod.categoria)
+        prod.almacen = data.get('almacen', prod.almacen)
         prod.metodo_redondeo = data.get('metodo_redondeo', prod.metodo_redondeo)
         if 'permite_decimal' in data:
             prod.permite_decimal = parse_bool(data.get('permite_decimal'))
@@ -548,7 +554,6 @@ def get_movimientos_stock_producto(id):
 @productos_bp.route('/<int:id>/historial-completo', methods=['GET'])
 @require_roles('admin')
 def get_historial_completo_producto(id):
-    import traceback
     producto = Producto.query.get_or_404(id)
     eventos = []
 
@@ -651,3 +656,146 @@ def get_historial_completo_producto(id):
         },
         'eventos': eventos
     })
+
+
+# ============================================
+# INFORME DE CAPITAL INVERTIDO EN INVENTARIO
+# ============================================
+
+@productos_bp.route('/inventario/capital', methods=['GET'])
+@require_roles('admin')
+def get_inventario_capital():
+    """Retorna el informe de capital invertido en inventario.
+    Incluye items paginados, resumen global sobre el set filtrado completo,
+    y listas de categorias/almacenes disponibles para los dropdowns.
+    """
+    # -- Filtros --
+    busqueda = (request.args.get('q') or '').strip()
+    categoria = (request.args.get('categoria') or '').strip()
+    almacen = (request.args.get('almacen') or '').strip()
+    fecha_inicio = (request.args.get('fecha_inicio') or '').strip()
+    fecha_fin = (request.args.get('fecha_fin') or '').strip()
+    solo_con_stock = (request.args.get('in_stock') or '').strip().lower() in ('true', '1', 'si', 'yes')
+
+    # Query base: solo productos (no servicios)
+    query = Producto.query.filter(
+        or_(Producto.tipo == 'producto', Producto.tipo.is_(None), Producto.tipo == '')
+    )
+
+    if busqueda:
+        termino = f'%{busqueda}%'
+        query = query.filter(or_(
+            Producto.codigo.ilike(termino),
+            Producto.nombre.ilike(termino),
+            Producto.categoria.ilike(termino),
+            Producto.almacen.ilike(termino),
+            Producto.marca.ilike(termino),
+        ))
+
+    if categoria:
+        query = query.filter(Producto.categoria.ilike(f'%{categoria}%'))
+
+    if almacen:
+        query = query.filter(Producto.almacen.ilike(f'%{almacen}%'))
+
+    if fecha_inicio:
+        try:
+            dt_inicio = datetime.strptime(fecha_inicio, '%Y-%m-%d')
+            query = query.filter(Producto.fecha_creado >= dt_inicio)
+        except ValueError:
+            pass
+
+    if fecha_fin:
+        try:
+            dt_fin = datetime.strptime(fecha_fin, '%Y-%m-%d').replace(hour=23, minute=59, second=59)
+            query = query.filter(Producto.fecha_creado <= dt_fin)
+        except ValueError:
+            pass
+
+    if solo_con_stock:
+        query = query.filter(Producto.cantidad > 0)
+
+    query = query.order_by(Producto.nombre)
+
+    # -- Calcular resumen sobre TODOS los productos filtrados (sin paginar) --
+    all_products = query.all()
+
+    total_productos = len(all_products)
+    total_unidades = 0.0
+    capital_invertido = 0.0
+    valor_venta_potencial = 0.0
+
+    categorias_set = set()
+    almacenes_set = set()
+
+    for p in all_products:
+        cant = float(p.cantidad or 0)
+        costo = float(p.precio_costo or 0)
+        precio_venta = float(p.precio_1_dolares or p.precio_dolares or 0)
+
+        total_unidades += cant
+        capital_invertido += cant * costo
+        valor_venta_potencial += cant * precio_venta
+
+        if p.categoria and p.categoria.strip():
+            categorias_set.add(p.categoria.strip())
+        if p.almacen and p.almacen.strip():
+            almacenes_set.add(p.almacen.strip())
+
+    ganancia_potencial = valor_venta_potencial - capital_invertido
+
+    resumen = {
+        'total_productos': total_productos,
+        'total_unidades': round(total_unidades, 2),
+        'capital_invertido': round(capital_invertido, 2),
+        'valor_venta_potencial': round(valor_venta_potencial, 2),
+        'ganancia_potencial': round(ganancia_potencial, 2),
+        'categorias_count': len(categorias_set),
+        'almacenes_count': len(almacenes_set),
+    }
+
+    # -- Paginacion --
+    if has_pagination_args():
+        page, page_size = get_pagination_params()
+        paginacion = query.paginate(page=page, per_page=page_size, error_out=False)
+        productos = paginacion.items
+        total = paginacion.total
+    else:
+        productos = all_products
+        page = 1
+        page_size = len(all_products) or 1
+        total = total_productos
+
+    items = []
+    for p in productos:
+        cant = float(p.cantidad or 0)
+        costo = float(p.precio_costo or 0)
+        precio_venta = float(p.precio_1_dolares or p.precio_dolares or 0)
+        items.append({
+            'id': p.id,
+            'codigo': p.codigo,
+            'nombre': p.nombre,
+            'categoria': p.categoria or '',
+            'almacen': p.almacen or '',
+            'unidad': p.unidad or 'und',
+            'cantidad': cant,
+            'precio_costo': round(costo, 2),
+            'valor_total': round(cant * costo, 2),
+            'precio_venta': round(precio_venta, 2),
+            'fecha_creado': p.fecha_creado.strftime('%d/%m/%Y') if p.fecha_creado else '',
+        })
+
+    categorias_lista = sorted(categorias_set, key=lambda x: x.lower())
+    almacenes_lista = sorted(almacenes_set, key=lambda x: x.lower())
+
+    response = {
+        'items': items,
+        'resumen': resumen,
+        'categorias': categorias_lista,
+        'almacenes': almacenes_lista,
+    }
+
+    if has_pagination_args():
+        response['pagination'] = build_paginated_response(items, int(total), page, page_size).get('pagination', {})
+
+    return jsonify(response)

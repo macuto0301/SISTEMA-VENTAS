@@ -764,6 +764,45 @@ function mostrarInformes(ventasFiltradas, titulo) {
     return window.InformesService?.mostrar(ventasFiltradas, titulo);
 }
 
+// ============================================
+// FUNCIONES DE CAPITAL INVERTIDO (delegadas al módulo InformesCapitalService)
+// ============================================
+
+async function cargarInformeCapital() {
+    return window.InformesCapitalService?.cargarInforme();
+}
+
+async function filtrarCapital() {
+    return window.InformesCapitalService?.filtrar();
+}
+
+async function limpiarFiltrosCapital() {
+    return window.InformesCapitalService?.limpiarFiltros();
+}
+
+function exportarCapitalPDF() {
+    return window.InformesCapitalService?.exportarPDF();
+}
+
+function cambiarSubtabInforme(subtab) {
+    const subpanelVentas = document.getElementById('subpanelVentas');
+    const subpanelCapital = document.getElementById('subpanelCapital');
+    const botones = document.querySelectorAll('.informes-subtab');
+
+    botones.forEach(btn => btn.classList.remove('active'));
+    const botonActivo = document.querySelector(`.informes-subtab[data-subtab="${subtab}"]`);
+    if (botonActivo) botonActivo.classList.add('active');
+
+    if (subtab === 'capital') {
+        if (subpanelVentas) subpanelVentas.style.display = 'none';
+        if (subpanelCapital) subpanelCapital.style.display = 'block';
+        window.InformesCapitalService?.cargarInforme?.();
+    } else {
+        if (subpanelVentas) subpanelVentas.style.display = 'block';
+        if (subpanelCapital) subpanelCapital.style.display = 'none';
+    }
+}
+
 function obtenerTimestampFecha(venta) {
     return window.Utils?.obtenerTimestampFecha(venta?.fecha || '') || 0;
 }

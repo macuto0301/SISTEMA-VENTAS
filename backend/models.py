@@ -46,6 +46,8 @@ class Producto(db.Model):
     permite_decimal = db.Column(db.Boolean, default=False)
     categoria = db.Column(db.String(50))
     metodo_redondeo = db.Column(db.String(20), default='none')
+    almacen = db.Column(db.String(100))
+    fecha_creado = db.Column(db.DateTime, default=ahora_local)
     foto_path = db.Column(db.String(255))
     fotos_json = db.Column(db.Text)
 

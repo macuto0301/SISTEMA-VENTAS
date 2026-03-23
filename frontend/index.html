@@ -51,6 +51,7 @@
     <script src="js/core/config.js"></script>
     <script src="js/table.js"></script>
     <script src="js/informes.js"></script>
+    <script src="js/informes-capital.js"></script>
     <script src="js/compras.js"></script>
     <script src="js/core/bootstrap.js"></script>
     <script src="script.js"></script>
@@ -286,55 +287,118 @@
 
         <!-- Panel de Informes -->
         <div id="panelInformes" class="tab-panel">
-            <div class="resumen-ventas" id="resumenVentas">
-                <!-- Resumen de ventas -->
+
+            <!-- Selector de sub-informe -->
+            <div class="informes-subtab-bar">
+                <button type="button" class="informes-subtab active" data-subtab="ventas">Ventas</button>
+                <button type="button" class="informes-subtab" data-subtab="capital">Capital Invertido</button>
             </div>
 
-            <div class="panel-header panel-header-surface">
-                <div>
-                    <span class="section-kicker">Análisis</span>
-                    <h2>Informes de Ventas</h2>
+            <!-- Sub-panel: Informe de Ventas -->
+            <div id="subpanelVentas" class="informes-subpanel active">
+                <div class="resumen-ventas" id="resumenVentas">
+                    <!-- Resumen de ventas -->
                 </div>
-                <div class="filtros-informe" style="display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap;">
-                    <div>
-                        <label for="fechaInicioInforme" style="display: block; font-size: 0.8em; margin-bottom: 2px;">Desde:</label>
-                        <input type="date" id="fechaInicioInforme" class="form-control" style="padding: 5px;" name="fechaInicioInforme">
-                    </div>
-                    <div>
-                        <label for="fechaFinInforme" style="display: block; font-size: 0.8em; margin-bottom: 2px;">Hasta:</label>
-                        <input type="date" id="fechaFinInforme" class="form-control" style="padding: 5px;" name="fechaFinInforme">
-                    </div>
-                    <div>
-                        <label for="filtroRolInforme" style="display: block; font-size: 0.8em; margin-bottom: 2px;">Rol:</label>
-                        <select id="filtroRolInforme" class="form-control" style="padding: 5px; min-width: 140px;" name="filtroRolInforme">
-                            <option value="">Todos</option>
-                            <option value="admin">Admin</option>
-                            <option value="cajero">Cajero</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label for="filtroUsuarioInforme" style="display: block; font-size: 0.8em; margin-bottom: 2px;">Usuario:</label>
-                        <select id="filtroUsuarioInforme" class="form-control" style="padding: 5px; min-width: 170px;" name="filtroUsuarioInforme">
-                            <option value="">Todos</option>
-                        </select>
-                    </div>
-                    <button id="btnFiltrarInformes" type="button" class="btn-primary"
-                        style="height: 32px; margin-bottom: 2px;">🔍 Filtrar</button>
-                    <button id="btnLimpiarInformes" type="button" class="btn-secondary" 
-                        style="height: 32px; margin-bottom: 2px;">🧹 Limpiar</button>
 
-                    <div style="margin-left: auto; display: flex; gap: 5px;">
-                        <button id="btnVentasHoy" type="button" class="btn-secondary" style="height: 32px;">📅
-                            Hoy</button>
-                        <button id="btnVentasTodas" type="button" class="btn-secondary" style="height: 32px;">📋
-                            Todas</button>
+                <div class="panel-header panel-header-surface">
+                    <div>
+                        <span class="section-kicker">Análisis</span>
+                        <h2>Informes de Ventas</h2>
                     </div>
+                    <div class="filtros-informe" style="display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap;">
+                        <div>
+                            <label for="fechaInicioInforme" style="display: block; font-size: 0.8em; margin-bottom: 2px;">Desde:</label>
+                            <input type="date" id="fechaInicioInforme" class="form-control" style="padding: 5px;" name="fechaInicioInforme">
+                        </div>
+                        <div>
+                            <label for="fechaFinInforme" style="display: block; font-size: 0.8em; margin-bottom: 2px;">Hasta:</label>
+                            <input type="date" id="fechaFinInforme" class="form-control" style="padding: 5px;" name="fechaFinInforme">
+                        </div>
+                        <div>
+                            <label for="filtroRolInforme" style="display: block; font-size: 0.8em; margin-bottom: 2px;">Rol:</label>
+                            <select id="filtroRolInforme" class="form-control" style="padding: 5px; min-width: 140px;" name="filtroRolInforme">
+                                <option value="">Todos</option>
+                                <option value="admin">Admin</option>
+                                <option value="cajero">Cajero</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="filtroUsuarioInforme" style="display: block; font-size: 0.8em; margin-bottom: 2px;">Usuario:</label>
+                            <select id="filtroUsuarioInforme" class="form-control" style="padding: 5px; min-width: 170px;" name="filtroUsuarioInforme">
+                                <option value="">Todos</option>
+                            </select>
+                        </div>
+                        <button id="btnFiltrarInformes" type="button" class="btn-primary"
+                            style="height: 32px; margin-bottom: 2px;">🔍 Filtrar</button>
+                        <button id="btnLimpiarInformes" type="button" class="btn-secondary" 
+                            style="height: 32px; margin-bottom: 2px;">🧹 Limpiar</button>
+
+                        <div style="margin-left: auto; display: flex; gap: 5px;">
+                            <button id="btnVentasHoy" type="button" class="btn-secondary" style="height: 32px;">📅
+                                Hoy</button>
+                            <button id="btnVentasTodas" type="button" class="btn-secondary" style="height: 32px;">📋
+                                Todas</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tabla-informes" id="tablaInformes">
+                    <!-- Tabla de ventas -->
                 </div>
             </div>
 
-            <div class="tabla-informes" id="tablaInformes">
-                <!-- Tabla de ventas -->
+            <!-- Sub-panel: Capital Invertido -->
+            <div id="subpanelCapital" class="informes-subpanel" style="display:none;">
+                <div class="resumen-ventas" id="resumenCapital">
+                    <!-- Resumen de capital -->
+                </div>
+
+                <div class="panel-header panel-header-surface">
+                    <div>
+                        <span class="section-kicker">Inventario</span>
+                        <h2>Capital Invertido</h2>
+                    </div>
+                    <div class="filtros-informe" style="display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap;">
+                        <div>
+                            <label for="filtroCategoriaCap" style="display: block; font-size: 0.8em; margin-bottom: 2px;">Categoria:</label>
+                            <select id="filtroCategoriaCap" class="form-control" style="padding: 5px; min-width: 150px;">
+                                <option value="">Todos</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="filtroAlmacenCap" style="display: block; font-size: 0.8em; margin-bottom: 2px;">Almacen:</label>
+                            <select id="filtroAlmacenCap" class="form-control" style="padding: 5px; min-width: 150px;">
+                                <option value="">Todos</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="fechaInicioCap" style="display: block; font-size: 0.8em; margin-bottom: 2px;">Creado desde:</label>
+                            <input type="date" id="fechaInicioCap" class="form-control" style="padding: 5px;" name="fechaInicioCap">
+                        </div>
+                        <div>
+                            <label for="fechaFinCap" style="display: block; font-size: 0.8em; margin-bottom: 2px;">Creado hasta:</label>
+                            <input type="date" id="fechaFinCap" class="form-control" style="padding: 5px;" name="fechaFinCap">
+                        </div>
+                        <div style="display:flex; align-items:center; gap:4px; padding-bottom:4px;">
+                            <input type="checkbox" id="filtroSoloStockCap" style="margin:0;">
+                            <label for="filtroSoloStockCap" style="font-size: 0.8em; white-space: nowrap;">Solo con stock</label>
+                        </div>
+                        <button id="btnFiltrarCapital" type="button" class="btn-primary"
+                            style="height: 32px; margin-bottom: 2px;">🔍 Filtrar</button>
+                        <button id="btnLimpiarCapital" type="button" class="btn-secondary"
+                            style="height: 32px; margin-bottom: 2px;">🧹 Limpiar</button>
+                        <div style="margin-left: auto;">
+                            <button id="btnExportarCapitalPDF" type="button" class="btn-secondary"
+                                style="height: 32px;">🖨️ PDF / Imprimir</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tabla-informes" id="tablaCapitalInvertido">
+                    <!-- Tabla de capital invertido -->
+                </div>
             </div>
+
         </div>
 
         <!-- Panel de Proveedores -->

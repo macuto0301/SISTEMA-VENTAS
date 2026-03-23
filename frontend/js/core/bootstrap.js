@@ -137,6 +137,21 @@ function registrarEventosGeneralesApp() {
     registrarEventoElemento('btnLimpiarInformes', 'click', () => window.InformesService?.limpiarFiltros?.());
     registrarEventoElemento('btnVentasHoy', 'click', () => window.InformesService?.cargarVentasDelDia?.());
     registrarEventoElemento('btnVentasTodas', 'click', () => window.InformesService?.cargarTodasLasVentas?.());
+
+    // Capital invertido
+    registrarEventoElemento('btnFiltrarCapital', 'click', () => window.InformesCapitalService?.filtrar?.());
+    registrarEventoElemento('btnLimpiarCapital', 'click', () => window.InformesCapitalService?.limpiarFiltros?.());
+    registrarEventoElemento('btnExportarCapitalPDF', 'click', () => window.InformesCapitalService?.exportarPDF?.());
+
+    // Sub-tabs de informes
+    document.querySelectorAll('.informes-subtab[data-subtab]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const subtab = btn.dataset.subtab;
+            if (subtab && typeof window.cambiarSubtabInforme === 'function') {
+                window.cambiarSubtabInforme(subtab);
+            }
+        });
+    });
     registrarEventoElemento('btnCerrarModalAbonoCuenta', 'click', () => window.CxcFeature?.cerrarModalAbonoCuenta?.());
     registrarEventoElemento('btnCancelarAbonoCuenta', 'click', () => window.CxcFeature?.cerrarModalAbonoCuenta?.());
     registrarEventoElemento('btnGuardarAbonoCuenta', 'click', () => window.CxcFeature?.guardarAbonoCuentaDesdeModal?.());
@@ -189,6 +204,23 @@ function inicializarFechaInformes() {
     });
 
     flatpickr('#fechaFinInforme', {
+        dateFormat: 'Y-m-d',
+        altInput: true,
+        altFormat: 'd/m/Y',
+        locale: 'es',
+        allowInput: true
+    });
+
+    // Capital invertido date pickers
+    flatpickr('#fechaInicioCap', {
+        dateFormat: 'Y-m-d',
+        altInput: true,
+        altFormat: 'd/m/Y',
+        locale: 'es',
+        allowInput: true
+    });
+
+    flatpickr('#fechaFinCap', {
         dateFormat: 'Y-m-d',
         altInput: true,
         altFormat: 'd/m/Y',
