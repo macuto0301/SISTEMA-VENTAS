@@ -130,8 +130,11 @@ const NavigationCore = {
                 setTimeout(() => {
                     // Cargar datos del sub-panel activo
                     const capitalActivo = document.querySelector('.informes-subtab[data-subtab="capital"]')?.classList.contains('active');
+                    const ventaDiaActivo = document.querySelector('.informes-subtab[data-subtab="ventaDia"]')?.classList.contains('active');
                     if (capitalActivo) {
                         window.InformesCapitalService?.cargarInforme?.();
+                    } else if (ventaDiaActivo) {
+                        window.InformesVentaDiaService?.inicializarFechaHoy?.();
                     } else {
                         if (typeof window.cargarTodasLasVentas === 'function') {
                             window.cargarTodasLasVentas();

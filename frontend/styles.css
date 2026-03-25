@@ -4068,6 +4068,293 @@ body.modal-open {
     }
 }
 
+/* ============================================
+   INFORME DE VENTA DEL DIA
+   ============================================ */
+
+.informe-dia-config {
+    display: flex;
+    gap: 28px;
+    margin-top: 16px;
+    flex-wrap: wrap;
+}
+
+.informe-dia-opciones {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 280px;
+    flex: 1;
+}
+
+.informe-dia-check {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    font-size: 0.88rem;
+    color: var(--text-main);
+    padding: 4px 0;
+    transition: color 0.15s;
+}
+
+.informe-dia-check:hover {
+    color: var(--accent);
+}
+
+.informe-dia-check input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--accent);
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.informe-dia-fecha-hora {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 220px;
+}
+
+.informe-dia-campo {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.informe-dia-campo label {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+.informe-dia-campo input {
+    padding: 6px 10px;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-sm);
+    font-family: 'Manrope', sans-serif;
+    font-size: 0.88rem;
+    background: var(--bg-card);
+    color: var(--text-main);
+}
+
+.informe-dia-rango-hora {
+    border: 1px solid var(--line-soft);
+    border-radius: var(--radius-md);
+    padding: 12px;
+    background: var(--bg-soft);
+}
+
+.informe-dia-rango-hora legend {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--accent);
+    padding: 0 6px;
+}
+
+.informe-dia-rango-hora .informe-dia-campo {
+    margin-top: 6px;
+}
+
+.informe-dia-acciones {
+    display: flex;
+    gap: 8px;
+    margin-top: 4px;
+}
+
+.informe-dia-acciones .btn-primary,
+.informe-dia-acciones .btn-secondary {
+    padding: 8px 18px;
+    font-size: 0.88rem;
+    white-space: nowrap;
+}
+
+/* Resultado del informe */
+
+.informe-dia-resultado {
+    padding: 16px 18px;
+    overflow: auto;
+    flex: 1;
+}
+
+.informe-dia-placeholder {
+    text-align: center;
+    padding: 48px 20px;
+    color: var(--text-muted);
+    font-size: 0.95rem;
+}
+
+.informe-dia-seccion {
+    margin-bottom: 20px;
+}
+
+.informe-dia-seccion-titulo {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    border-bottom: 2px solid var(--accent);
+    padding-bottom: 6px;
+    margin-bottom: 12px;
+}
+
+.informe-dia-resumen-grid {
+    grid-template-columns: repeat(3, minmax(160px, 1fr)) !important;
+}
+
+.informe-dia-vacio {
+    text-align: center;
+    padding: 16px;
+    color: var(--text-soft);
+    font-style: italic;
+}
+
+/* Tarjeta variants para venta del dia */
+.tarjeta-resumen--ventas-dia {
+    background: linear-gradient(135deg, #2f6f86 0%, #133844 100%);
+}
+
+.tarjeta-resumen--contado-dia {
+    background: linear-gradient(135deg, #2d8f57 0%, #176245 100%);
+}
+
+.tarjeta-resumen--credito-dia {
+    background: linear-gradient(135deg, #b78a49 0%, #7a541d 100%);
+}
+
+.tarjeta-resumen--costo-dia {
+    background: linear-gradient(135deg, #4a6fa5 0%, #2a4a7f 100%);
+}
+
+.tarjeta-resumen--utilidad-contado-dia {
+    background: linear-gradient(135deg, #2d8f57 0%, #176245 100%);
+}
+
+.tarjeta-resumen--utilidad-credito-dia {
+    background: linear-gradient(135deg, #b78a49 0%, #7a541d 100%);
+}
+
+.tarjeta-resumen--utilidad-dia {
+    background: linear-gradient(135deg, #1d6b4f 0%, #0f3d2e 100%);
+}
+
+.tarjeta-resumen--transacciones-dia {
+    background: linear-gradient(135deg, #0c7b93 0%, #155e75 100%);
+}
+
+/* Badges */
+.badge-tipo-venta {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 20px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+}
+
+.badge-tipo-venta--contado {
+    background: rgba(45, 143, 87, 0.15);
+    color: #2d8f57;
+}
+
+.badge-tipo-venta--credito {
+    background: rgba(183, 138, 73, 0.15);
+    color: #9a6b2a;
+}
+
+.badge-pago {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.78rem;
+    background: var(--bg-muted);
+    color: var(--text-main);
+    font-weight: 600;
+    margin: 2px 2px;
+}
+
+/* Ventas detalladas cards */
+.informe-dia-venta-card {
+    background: var(--bg-card);
+    border: 1px solid var(--line-soft);
+    border-radius: var(--radius-md);
+    padding: 12px 14px;
+    margin-bottom: 10px;
+    box-shadow: 0 2px 8px rgba(18, 28, 36, 0.04);
+}
+
+.informe-dia-venta-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--line-soft);
+    font-size: 0.88rem;
+    color: var(--text-muted);
+}
+
+.informe-dia-venta-header strong {
+    color: var(--accent);
+}
+
+.informe-dia-mini-tabla {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 4px 0;
+}
+
+.informe-dia-mini-tabla th {
+    background: var(--bg-muted);
+    color: var(--text-main);
+    padding: 4px 8px;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    text-align: left;
+}
+
+.informe-dia-mini-tabla td {
+    padding: 4px 8px;
+    font-size: 0.84rem;
+    border-bottom: 1px solid var(--line-soft);
+}
+
+.informe-dia-venta-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 8px;
+    padding-top: 6px;
+    border-top: 1px solid var(--line-soft);
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.informe-dia-venta-pagos {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+
+.informe-dia-venta-total {
+    font-size: 0.95rem;
+    color: var(--accent);
+}
+
+@media (max-width: 900px) {
+    .informe-dia-config {
+        flex-direction: column;
+        gap: 16px;
+    }
+    .informe-dia-resumen-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+    }
+}
+
 @media (max-width: 520px) {
     .resumen-capital-grid {
         grid-template-columns: 1fr;

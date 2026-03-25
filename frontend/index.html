@@ -52,6 +52,7 @@
     <script src="js/table.js"></script>
     <script src="js/informes.js"></script>
     <script src="js/informes-capital.js"></script>
+    <script src="js/informes-venta-dia.js"></script>
     <script src="js/compras.js"></script>
     <script src="js/core/bootstrap.js"></script>
     <script src="script.js"></script>
@@ -291,6 +292,7 @@
             <!-- Selector de sub-informe -->
             <div class="informes-subtab-bar">
                 <button type="button" class="informes-subtab active" data-subtab="ventas">Ventas</button>
+                <button type="button" class="informes-subtab" data-subtab="ventaDia">Venta del Dia</button>
                 <button type="button" class="informes-subtab" data-subtab="capital">Capital Invertido</button>
             </div>
 
@@ -344,6 +346,80 @@
 
                 <div class="tabla-informes" id="tablaInformes">
                     <!-- Tabla de ventas -->
+                </div>
+            </div>
+
+            <!-- Sub-panel: Venta del Dia -->
+            <div id="subpanelVentaDia" class="informes-subpanel" style="display:none;">
+                <div class="panel-header panel-header-surface">
+                    <div style="width:100%;">
+                        <span class="section-kicker">Cierre Diario</span>
+                        <h2>Informe de Venta del Dia</h2>
+
+                        <div class="informe-dia-config">
+                            <!-- Columna izquierda: opciones checkbox -->
+                            <div class="informe-dia-opciones">
+                                <label class="informe-dia-check">
+                                    <input type="checkbox" id="chkResumenGeneral" checked>
+                                    <span>Incluir resumen general de ventas</span>
+                                </label>
+                                <label class="informe-dia-check">
+                                    <input type="checkbox" id="chkMetodosPago" checked>
+                                    <span>Incluir desglose por metodos de pago</span>
+                                </label>
+                                <label class="informe-dia-check">
+                                    <input type="checkbox" id="chkCuentasCobrar">
+                                    <span>Incluir cuentas por cobrar del dia</span>
+                                </label>
+                                <label class="informe-dia-check">
+                                    <input type="checkbox" id="chkRecibosCaja" checked>
+                                    <span>Detallar recibos de caja (facturas)</span>
+                                </label>
+                                <label class="informe-dia-check">
+                                    <input type="checkbox" id="chkVentasDetalladas">
+                                    <span>Detallar ventas del dia</span>
+                                </label>
+                                <label class="informe-dia-check">
+                                    <input type="checkbox" id="chkProductosVendidos" checked>
+                                    <span>Detallar productos vendidos</span>
+                                </label>
+                                <label class="informe-dia-check">
+                                    <input type="checkbox" id="chkDevoluciones">
+                                    <span>Incluir devoluciones del dia</span>
+                                </label>
+                            </div>
+
+                            <!-- Columna derecha: fecha y rango de hora -->
+                            <div class="informe-dia-fecha-hora">
+                                <div class="informe-dia-campo">
+                                    <label for="fechaInformeDia">Fecha:</label>
+                                    <input type="date" id="fechaInformeDia" class="form-control">
+                                </div>
+                                <fieldset class="informe-dia-rango-hora">
+                                    <legend>Rango de Hora</legend>
+                                    <div class="informe-dia-campo">
+                                        <label for="horaInicioInforme">Hora Inicio:</label>
+                                        <input type="time" id="horaInicioInforme" class="form-control" value="00:00">
+                                    </div>
+                                    <div class="informe-dia-campo">
+                                        <label for="horaFinInforme">Hora Final:</label>
+                                        <input type="time" id="horaFinInforme" class="form-control" value="23:59">
+                                    </div>
+                                </fieldset>
+                                <div class="informe-dia-acciones">
+                                    <button id="btnGenerarInformeDia" type="button" class="btn-primary">Generar Informe</button>
+                                    <button id="btnImprimirInformeDia" type="button" class="btn-secondary" disabled>PDF / Imprimir</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Resultado del informe -->
+                <div id="resultadoInformeDia" class="informe-dia-resultado">
+                    <div class="informe-dia-placeholder">
+                        <p>Seleccione una fecha y las opciones deseadas, luego presione <strong>Generar Informe</strong>.</p>
+                    </div>
                 </div>
             </div>
 

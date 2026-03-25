@@ -143,6 +143,10 @@ function registrarEventosGeneralesApp() {
     registrarEventoElemento('btnLimpiarCapital', 'click', () => window.InformesCapitalService?.limpiarFiltros?.());
     registrarEventoElemento('btnExportarCapitalPDF', 'click', () => window.InformesCapitalService?.exportarPDF?.());
 
+    // Informe venta del dia
+    registrarEventoElemento('btnGenerarInformeDia', 'click', () => window.InformesVentaDiaService?.cargarInforme?.());
+    registrarEventoElemento('btnImprimirInformeDia', 'click', () => window.InformesVentaDiaService?.exportarPDF?.());
+
     // Sub-tabs de informes
     document.querySelectorAll('.informes-subtab[data-subtab]').forEach(btn => {
         btn.addEventListener('click', () => {

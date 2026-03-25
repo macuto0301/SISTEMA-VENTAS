@@ -662,3 +662,227 @@ def get_venta_por_id(id):
         'total_devuelto_bolivares': round(sum(d.total_reintegrado_bolivares for d in devoluciones), 2),
         'cantidad_items_devueltos': sum(det.get('cantidad', 0) for d in devoluciones_list for det in d['detalles']),
     })
+
+
+@ventas_bp.route('/informe-dia', methods=['GET'])
+@require_roles('admin', 'cajero')
+def informe_venta_dia():
+    """Genera un informe consolidado de ventas para un dia especifico."""
+    fecha_str = (request.args.get('fecha') or '').strip()
+    if not fecha_str:
+        return jsonify({'error': 'Debe indicar una fecha'}), 400
+
+    try:
+        fecha_base = datetime.strptime(fecha_str, '%Y-%m-%d')
+    except ValueError:
+        return jsonify({'error': 'Formato de fecha invalido. Use YYYY-MM-DD'}), 400
+
+    hora_inicio_str = (request.args.get('hora_inicio') or '00:00').strip()
+    hora_fin_str = (request.args.get('hora_fin') or '23:59').strip()
+
+    try:
+        h_ini, m_ini = map(int, hora_inicio_str.split(':'))
+        h_fin, m_fin = map(int, hora_fin_str.split(':'))
+    except (ValueError, TypeError):
+        return jsonify({'error': 'Formato de hora invalido. Use HH:MM'}), 400
+
+    desde = fecha_base.replace(hour=h_ini, minute=m_ini, second=0)
+    hasta = fecha_base.replace(hour=h_fin, minute=m_fin, second=59)
+
+    secciones_str = (request.args.get('secciones') or '').strip()
+    secciones = {s.strip() for s in secciones_str.split(',') if s.strip()} if secciones_str else {
+        'resumen', 'metodos_pago', 'recibos_caja', 'ventas_detalladas', 'productos_vendidos',
+        'cuentas_por_cobrar', 'devoluciones',
+    }
+
+    # Consulta base de ventas del dia
+    ventas_query = Venta.query.filter(Venta.fecha >= desde, Venta.fecha <= hasta)
+    ventas_dia = ventas_query.all()
+    ventas_ids = [v.id for v in ventas_dia]
+
+    resultado: dict = {
+        'fecha': fecha_base.strftime('%d-%m-%Y'),
+        'fecha_iso': fecha_str,
+        'hora_inicio': hora_inicio_str,
+        'hora_fin': hora_fin_str,
+        'total_transacciones': len(ventas_dia),
+    }
+
+    # --- Resumen general ---
+    if 'resumen' in secciones:
+        ventas_brutas_usd = sum(v.total_dolares or 0 for v in ventas_dia)
+        ventas_brutas_bs = sum(v.total_bolivares or 0 for v in ventas_dia)
+        total_descuentos = sum(v.descuento_total or 0 for v in ventas_dia)
+
+        contado = [v for v in ventas_dia if (v.tipo_venta or 'contado') == 'contado']
+        credito = [v for v in ventas_dia if (v.tipo_venta or 'contado') == 'credito']
+        total_contado_usd = sum(v.total_dolares or 0 for v in contado)
+        total_credito_usd = sum(v.total_dolares or 0 for v in credito)
+
+        # Calcular costos separados por tipo de venta
+        total_costo = 0.0
+        costo_contado = 0.0
+        costo_credito = 0.0
+        contado_ids = {v.id for v in contado}
+        credito_ids = {v.id for v in credito}
+
+        if ventas_ids:
+            detalles_all = DetalleVenta.query.filter(DetalleVenta.venta_id.in_(ventas_ids)).all()
+            for d in detalles_all:
+                costo_linea = (d.costo_unitario or 0) * (d.cantidad or 0)
+                total_costo += costo_linea
+                if d.venta_id in contado_ids:
+                    costo_contado += costo_linea
+                elif d.venta_id in credito_ids:
+                    costo_credito += costo_linea
+
+        utilidad_contado = total_contado_usd - costo_contado
+        utilidad_credito = total_credito_usd - costo_credito
+        utilidad_total = ventas_brutas_usd - total_costo
+        margen = round((utilidad_total / ventas_brutas_usd * 100) if ventas_brutas_usd else 0, 2)
+        margen_contado = round((utilidad_contado / total_contado_usd * 100) if total_contado_usd else 0, 2)
+        margen_credito = round((utilidad_credito / total_credito_usd * 100) if total_credito_usd else 0, 2)
+
+        # Devoluciones del dia
+        devs_dia = DevolucionVenta.query.filter(
+            DevolucionVenta.venta_id.in_(ventas_ids) if ventas_ids else False,
+        ).all() if ventas_ids else []
+        total_devuelto_usd = sum(d.total_reintegrado_dolares or 0 for d in devs_dia)
+
+        resultado['resumen'] = {
+            'ventas_brutas_usd': round(ventas_brutas_usd, 2),
+            'ventas_brutas_bs': round(ventas_brutas_bs, 2),
+            'total_contado_usd': round(total_contado_usd, 2),
+            'total_credito_usd': round(total_credito_usd, 2),
+            'total_descuentos_usd': round(total_descuentos, 2),
+            'total_costo': round(total_costo, 2),
+            'costo_contado': round(costo_contado, 2),
+            'costo_credito': round(costo_credito, 2),
+            'utilidad_total': round(utilidad_total, 2),
+            'utilidad_contado': round(utilidad_contado, 2),
+            'utilidad_credito': round(utilidad_credito, 2),
+            'margen_utilidad': margen,
+            'margen_contado': margen_contado,
+            'margen_credito': margen_credito,
+            'total_transacciones': len(ventas_dia),
+            'total_devoluciones_usd': round(total_devuelto_usd, 2),
+        }
+
+    # --- Metodos de pago ---
+    if 'metodos_pago' in secciones and ventas_ids:
+        pagos_dia = PagoVenta.query.filter(PagoVenta.venta_id.in_(ventas_ids)).all()
+        medios: dict[str, dict] = {}
+        for p in pagos_dia:
+            clave = p.medio or 'Otro'
+            if clave not in medios:
+                medios[clave] = {'medio': clave, 'total_usd': 0.0, 'total_moneda': 0.0, 'moneda': p.moneda, 'cantidad_pagos': 0}
+            medios[clave]['total_usd'] += p.valor_reconocido_usd or 0
+            medios[clave]['total_moneda'] += p.monto or 0
+            medios[clave]['cantidad_pagos'] += 1
+        resultado['metodos_pago'] = [
+            {**v, 'total_usd': round(v['total_usd'], 2), 'total_moneda': round(v['total_moneda'], 2)}
+            for v in sorted(medios.values(), key=lambda x: x['total_usd'], reverse=True)
+        ]
+    elif 'metodos_pago' in secciones:
+        resultado['metodos_pago'] = []
+
+    # --- Recibos de caja ---
+    if 'recibos_caja' in secciones:
+        resultado['recibos_caja'] = [{
+            'numero_venta': v.numero_venta or v.id,
+            'hora': v.fecha.strftime('%H:%M') if v.fecha else '-',
+            'cliente': v.cliente or 'Cliente General',
+            'total_usd': round(v.total_dolares or 0, 2),
+            'total_bs': round(v.total_bolivares or 0, 2),
+            'tipo': v.tipo_venta or 'contado',
+            'usuario': v.usuario_username or '-',
+        } for v in sorted(ventas_dia, key=lambda x: x.fecha or datetime.min)]
+
+    # --- Ventas detalladas ---
+    if 'ventas_detalladas' in secciones:
+        detalladas = []
+        for v in sorted(ventas_dia, key=lambda x: x.fecha or datetime.min):
+            detalles = DetalleVenta.query.filter_by(venta_id=v.id).all()
+            pagos = PagoVenta.query.filter_by(venta_id=v.id).all()
+            detalladas.append({
+                'numero_venta': v.numero_venta or v.id,
+                'hora': v.fecha.strftime('%H:%M') if v.fecha else '-',
+                'cliente': v.cliente or 'Cliente General',
+                'usuario': v.usuario_username or '-',
+                'tipo': v.tipo_venta or 'contado',
+                'total_usd': round(v.total_dolares or 0, 2),
+                'total_bs': round(v.total_bolivares or 0, 2),
+                'descuento': round(v.descuento_total or 0, 2),
+                'productos': [{
+                    'nombre': d.producto_nombre,
+                    'cantidad': d.cantidad,
+                    'precio_unitario': round(d.precio_unitario, 2),
+                    'costo_unitario': round(d.costo_unitario or 0, 2),
+                    'subtotal': round(d.subtotal, 2),
+                } for d in detalles],
+                'pagos': [{
+                    'medio': p.medio,
+                    'monto': round(p.monto, 2),
+                    'moneda': p.moneda,
+                    'valor_reconocido_usd': round(p.valor_reconocido_usd, 2),
+                } for p in pagos],
+            })
+        resultado['ventas_detalladas'] = detalladas
+
+    # --- Productos vendidos consolidados ---
+    if 'productos_vendidos' in secciones and ventas_ids:
+        detalles_todos = DetalleVenta.query.filter(DetalleVenta.venta_id.in_(ventas_ids)).all()
+        prods_consolidado: dict[str, dict] = {}
+        for d in detalles_todos:
+            clave = d.producto_nombre or f'Producto #{d.producto_id}'
+            if clave not in prods_consolidado:
+                prods_consolidado[clave] = {
+                    'producto': clave,
+                    'producto_id': d.producto_id,
+                    'cantidad_total': 0,
+                    'total_usd': 0.0,
+                    'costo_total': 0.0,
+                }
+            prods_consolidado[clave]['cantidad_total'] += d.cantidad or 0
+            prods_consolidado[clave]['total_usd'] += d.subtotal or 0
+            prods_consolidado[clave]['costo_total'] += (d.costo_unitario or 0) * (d.cantidad or 0)
+
+        resultado['productos_vendidos'] = [
+            {**v, 'cantidad_total': round(v['cantidad_total'], 2), 'total_usd': round(v['total_usd'], 2), 'costo_total': round(v['costo_total'], 2)}
+            for v in sorted(prods_consolidado.values(), key=lambda x: x['total_usd'], reverse=True)
+        ]
+    elif 'productos_vendidos' in secciones:
+        resultado['productos_vendidos'] = []
+
+    # --- Cuentas por cobrar generadas ---
+    if 'cuentas_por_cobrar' in secciones:
+        cxc_dia = CuentaPorCobrar.query.filter(
+            CuentaPorCobrar.fecha_emision >= desde,
+            CuentaPorCobrar.fecha_emision <= hasta,
+        ).all()
+        resultado['cuentas_por_cobrar'] = [{
+            'numero_venta': c.numero_venta or c.venta_id,
+            'cliente': c.cliente.nombre if c.cliente else '-',
+            'monto_original_usd': round(c.monto_original_usd, 2),
+            'saldo_pendiente_usd': round(c.saldo_pendiente_usd, 2),
+            'estado': c.estado,
+        } for c in cxc_dia]
+
+    # --- Devoluciones del dia ---
+    if 'devoluciones' in secciones:
+        devs = DevolucionVenta.query.filter(
+            DevolucionVenta.fecha >= desde,
+            DevolucionVenta.fecha <= hasta,
+        ).all()
+        resultado['devoluciones'] = [{
+            'id': d.id,
+            'venta_id': d.venta_id,
+            'fecha': d.fecha.strftime('%H:%M') if d.fecha else '-',
+            'cliente': d.cliente or '-',
+            'motivo': d.motivo or '',
+            'total_reintegrado_usd': round(d.total_reintegrado_dolares or 0, 2),
+            'total_reintegrado_bs': round(d.total_reintegrado_bolivares or 0, 2),
+            'metodo_reintegro': d.metodo_reintegro or '-',
+        } for d in devs]
+
+    return jsonify(resultado)
