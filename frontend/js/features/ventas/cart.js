@@ -138,6 +138,14 @@ const VentasCartFeature = {
         }));
     },
 
+    obtenerPrecioBsMostrar(item, prodOriginal) {
+        if (item.precio_bs_manual != null) {
+            return item.precio_bs_manual;
+        }
+        const metodo = item.lista_precio === 0 ? 'none' : (prodOriginal?.metodo_redondeo || 'none');
+        return this.aplicarRedondeoBsSeguro(item.precio_dolares * tasaDolar, metodo);
+    },
+
     aplicarListaPrecioEnCarrito(index, listaPrecio) {
         const item = carrito[index];
         if (!item) return;
@@ -149,6 +157,7 @@ const VentasCartFeature = {
         item.lista_precio_nombre = this.obtenerEtiquetaListaPrecioSegura(listaPrecio);
         item.precio_dolares = precio;
         item.precio_original_dolares = precio;
+        delete item.precio_bs_manual;
         item.subtotal_dolares = precio * item.cantidad;
         this.actualizarCarrito();
     },
@@ -176,6 +185,7 @@ const VentasCartFeature = {
         item.lista_precio_nombre = this.obtenerEtiquetaListaPrecioSegura(0);
         item.precio_dolares = nuevoPrecio;
         item.precio_original_dolares = nuevoPrecio;
+        delete item.precio_bs_manual;
         item.subtotal_dolares = nuevoPrecio * item.cantidad;
         this.actualizarCarrito();
         return true;
@@ -406,13 +416,16 @@ const VentasCartFeature = {
                         </td>
                         <td class="carrito-col-precio">
                             ${precioEditable
-                                ? `<input type="number" min="0" step="0.01" value="${item.precio_dolares.toFixed(2)}" class="carrito-precio-input" onclick="event.stopPropagation()" onchange="actualizarPrecioCarrito(${index}, this.value)">`
+                                ? `<input type="number" min="0" step="0.01" value="${item.precio_dolares.toFixed(2)}" class="carrito-precio-input" onclick="event.stopPropagation()" onchange="delete carrito[${index}].precio_bs_manual; actualizarPrecioCarrito(${index}, this.value)">`
                                 : `$${item.precio_dolares.toFixed(2)}`}
                         </td>
                         <td class="carrito-col-precio-bs">
-                            ${precioEditable
-                                ? `<input type="number" min="0" step="0.01" value="${this.aplicarRedondeoBsSeguro(item.precio_dolares * tasaDolar, item.lista_precio === 0 ? 'none' : (prodOriginal?.metodo_redondeo || 'none')).toFixed(2)}" class="carrito-precio-input" onclick="event.stopPropagation()" onchange="actualizarPrecioCarritoDesdebs(${index}, this.value)">`
-                                : `Bs ${this.aplicarRedondeoBsSeguro(item.precio_dolares * tasaDolar, item.lista_precio === 0 ? 'none' : (prodOriginal?.metodo_redondeo || 'none')).toFixed(2)}`}
+                            ${(() => {
+                                const precioBsDisplay = this.obtenerPrecioBsMostrar(item, prodOriginal).toFixed(2);
+                                return precioEditable
+                                    ? `<input type="number" min="0" step="0.01" value="${precioBsDisplay}" class="carrito-precio-input" onclick="event.stopPropagation()" onchange="actualizarPrecioCarritoDesdebs(${index}, this.value)">`
+                                    : `Bs ${precioBsDisplay}`;
+                            })()}
                         </td>
                         <td class="carrito-col-total">$${item.subtotal_dolares.toFixed(2)}</td>
                     </tr>
@@ -421,6 +434,9 @@ const VentasCartFeature = {
         }
 
         const totalBs = carrito.reduce((sum, item) => {
+            if (item.precio_bs_manual != null) {
+                return sum + item.precio_bs_manual * item.cantidad;
+            }
             const prodOriginal = productos[item.productoIndex];
             const metodoRedondeo = item.lista_precio === 0 ? 'none' : (prodOriginal.metodo_redondeo || 'none');
             return sum + this.aplicarRedondeoBsSeguro(item.subtotal_dolares * tasaDolar, metodoRedondeo);
@@ -494,12 +510,14 @@ const VentasCartFeature = {
             this.mostrarNotificacionSegura('❌ Tasa del dolar no disponible');
             return;
         }
-        const usd = parseFloat(precioBs) / tasa;
+        const bsNumerico = parseFloat(precioBs);
+        const usd = bsNumerico / tasa;
         if (Number.isNaN(usd) || usd < 0) {
             this.mostrarNotificacionSegura('❌ Ingrese un precio valido en Bs');
             this.actualizarCarrito();
             return;
         }
+        carrito[index].precio_bs_manual = bsNumerico;
         this.actualizarPrecioCarrito(index, usd);
     },
 

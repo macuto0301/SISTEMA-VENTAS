@@ -35,6 +35,9 @@ const VentasCheckoutFeature = {
 
         const totalVenta = carrito.reduce((sum, item) => sum + item.subtotal_dolares, 0);
         const totalVentaBs = carrito.reduce((sum, item) => {
+            if (item.precio_bs_manual != null) {
+                return sum + item.precio_bs_manual * item.cantidad;
+            }
             const prodOriginal = productos[item.productoIndex];
             const metodoRedondeo = item.lista_precio === 0 ? 'none' : (prodOriginal.metodo_redondeo || 'none');
             return sum + this.aplicarRedondeoBsSeguro(item.subtotal_dolares * tasaDolar, metodoRedondeo);
