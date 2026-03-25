@@ -712,7 +712,7 @@ const ProductosFeature = {
         const porcentajeGanancia1 = parseFloat(document.getElementById('productoPorcentajeGanancia1').value) || 0;
         const porcentajeGanancia2 = parseFloat(document.getElementById('productoPorcentajeGanancia2').value) || 0;
         const porcentajeGanancia3 = parseFloat(document.getElementById('productoPorcentajeGanancia3').value) || 0;
-        const precioDolares1 = parseFloat(document.getElementById('productoPrecioDolares1').value) || 0;
+        const precioDolares1 = parseFloat(document.getElementById('productoPrecioDolares1').dataset.preciseValue || document.getElementById('productoPrecioDolares1').value) || 0;
         const precioDolares2 = parseFloat(document.getElementById('productoPrecioDolares2').value) || 0;
         const precioDolares3 = parseFloat(document.getElementById('productoPrecioDolares3').value) || 0;
         const categoria = document.getElementById('productoCategoria').value;
@@ -751,6 +751,22 @@ const ProductosFeature = {
             this.abrirModalPreciosProducto();
             window.mostrarNotificacion('⚠️ Ajusta los precios P1, P2 y P3 antes de guardar');
             return;
+        }
+
+        if (precioCosto > 0) {
+            const preciosMenores = [];
+            if (precioDolares1 < precioCosto) preciosMenores.push('P1');
+            if (precioDolares2 < precioCosto) preciosMenores.push('P2');
+            if (precioDolares3 < precioCosto) preciosMenores.push('P3');
+
+            if (preciosMenores.length > 0) {
+                if (precioDolares1 < precioCosto) this.obtenerCampoPrecio('precio1')?.setError('Precio menor al costo');
+                if (precioDolares2 < precioCosto) this.obtenerCampoPrecio('precio2')?.setError('Precio menor al costo');
+                if (precioDolares3 < precioCosto) this.obtenerCampoPrecio('precio3')?.setError('Precio menor al costo');
+                this.abrirModalPreciosProducto();
+                window.mostrarNotificacion(`⚠️ ${preciosMenores.join(', ')} tiene${preciosMenores.length > 1 ? 'n' : ''} precio menor al costo ($${precioCosto.toFixed(2)})`);
+                return;
+            }
         }
 
         const formData = new FormData();
@@ -1237,12 +1253,14 @@ const ProductosFeature = {
         document.getElementById('productoPrecioDolares1').value = '';
         document.getElementById('productoPrecioDolares2').value = '';
         document.getElementById('productoPrecioDolares3').value = '';
+        delete document.getElementById('productoPrecioDolares1').dataset.preciseValue;
         document.getElementById('productoTipo').value = 'producto';
         document.getElementById('productoMetodoRedondeo').value = 'none';
         document.getElementById('productoPermiteDecimal').checked = false;
         document.getElementById('productoCantidad').value = 0;
         document.getElementById('productoCodigo').disabled = false;
         document.getElementById('productoPrecioBolivares').value = '';
+        this._precioBsManual = false;
         this.limpiarErroresProducto();
         this.limpiarErroresPrecios();
         this._productActions?.setLoading('btnGuardarProducto', false);
@@ -1258,8 +1276,11 @@ const ProductosFeature = {
 
         if (costo > 0) {
             const precioVenta = costo * (1 + (porcentaje / 100));
-            document.getElementById(`productoPrecioDolares${lista}`).value = precioVenta.toFixed(2);
+            const inputUsd = document.getElementById(`productoPrecioDolares${lista}`);
+            inputUsd.value = precioVenta.toFixed(2);
+            delete inputUsd.dataset.preciseValue;
             if (lista === 1) {
+                this._precioBsManual = false;
                 this.calcularPrecioBolivares();
             }
             this.actualizarResumenPreciosProducto();
@@ -1271,6 +1292,7 @@ const ProductosFeature = {
     },
 
     calcularPrecioBolivares() {
+        if (this._precioBsManual) return;
         const precioDolares = parseFloat(document.getElementById('productoPrecioDolares1').value) || 0;
         const metodo = document.getElementById('productoMetodoRedondeo').value;
         const precioBs = window.aplicarRedondeoBs(precioDolares * window.tasaDolar, metodo);
@@ -1292,7 +1314,10 @@ const ProductosFeature = {
     calcularPrecioDolares() {
         const precioBs = parseFloat(document.getElementById('productoPrecioBolivares').value) || 0;
         const precioDolares = precioBs / window.tasaDolar;
-        document.getElementById('productoPrecioDolares1').value = precioDolares ? precioDolares.toFixed(2) : '';
+        this._precioBsManual = true;
+        const inputUsd = document.getElementById('productoPrecioDolares1');
+        inputUsd.value = precioDolares ? precioDolares.toFixed(2) : '';
+        inputUsd.dataset.preciseValue = precioDolares ? String(precioDolares) : '';
         this.recalcularPorcentajeGanancia(1);
         this.actualizarResumenPreciosProducto();
     },
@@ -1334,7 +1359,9 @@ const ProductosFeature = {
         document.getElementById('productoPrecioDolares1').value = this.obtenerPrecioProducto(producto, 1);
         document.getElementById('productoPrecioDolares2').value = this.obtenerPrecioProducto(producto, 2);
         document.getElementById('productoPrecioDolares3').value = this.obtenerPrecioProducto(producto, 3);
+        delete document.getElementById('productoPrecioDolares1').dataset.preciseValue;
         document.getElementById('productoMetodoRedondeo').value = producto.metodo_redondeo || 'none';
+        this._precioBsManual = false;
         this.calcularPrecioBolivares();
         document.getElementById('productoCantidad').value = producto.cantidad;
         document.getElementById('productoCategoria').value = producto.categoria;

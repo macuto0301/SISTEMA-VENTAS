@@ -344,6 +344,14 @@ def crear_producto():
         nuevo.unidad = data.get('unidad')
         nuevo.precio_costo = parse_float(data.get('precio_costo'), 0)
         price_values = extract_price_values(data)
+
+        costo = nuevo.precio_costo
+        if costo > 0:
+            for key in ('precio_1_dolares', 'precio_2_dolares', 'precio_3_dolares'):
+                if price_values[key] < costo:
+                    label = key.replace('precio_', 'P').replace('_dolares', '')
+                    raise ValueError(f'El precio {label} (${price_values[key]:.2f}) no puede ser menor al costo (${costo:.2f})')
+
         nuevo.porcentaje_ganancia = price_values['porcentaje_ganancia']
         nuevo.precio_dolares = price_values['precio_dolares']
         nuevo.precio_1_dolares = price_values['precio_1_dolares']
@@ -394,6 +402,14 @@ def editar_producto(id):
         prod.modelo = data.get('modelo', prod.modelo)
         prod.unidad = data.get('unidad', prod.unidad)
         prod.precio_costo = parse_float(data.get('precio_costo'), prod.precio_costo)
+
+        costo = prod.precio_costo
+        if costo > 0:
+            for key in ('precio_1_dolares', 'precio_2_dolares', 'precio_3_dolares'):
+                if price_values[key] < costo:
+                    label = key.replace('precio_', 'P').replace('_dolares', '')
+                    raise ValueError(f'El precio {label} (${price_values[key]:.2f}) no puede ser menor al costo (${costo:.2f})')
+
         prod.porcentaje_ganancia = price_values['porcentaje_ganancia']
         prod.precio_dolares = price_values['precio_dolares']
         prod.precio_1_dolares = price_values['precio_1_dolares']

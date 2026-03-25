@@ -67,12 +67,19 @@ function registrarEventosGeneralesApp() {
     registrarEventoElemento('productoPorcentajeGanancia3', 'input', () => obtenerFuncionGlobal('calcularPrecioVenta')?.(3));
 
     registrarEventoElemento('productoPrecioDolares1', 'input', () => {
+        if (window.ProductosFeature) window.ProductosFeature._precioBsManual = false;
+        const el = document.getElementById('productoPrecioDolares1');
+        if (el) delete el.dataset.preciseValue;
         obtenerFuncionGlobal('calcularPrecioBolivares')?.();
         obtenerFuncionGlobal('recalcularPorcentajeGanancia')?.(1);
     });
     registrarEventoElemento('productoPrecioDolares2', 'input', () => obtenerFuncionGlobal('recalcularPorcentajeGanancia')?.(2));
     registrarEventoElemento('productoPrecioDolares3', 'input', () => obtenerFuncionGlobal('recalcularPorcentajeGanancia')?.(3));
-    registrarEventoElemento('productoMetodoRedondeo', 'change', obtenerFuncionGlobal('actualizarResumenPreciosProducto'));
+    registrarEventoElemento('productoMetodoRedondeo', 'change', () => {
+        if (window.ProductosFeature) window.ProductosFeature._precioBsManual = false;
+        obtenerFuncionGlobal('calcularPrecioBolivares')?.();
+        obtenerFuncionGlobal('actualizarResumenPreciosProducto')?.();
+    });
 
     registrarEventoElemento('productoPrecioBolivares', 'input', () => {
         obtenerFuncionGlobal('calcularPrecioDolares')?.();

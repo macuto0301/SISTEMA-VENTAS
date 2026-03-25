@@ -65,6 +65,7 @@ function recalcularPrecioCompraDesdePorcentaje(lista = 1) {
 
     const porcentaje = parseFloat(porcentajeInput.value) || 0;
     precioInput.value = costo > 0 ? redondearMontoCompra(costo * (1 + (porcentaje / 100))).toFixed(2) : '0.00';
+    delete precioInput.dataset.preciseValue;
 }
 
 function recalcularPorcentajeCompraDesdePrecio(lista = 1) {
@@ -78,11 +79,15 @@ function recalcularPorcentajeCompraDesdePrecio(lista = 1) {
 }
 
 function recalcularTodosLosPreciosCompra() {
+    _precioBsManualCompra = false;
     [1, 2, 3].forEach(recalcularPrecioCompraDesdePorcentaje);
     calcularPrecioBolivaresCompra();
 }
 
+let _precioBsManualCompra = false;
+
 function calcularPrecioBolivaresCompra() {
+    if (_precioBsManualCompra) return;
     const precioDolares = parseFloat(document.getElementById('compraPrecioDolares1Modal')?.value) || 0;
     const metodo = document.getElementById('compraMetodoRedondeoModal')?.value || 'none';
     const precioBs = window.aplicarRedondeoBs(precioDolares * window.tasaDolar, metodo);
@@ -95,9 +100,11 @@ function calcularPrecioBolivaresCompra() {
 function calcularPrecioDolaresCompra() {
     const precioBs = parseFloat(document.getElementById('compraPrecioBolivaresModal')?.value) || 0;
     const precioDolares = precioBs / window.tasaDolar;
+    _precioBsManualCompra = true;
     const inputPrecio = document.getElementById('compraPrecioDolares1Modal');
     if (inputPrecio) {
         inputPrecio.value = precioDolares ? precioDolares.toFixed(2) : '';
+        inputPrecio.dataset.preciseValue = precioDolares ? String(precioDolares) : '';
     }
     recalcularPorcentajeCompraDesdePrecio(1);
 }
@@ -107,6 +114,7 @@ function abrirModalPreciosCompra(index) {
     const modal = document.getElementById('modalCompraPrecios');
     if (!item || !modal) return;
 
+    _precioBsManualCompra = false;
     document.getElementById('compraPrecioIndex').value = index;
     document.getElementById('compraPrecioProductoNombre').textContent = item.producto_nombre;
     document.getElementById('compraPrecioCostoModal').value = redondearMontoCompra(item.precio_unitario).toFixed(2);
@@ -116,6 +124,7 @@ function abrirModalPreciosCompra(index) {
     document.getElementById('compraPrecioDolares1Modal').value = redondearMontoCompra(item.precio_1_dolares).toFixed(2);
     document.getElementById('compraPrecioDolares2Modal').value = redondearMontoCompra(item.precio_2_dolares).toFixed(2);
     document.getElementById('compraPrecioDolares3Modal').value = redondearMontoCompra(item.precio_3_dolares).toFixed(2);
+    delete document.getElementById('compraPrecioDolares1Modal').dataset.preciseValue;
     document.getElementById('compraMetodoRedondeoModal').value = item.metodo_redondeo || window.metodoRedondeoBs || 'none';
     calcularPrecioBolivaresCompra();
     modal.style.display = 'block';
@@ -170,13 +179,31 @@ function guardarPreciosCompra() {
         return;
     }
 
-    item.precio_unitario = redondearMontoCompra(document.getElementById('compraPrecioCostoModal').value);
+    const costo = redondearMontoCompra(document.getElementById('compraPrecioCostoModal').value);
+    const inputP1 = document.getElementById('compraPrecioDolares1Modal');
+    const precio1 = parseFloat(inputP1.dataset.preciseValue || inputP1.value) || 0;
+    const precio2 = redondearMontoCompra(document.getElementById('compraPrecioDolares2Modal').value);
+    const precio3 = redondearMontoCompra(document.getElementById('compraPrecioDolares3Modal').value);
+
+    if (costo > 0) {
+        const preciosMenores = [];
+        if (precio1 < costo) preciosMenores.push('P1');
+        if (precio2 < costo) preciosMenores.push('P2');
+        if (precio3 < costo) preciosMenores.push('P3');
+
+        if (preciosMenores.length > 0) {
+            mostrarNotificacion(`⚠️ ${preciosMenores.join(', ')} tiene${preciosMenores.length > 1 ? 'n' : ''} precio menor al costo ($${costo.toFixed(2)})`);
+            return;
+        }
+    }
+
+    item.precio_unitario = costo;
     item.porcentaje_ganancia_1 = parseFloat(document.getElementById('compraPorcentajeGanancia1Modal').value) || 0;
     item.porcentaje_ganancia_2 = parseFloat(document.getElementById('compraPorcentajeGanancia2Modal').value) || 0;
     item.porcentaje_ganancia_3 = parseFloat(document.getElementById('compraPorcentajeGanancia3Modal').value) || 0;
-    item.precio_1_dolares = redondearMontoCompra(document.getElementById('compraPrecioDolares1Modal').value);
-    item.precio_2_dolares = redondearMontoCompra(document.getElementById('compraPrecioDolares2Modal').value);
-    item.precio_3_dolares = redondearMontoCompra(document.getElementById('compraPrecioDolares3Modal').value);
+    item.precio_1_dolares = precio1;
+    item.precio_2_dolares = precio2;
+    item.precio_3_dolares = precio3;
     item.metodo_redondeo = document.getElementById('compraMetodoRedondeoModal').value || 'none';
     recalcularSubtotalCompra(item);
 

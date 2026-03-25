@@ -1648,7 +1648,7 @@
                 </div>
                 <div>
                     <label for="compraMetodoRedondeoModal" style="font-weight: bold; display: block; margin-bottom: 5px;">Redondeo:</label>
-                    <select id="compraMetodoRedondeoModal" onchange="calcularPrecioBolivaresCompra()" style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;" name="compraMetodoRedondeoModal">
+                    <select id="compraMetodoRedondeoModal" onchange="_precioBsManualCompra = false; calcularPrecioBolivaresCompra()" style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;" name="compraMetodoRedondeoModal">
                         <option value="none">Sin Redondeo</option>
                         <option value="no_decimals">Sin Decimales</option>
                         <option value="five_cents">Cinco céntimos (0.05)</option>
@@ -1666,7 +1666,7 @@
                 </div>
                 <div>
                     <label for="compraPrecioDolares1Modal" style="font-weight: bold; display: block; margin-bottom: 5px;">Precio Venta P1 ($):</label>
-                    <input type="number" id="compraPrecioDolares1Modal" step="0.01" min="0" oninput="recalcularPorcentajeCompraDesdePrecio(1)" style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;" name="compraPrecioDolares1Modal">
+                    <input type="number" id="compraPrecioDolares1Modal" step="0.01" min="0" oninput="_precioBsManualCompra = false; delete this.dataset.preciseValue; recalcularPorcentajeCompraDesdePrecio(1); calcularPrecioBolivaresCompra()" style="width: 100%; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 5px;" name="compraPrecioDolares1Modal">
                 </div>
                 <div>
                     <label for="compraPorcentajeGanancia2Modal" style="font-weight: bold; display: block; margin-bottom: 5px;">% Ganancia P2:</label>
