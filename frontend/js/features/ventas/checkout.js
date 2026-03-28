@@ -372,6 +372,11 @@ const VentasCheckoutFeature = {
 
     async finalizarVentaSinVuelto() {
         const excedentePendiente = ventaEnProgreso?.excedenteTotalUSD || 0;
+        if (!ventaEnProgreso?.cliente_id && excedentePendiente > 0.01) {
+            this.mostrarNotificacionSegura('❌ Cliente General / Contado requiere registrar todo el vuelto antes de finalizar');
+            return;
+        }
+
         const confirmarModal = window.Utils?.confirmarModal?.bind(window.Utils)
             || ((mensaje) => Promise.resolve(confirm(mensaje)));
         const confirmado = await confirmarModal(
@@ -405,6 +410,13 @@ const VentasCheckoutFeature = {
         const totalExcedente = ventaEnProgreso.excedenteReconocido;
         const confirmarModal = window.Utils?.confirmarModal?.bind(window.Utils)
             || ((mensaje) => Promise.resolve(confirm(mensaje)));
+        const totalEntregado = vueltosAgregados.reduce((sum, v) => sum + v.valorEnDolares, 0);
+        const faltanteVuelto = Math.max(0, totalExcedente - totalEntregado);
+
+        if (!ventaEnProgreso?.cliente_id && faltanteVuelto > 0.01) {
+            this.mostrarNotificacionSegura(`❌ Debe entregar el vuelto completo de Cliente General / Contado. Falta $${faltanteVuelto.toFixed(2)}`);
+            return;
+        }
 
         if (vueltosAgregados.length === 0 && totalExcedente > 0.01) {
             const confirmado = await confirmarModal(

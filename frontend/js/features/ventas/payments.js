@@ -1,4 +1,6 @@
 const VentasPaymentsFeature = {
+    USD_EFECTIVO_BILLETE_MAXIMO: 100,
+
     mostrarNotificacionSegura(mensaje) {
         if (typeof window.mostrarNotificacion === 'function') {
             return window.mostrarNotificacion(mensaje);
@@ -106,21 +108,130 @@ const VentasPaymentsFeature = {
         }
     },
 
+    calcularTopeEfectivoDolares(pendienteDolares = 0) {
+        if (pendienteDolares <= 0.01) return 0;
+        return Math.max(
+            this.USD_EFECTIVO_BILLETE_MAXIMO,
+            Math.ceil(pendienteDolares / this.USD_EFECTIVO_BILLETE_MAXIMO) * this.USD_EFECTIVO_BILLETE_MAXIMO
+        );
+    },
+
+    calcularResumenPagosActuales() {
+        const totalVenta = carrito.reduce((sum, item) => sum + item.subtotal_dolares, 0);
+        const totalVentaBs = carrito.reduce((sum, item) => {
+            if (item.precio_bs_manual != null) {
+                return sum + item.precio_bs_manual * item.cantidad;
+            }
+            const prodOriginal = productos[item.productoIndex];
+            const metodoRedondeo = item.lista_precio === 0 ? 'none' : (prodOriginal.metodo_redondeo || 'none');
+            return sum + this.aplicarRedondeoBsSeguro(item.subtotal_dolares * tasaDolar, metodoRedondeo);
+        }, 0);
+
+        const tasaEfectiva = totalVenta > 0 ? (totalVentaBs / totalVenta) : tasaDolar;
+
+        let deudaPendiente = totalVenta;
+        let totalReconocidoDolares = 0;
+        let descuentoAcumulado = 0;
+        let ultimaMonedaCompletoDeuda = 'USD';
+        const saldoFavorAplicado = this.obtenerSaldoFavorAplicadoVenta(totalVenta);
+
+        const pagosOrdenados = [...pagos].sort((a, b) => (b.esDolares ? 1 : 0) - (a.esDolares ? 1 : 0));
+
+        pagosOrdenados.forEach(pago => {
+            let valorReconocido = 0;
+            let descuentoEstePago = 0;
+
+            const deudaAntesDeEstePago = deudaPendiente;
+
+            if (pago.esDolares) {
+                if (porcentajeDescuentoDolares > 0 && deudaPendiente > 0.01) {
+                    const factor = 1 - (porcentajeDescuentoDolares / 100);
+                    const valorPotencial = pago.monto / factor;
+
+                    if (valorPotencial > deudaPendiente) {
+                        const costoFisicoParaDeuda = deudaPendiente * factor;
+
+                        valorReconocido = deudaPendiente + (pago.monto - costoFisicoParaDeuda);
+                        descuentoEstePago = deudaPendiente - costoFisicoParaDeuda;
+                        deudaPendiente = 0;
+                    } else {
+                        valorReconocido = valorPotencial;
+                        descuentoEstePago = valorReconocido - pago.monto;
+                        deudaPendiente -= valorReconocido;
+                    }
+                } else {
+                    valorReconocido = pago.monto;
+                    deudaPendiente = Math.max(0, deudaPendiente - valorReconocido);
+                }
+            } else {
+                valorReconocido = pago.monto / tasaEfectiva;
+                deudaPendiente = Math.max(0, deudaPendiente - valorReconocido);
+            }
+
+            pago.valorReconocido = valorReconocido;
+            pago.descuentoAplicado = descuentoEstePago;
+
+            if (deudaAntesDeEstePago > 0.01 && valorReconocido >= deudaAntesDeEstePago - 0.01) {
+                ultimaMonedaCompletoDeuda = pago.esDolares ? 'USD' : 'BS';
+            }
+
+            totalReconocidoDolares += valorReconocido;
+            descuentoAcumulado += descuentoEstePago;
+        });
+
+        totalReconocidoDolares += saldoFavorAplicado;
+
+        const pendienteDolares = Math.max(0, totalVenta - totalReconocidoDolares);
+
+        return {
+            totalVenta,
+            totalVentaBs,
+            tasaEfectiva,
+            descuentoAcumulado,
+            totalReconocidoDolares,
+            saldoFavorAplicado,
+            pendienteDolares,
+            pendienteBs: pendienteDolares * tasaEfectiva,
+            saldoFavorGenerado: Math.max(0, totalReconocidoDolares - totalVenta),
+            ultimaMonedaCompletoDeuda
+        };
+    },
+
     agregarPago() {
         const medioPago = document.getElementById('medioPago').value;
         const monto = parseFloat(document.getElementById('montoPago').value);
+        const { pendienteDolares } = this.calcularResumenPagosActuales();
+
+        if (pendienteDolares <= 0.01) {
+            this.mostrarNotificacionSegura('❌ La compra ya esta cubierta. No puede agregar mas pagos');
+            return;
+        }
 
         if (!medioPago) {
-            alert('❌ Seleccione un medio de pago');
+            this.mostrarNotificacionSegura('❌ Seleccione un medio de pago');
             return;
         }
 
         if (isNaN(monto) || monto <= 0) {
-            alert('❌ Ingrese un monto válido');
+            this.mostrarNotificacionSegura('❌ Ingrese un monto válido');
             return;
         }
 
         const esDolares = medioPago.includes('Dólares');
+
+        if (medioPago === 'Efectivo en Dólares') {
+            const topePermitido = this.calcularTopeEfectivoDolares(pendienteDolares);
+
+            if (topePermitido <= 0.01) {
+                this.mostrarNotificacionSegura('❌ La venta ya no tiene saldo pendiente en dolares');
+                return;
+            }
+
+            if (monto > topePermitido + 0.001) {
+                this.mostrarNotificacionSegura(`❌ Para efectivo en dolares no puede registrar mas de $${topePermitido.toFixed(2)} con un pendiente de $${pendienteDolares.toFixed(2)}`);
+                return;
+            }
+        }
 
         const pago = {
             medio: medioPago,
@@ -159,80 +270,16 @@ const VentasPaymentsFeature = {
 
     actualizarListaPagos() {
         const listaPagos = document.getElementById('listaPagos');
-
-        const totalVenta = carrito.reduce((sum, item) => sum + item.subtotal_dolares, 0);
-        const totalVentaBs = carrito.reduce((sum, item) => {
-            if (item.precio_bs_manual != null) {
-                return sum + item.precio_bs_manual * item.cantidad;
-            }
-            const prodOriginal = productos[item.productoIndex];
-            const metodoRedondeo = item.lista_precio === 0 ? 'none' : (prodOriginal.metodo_redondeo || 'none');
-            return sum + this.aplicarRedondeoBsSeguro(item.subtotal_dolares * tasaDolar, metodoRedondeo);
-        }, 0);
-
-        const tasaEfectiva = totalVenta > 0 ? (totalVentaBs / totalVenta) : tasaDolar;
-
-        let deudaPendiente = totalVenta;
-        let totalReconocidoDolares = 0;
-        let descuentoAcumulado = 0;
-        let ultimaMonedaCompletoDeuda = 'USD';
-        const saldoFavorAplicado = this.obtenerSaldoFavorAplicadoVenta(totalVenta);
-
-        const pagosOrdenados = [...pagos].sort((a, b) => (b.esDolares ? 1 : 0) - (a.esDolares ? 1 : 0));
-
-        pagosOrdenados.forEach(pago => {
-            let valorReconocido = 0;
-            let descuentoEstePago = 0;
-
-            const deudaAntesDeEstePago = deudaPendiente;
-
-            if (pago.esDolares) {
-                if (porcentajeDescuentoDolares > 0 && deudaPendiente > 0.01) {
-                    const factor = 1 - (porcentajeDescuentoDolares / 100);
-                    const valorPotencial = pago.monto / factor;
-
-                    if (valorPotencial > deudaPendiente) {
-                        const costoFisicoParaDeuda = deudaPendiente * factor;
-                        const sobranteFisico = pago.monto - costoFisicoParaDeuda;
-
-                        valorReconocido = deudaPendiente + sobranteFisico;
-                        descuentoEstePago = deudaPendiente - costoFisicoParaDeuda;
-
-                        deudaPendiente = 0;
-                    } else {
-                        valorReconocido = valorPotencial;
-                        descuentoEstePago = valorReconocido - pago.monto;
-                        deudaPendiente -= valorReconocido;
-                    }
-                } else {
-                    valorReconocido = pago.monto;
-                    descuentoEstePago = 0;
-                    deudaPendiente = Math.max(0, deudaPendiente - valorReconocido);
-                }
-            } else {
-                valorReconocido = pago.monto / tasaEfectiva;
-                descuentoEstePago = 0;
-                deudaPendiente = Math.max(0, deudaPendiente - valorReconocido);
-            }
-
-            pago.valorReconocido = valorReconocido;
-            pago.descuentoAplicado = descuentoEstePago;
-
-            if (deudaAntesDeEstePago > 0.01 && valorReconocido >= deudaAntesDeEstePago - 0.01) {
-                ultimaMonedaCompletoDeuda = pago.esDolares ? 'USD' : 'BS';
-            }
-
-            totalReconocidoDolares += valorReconocido;
-            descuentoAcumulado += descuentoEstePago;
-        });
+        const {
+            totalVenta,
+            descuentoAcumulado,
+            pendienteDolares,
+            pendienteBs,
+            saldoFavorGenerado,
+            ultimaMonedaCompletoDeuda
+        } = this.calcularResumenPagosActuales();
 
         descuentoTotal = descuentoAcumulado;
-
-        totalReconocidoDolares += saldoFavorAplicado;
-
-        const pendienteDolares = Math.max(0, totalVenta - totalReconocidoDolares);
-        const pendienteBs = pendienteDolares * tasaEfectiva;
-        const saldoFavorGenerado = Math.max(0, totalReconocidoDolares - totalVenta);
 
         if (pagos.length === 0) {
             listaPagos.innerHTML = '<div class="mensaje-vacio" style="text-align: center; padding: 15px;">No hay pagos registrados</div>';

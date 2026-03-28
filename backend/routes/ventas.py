@@ -144,15 +144,21 @@ def registrar_venta():
         cliente_nombre = (data.get('cliente') or 'Cliente General').strip() or 'Cliente General'
         cliente = Cliente.query.get(cliente_id) if cliente_id else None
         pagos = data.get('pagos', [])
+        vueltos_entregados = data.get('vueltos_entregados', [])
         saldo_a_favor_aplicado_usd = round(float(data.get('saldo_a_favor_aplicado_usd') or 0), 2)
         saldo_a_favor_generado_usd = round(float(data.get('saldo_a_favor_generado_usd') or 0), 2)
         total_reconocido_pagos = round(sum(float(p.get('valor_reconocido') or 0) for p in pagos), 2)
         total_dolares = round(float(data['total_dolares']), 2)
         saldo_pendiente_usd = round(float(data.get('saldo_pendiente_usd') or max(0.0, total_dolares - total_reconocido_pagos - saldo_a_favor_aplicado_usd)), 2)
         tipo_venta = 'credito' if saldo_pendiente_usd > 0.01 else 'contado'
+        total_vuelto_entregado_usd = round(sum(float(v.get('valorEnDolares') or 0) for v in vueltos_entregados), 2)
+        excedente_sin_vuelto_usd = round(max(0.0, total_reconocido_pagos - total_dolares - total_vuelto_entregado_usd), 2)
 
         if (saldo_pendiente_usd > 0.01 or saldo_a_favor_generado_usd > 0.01 or saldo_a_favor_aplicado_usd > 0.01) and not cliente:
             return jsonify({'error': 'Debe seleccionar un cliente para ventas con saldo pendiente o saldo a favor'}), 400
+
+        if not cliente and excedente_sin_vuelto_usd > 0.01:
+            return jsonify({'error': 'Cliente General / Contado requiere registrar todo el vuelto antes de finalizar la venta'}), 400
 
         if saldo_a_favor_aplicado_usd > 0.01:
             if not cliente:
@@ -175,7 +181,7 @@ def registrar_venta():
             total_pagado_bs=data.get('total_pagado_real_bs', 0),
             saldo_pendiente_usd=saldo_pendiente_usd,
             saldo_a_favor_generado_usd=saldo_a_favor_generado_usd,
-            vuelto_entregado=data.get('vueltos_entregados', []),
+            vuelto_entregado=vueltos_entregados,
         )
         db.session.add(nueva_venta)
         db.session.flush()
