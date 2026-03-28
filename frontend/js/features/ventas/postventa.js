@@ -436,15 +436,24 @@ const VentasPostventaFeature = {
         const tasa = parseFloat(document.getElementById('devolucionTasaReintegro').value || '0') || 0;
 
         if (monto <= 0) {
-            alert('Ingrese un monto de reintegro válido');
+            mostrarNotificacion('❌ Ingrese un monto de reintegro válido');
             return;
         }
         if (moneda === 'BS' && tasa <= 0) {
-            alert('Ingrese una tasa válida para el reintegro en bolívares');
+            mostrarNotificacion('❌ Ingrese una tasa válida para el reintegro en bolívares');
             return;
         }
 
         const equivalenteUSD = moneda === 'BS' ? monto / tasa : monto;
+        const totalUSD = roundAmount(this.obtenerItemsDevolucionSeleccionados().reduce((sum, item) => sum + item.subtotal, 0));
+        const entregadoUSD = roundAmount(reintegrosDevolucion.reduce((sum, item) => sum + (item.equivalente_usd || 0), 0));
+        const faltanteUSD = roundAmount(totalUSD - entregadoUSD);
+
+        if (totalUSD > 0 && equivalenteUSD - faltanteUSD > 0.05) {
+            mostrarNotificacion(`❌ El reintegro no puede superar el faltante de $${faltanteUSD.toFixed(2)}`);
+            return;
+        }
+
         reintegrosDevolucion.push({
             metodo,
             moneda,
@@ -522,19 +531,19 @@ const VentasPostventaFeature = {
 
         const items = this.obtenerItemsDevolucionSeleccionados();
         if (items.length === 0) {
-            alert('Seleccione al menos un producto para devolver');
+            mostrarNotificacion('❌ Seleccione al menos un producto para devolver');
             return;
         }
 
         if (reintegrosDevolucion.length === 0) {
-            alert('Debe agregar al menos una entrega de reintegro');
+            mostrarNotificacion('❌ Debe agregar al menos una entrega de reintegro');
             return;
         }
 
         const totalUSD = roundAmount(items.reduce((sum, item) => sum + item.subtotal, 0));
         const entregadoUSD = roundAmount(reintegrosDevolucion.reduce((sum, item) => sum + (item.equivalente_usd || 0), 0));
         if (Math.abs(totalUSD - entregadoUSD) > 0.05) {
-            alert('El total de reintegro no coincide con la devolución');
+            mostrarNotificacion('❌ El total de reintegro no coincide con la devolución');
             return;
         }
 
@@ -573,7 +582,7 @@ const VentasPostventaFeature = {
             mostrarNotificacion('✅ Devolución registrada con reintegro');
             this.verTicketDevolucion(respuesta.devolucion, ventaActualizada);
         } catch (e) {
-            alert(`No se pudo registrar la devolución: ${e.message || 'Error inesperado'}`);
+            mostrarNotificacion(`❌ No se pudo registrar la devolución: ${e.message || 'Error inesperado'}`);
         } finally {
             btnGuardar.disabled = false;
             btnGuardar.textContent = textoOriginal;

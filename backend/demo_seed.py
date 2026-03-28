@@ -261,9 +261,12 @@ def ensure_demo_dataset() -> None:
         ))
         db.session.add(PagoVenta(
             venta_id=venta_contado.id,
+            fecha=venta_contado.fecha,
             medio='Efectivo USD',
             monto=18.5,
             moneda='USD',
+            tasa_usada=1.0,
+            usuario_username=demo_admin.username,
             valor_reconocido_usd=18.5,
             descuento_aplicado=0.0,
         ))
@@ -301,9 +304,12 @@ def ensure_demo_dataset() -> None:
         ))
         db.session.add(PagoVenta(
             venta_id=venta_credito.id,
+            fecha=venta_credito.fecha,
             medio='Pago movil',
             monto=12.0,
             moneda='USD',
+            tasa_usada=1.0,
+            usuario_username=demo_admin.username,
             valor_reconocido_usd=12.0,
             descuento_aplicado=0.0,
         ))

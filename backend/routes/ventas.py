@@ -36,6 +36,7 @@ MEDIOS_PAGO_PERMITIDOS = {
 
 MONEDAS_PAGO_PERMITIDAS = {'USD', 'BS'}
 MEDIOS_VUELTO_PERMITIDOS = {'Efectivo', 'Transferencia', 'Pago Móvil'}
+MEDIOS_REINTEGRO_PERMITIDOS = {'Efectivo', 'Transferencia', 'Pago móvil', 'Zelle'}
 TOLERANCIA_MONTO = 0.05
 
 
@@ -96,6 +97,19 @@ def serializar_devolucion(devolucion: DevolucionVenta) -> dict:
             'subtotal_dolares': d.subtotal,
             'lista_precio': getattr(d, 'lista_precio', 1) or 1,
         } for d in detalles],
+    }
+
+
+def serializar_pago_venta(pago: PagoVenta) -> dict:
+    return {
+        'medio': pago.medio,
+        'monto': pago.monto,
+        'moneda': pago.moneda,
+        'tasa_usada': round(pago.tasa_usada or 0.0, 6),
+        'usuario_username': pago.usuario_username,
+        'fecha': pago.fecha.strftime('%d/%m/%Y %H:%M') if pago.fecha else None,
+        'valor_reconocido': pago.valor_reconocido_usd,
+        'descuento_aplicado': pago.descuento_aplicado,
     }
 
 
@@ -231,6 +245,7 @@ def validar_pagos_venta(pagos: list[dict]) -> tuple[list[dict], dict, str | None
             'medio': medio,
             'moneda': moneda,
             'monto': monto,
+            'tasa_usada': round((monto / valor_reconocido), 6) if moneda == 'BS' and valor_reconocido > 0 else 1.0,
             'valor_reconocido': valor_reconocido,
             'descuento_aplicado': descuento_aplicado,
         })
@@ -283,6 +298,94 @@ def validar_vueltos_entregados(vueltos_entregados: list[dict]) -> tuple[list[dic
         total_vuelto_entregado_usd = round(total_vuelto_entregado_usd + valor_en_dolares, 2)
 
     return vueltos_normalizados, total_vuelto_entregado_usd, None
+
+
+def validar_items_devolucion(venta: Venta, items: list[dict]) -> tuple[list[tuple[DetalleVenta, float, float]], float, str | None]:
+    if not items:
+        return [], 0.0, 'Debe indicar al menos un producto para devolver'
+
+    detalles_venta = {
+        detalle.id: detalle
+        for detalle in DetalleVenta.query.filter_by(venta_id=venta.id).all()
+    }
+    cantidades_devueltas = obtener_cantidades_devueltas(venta.id)
+    detalle_ids_vistos: set[int] = set()
+    detalles_validados: list[tuple[DetalleVenta, float, float]] = []
+    total_reintegrado_dolares = 0.0
+
+    for item in items:
+        detalle_venta_id = int(item.get('detalle_venta_id') or 0)
+        cantidad = round(float(item.get('cantidad') or 0), 3)
+
+        if not detalle_venta_id or detalle_venta_id not in detalles_venta:
+            return [], 0.0, 'Producto de venta no válido para devolución'
+        if detalle_venta_id in detalle_ids_vistos:
+            detalle = detalles_venta[detalle_venta_id]
+            return [], 0.0, f'No puede repetir el producto {detalle.producto_nombre} en la devolución'
+        if cantidad <= 0:
+            return [], 0.0, 'La cantidad a devolver debe ser mayor a cero'
+
+        detalle_venta = detalles_venta[detalle_venta_id]
+        producto_dev = Producto.query.get(detalle_venta.producto_id) if detalle_venta.producto_id else None
+        if producto_dev and not producto_dev.permite_decimal and cantidad != int(cantidad):
+            return [], 0.0, f'El producto {detalle_venta.producto_nombre} no permite cantidades decimales'
+
+        cantidad_ya_devuelta = cantidades_devueltas.get(detalle_venta_id, 0)
+        cantidad_disponible = round(detalle_venta.cantidad - cantidad_ya_devuelta, 3)
+        if cantidad > cantidad_disponible:
+            return [], 0.0, f'La cantidad a devolver de {detalle_venta.producto_nombre} supera lo disponible'
+
+        subtotal = round(detalle_venta.precio_unitario * cantidad, 2)
+        total_reintegrado_dolares = round(total_reintegrado_dolares + subtotal, 2)
+        detalles_validados.append((detalle_venta, cantidad, subtotal))
+        detalle_ids_vistos.add(detalle_venta_id)
+
+    return detalles_validados, total_reintegrado_dolares, None
+
+
+def validar_reintegros_devolucion(reintegros: list[dict]) -> tuple[list[dict], float, float, str | None]:
+    if not reintegros:
+        return [], 0.0, 0.0, 'Debe agregar al menos una entrega de reintegro'
+
+    reintegros_normalizados = []
+    total_reintegrado_bs = 0.0
+    total_entregado_usd = 0.0
+
+    for reintegro in reintegros:
+        metodo = (reintegro.get('metodo') or 'Efectivo').strip() or 'Efectivo'
+        moneda = (reintegro.get('moneda') or 'USD').upper().strip()
+        monto = round(float(reintegro.get('monto') or 0), 2)
+        tasa = round(float(reintegro.get('tasa') or 0), 6)
+
+        if metodo not in MEDIOS_REINTEGRO_PERMITIDOS:
+            return [], 0.0, 0.0, f'Metodo de reintegro no permitido: {metodo}'
+        if moneda not in MONEDAS_PAGO_PERMITIDAS:
+            return [], 0.0, 0.0, 'Moneda de reintegro inválida'
+        if monto <= 0:
+            return [], 0.0, 0.0, 'Cada entrega de reintegro debe ser mayor a cero'
+        if moneda == 'BS' and tasa <= 0:
+            return [], 0.0, 0.0, 'Cada reintegro en bolívares debe tener una tasa mayor a cero'
+
+        equivalente_usd = round(monto / tasa, 2) if moneda == 'BS' else monto
+        if moneda == 'USD':
+            tasa = 0.0
+        else:
+            if abs(equivalente_usd - round(monto / tasa, 2)) > TOLERANCIA_MONTO:
+                return [], 0.0, 0.0, 'El reintegro en bolívares no coincide con la tasa indicada'
+
+        total_entregado_usd = round(total_entregado_usd + equivalente_usd, 2)
+        if moneda == 'BS':
+            total_reintegrado_bs = round(total_reintegrado_bs + monto, 2)
+
+        reintegros_normalizados.append({
+            'metodo': metodo,
+            'moneda': moneda,
+            'monto': monto,
+            'tasa': tasa,
+            'equivalente_usd': equivalente_usd,
+        })
+
+    return reintegros_normalizados, total_reintegrado_bs, total_entregado_usd, None
 
 
 @ventas_bp.route('/', methods=['POST'])
@@ -338,7 +441,7 @@ def registrar_venta():
         if (saldo_pendiente_usd > 0.01 or saldo_a_favor_generado_usd > 0.01 or saldo_a_favor_aplicado_usd > 0.01) and not cliente:
             return jsonify({'error': 'Debe seleccionar un cliente para ventas con saldo pendiente o saldo a favor'}), 400
 
-        if not cliente and excedente_sin_vuelto_usd > 0.01:
+        if not cliente and saldo_a_favor_generado_usd > 0.01:
             return jsonify({'error': 'Cliente General / Contado requiere registrar todo el vuelto antes de finalizar la venta'}), 400
 
         if saldo_a_favor_aplicado_usd > 0.01:
@@ -392,9 +495,12 @@ def registrar_venta():
         for p in pagos_normalizados:
             pago = PagoVenta(
                 venta_id=nueva_venta.id,
+                fecha=ahora_local(),
                 medio=p['medio'],
                 monto=p['monto'],
                 moneda=p['moneda'],
+                tasa_usada=p['tasa_usada'],
+                usuario_username=current_user.username,
                 valor_reconocido_usd=p['valor_reconocido'],
                 descuento_aplicado=p['descuento_aplicado'],
             )
@@ -502,10 +608,6 @@ def registrar_devolucion(venta_id: int):
     venta = Venta.query.get_or_404(venta_id)
 
     try:
-        items = data.get('items', [])
-        if not items:
-            return jsonify({'error': 'Debe indicar al menos un producto para devolver'}), 400
-
         reintegros = data.get('reintegros', [])
         motivo = (data.get('motivo') or '').strip()
 
@@ -521,80 +623,13 @@ def registrar_devolucion(venta_id: int):
                 'tasa': tasa_reintegro,
             }]
 
-        detalles_venta = {
-            detalle.id: detalle
-            for detalle in DetalleVenta.query.filter_by(venta_id=venta.id).all()
-        }
-        cantidades_devueltas = obtener_cantidades_devueltas(venta.id)
+        detalles_validados, total_reintegrado_dolares, error_items = validar_items_devolucion(venta, data.get('items', []))
+        if error_items:
+            return jsonify({'error': error_items}), 400
 
-        detalles_validados = []
-        total_reintegrado_dolares = 0.0
-
-        for item in items:
-            detalle_venta_id = item.get('detalle_venta_id')
-            cantidad = float(item.get('cantidad') or 0)
-
-            if not detalle_venta_id or detalle_venta_id not in detalles_venta:
-                return jsonify({'error': 'Producto de venta no válido para devolución'}), 400
-            if cantidad <= 0:
-                return jsonify({'error': 'La cantidad a devolver debe ser mayor a cero'}), 400
-
-            detalle_venta = detalles_venta[detalle_venta_id]
-
-            # Validar decimales segun producto
-            if detalle_venta.producto_id:
-                producto_dev = Producto.query.get(detalle_venta.producto_id)
-                if producto_dev and not producto_dev.permite_decimal and cantidad != int(cantidad):
-                    return jsonify({
-                        'error': f'El producto {detalle_venta.producto_nombre} no permite cantidades decimales'
-                    }), 400
-
-            cantidad_ya_devuelta = cantidades_devueltas.get(detalle_venta_id, 0)
-            cantidad_disponible = detalle_venta.cantidad - cantidad_ya_devuelta
-
-            if cantidad > cantidad_disponible:
-                return jsonify({
-                    'error': f'La cantidad a devolver de {detalle_venta.producto_nombre} supera lo disponible'
-                }), 400
-
-            subtotal = round(detalle_venta.precio_unitario * cantidad, 2)
-            total_reintegrado_dolares += subtotal
-            detalles_validados.append((detalle_venta, cantidad, subtotal))
-
-        total_reintegrado_dolares = round(total_reintegrado_dolares, 2)
-
-        reintegros_normalizados = []
-        total_reintegrado_bs = 0.0
-        total_entregado_usd = 0.0
-
-        for reintegro in reintegros:
-            metodo = (reintegro.get('metodo') or 'Efectivo').strip() or 'Efectivo'
-            moneda = (reintegro.get('moneda') or 'USD').upper()
-            monto = round(float(reintegro.get('monto') or 0), 2)
-            tasa = float(reintegro.get('tasa') or 0)
-
-            if moneda not in ('USD', 'BS'):
-                return jsonify({'error': 'Moneda de reintegro inválida'}), 400
-            if monto <= 0:
-                return jsonify({'error': 'Cada entrega de reintegro debe ser mayor a cero'}), 400
-            if moneda == 'BS' and tasa <= 0:
-                return jsonify({'error': 'Cada reintegro en bolívares debe tener una tasa mayor a cero'}), 400
-
-            equivalente_usd = round(monto / tasa, 2) if moneda == 'BS' else round(monto, 2)
-            total_entregado_usd += equivalente_usd
-            if moneda == 'BS':
-                total_reintegrado_bs += monto
-
-            reintegros_normalizados.append({
-                'metodo': metodo,
-                'moneda': moneda,
-                'monto': monto,
-                'tasa': tasa,
-                'equivalente_usd': equivalente_usd,
-            })
-
-        total_entregado_usd = round(total_entregado_usd, 2)
-        total_reintegrado_bs = round(total_reintegrado_bs, 2)
+        reintegros_normalizados, total_reintegrado_bs, total_entregado_usd, error_reintegros = validar_reintegros_devolucion(reintegros)
+        if error_reintegros:
+            return jsonify({'error': error_reintegros}), 400
 
         if abs(total_entregado_usd - total_reintegrado_dolares) > 0.05:
             return jsonify({'error': 'El reintegro total no coincide con el monto de la devolución'}), 400
@@ -650,9 +685,10 @@ def registrar_devolucion(venta_id: int):
             'devolucion': serializar_devolucion(devolucion),
         }), 201
 
-    except Exception as e:
+    except Exception:
         db.session.rollback()
-        return jsonify({'error': str(e)}), 500
+        logger.exception('Error registrando devolucion')
+        return jsonify({'error': 'Ocurrio un error inesperado al registrar la devolución'}), 500
 
 
 @ventas_bp.route('/', methods=['GET'])
@@ -748,13 +784,7 @@ def get_ventas():
         ]
 
         pagos = PagoVenta.query.filter_by(venta_id=v.id).all()
-        pagos_list = [{
-            'medio': p.medio,
-            'monto': p.monto,
-            'moneda': p.moneda,
-            'valor_reconocido': p.valor_reconocido_usd,
-            'descuento_aplicado': p.descuento_aplicado,
-        } for p in pagos]
+        pagos_list = [serializar_pago_venta(p) for p in pagos]
 
         devoluciones = DevolucionVenta.query.filter_by(venta_id=v.id).order_by(DevolucionVenta.fecha.desc()).all()
         devoluciones_list = [serializar_devolucion(d) for d in devoluciones]
@@ -802,13 +832,7 @@ def get_venta_por_id(id):
         for d in detalles
     ]
     pagos = PagoVenta.query.filter_by(venta_id=v.id).all()
-    pagos_list = [{
-        'medio': p.medio,
-        'monto': p.monto,
-        'moneda': p.moneda,
-        'valor_reconocido': p.valor_reconocido_usd,
-        'descuento_aplicado': p.descuento_aplicado,
-    } for p in pagos]
+    pagos_list = [serializar_pago_venta(p) for p in pagos]
     devoluciones = DevolucionVenta.query.filter_by(venta_id=v.id).order_by(DevolucionVenta.fecha.desc()).all()
     devoluciones_list = [serializar_devolucion(d) for d in devoluciones]
     return jsonify({
@@ -995,6 +1019,9 @@ def informe_venta_dia():
                     'medio': p.medio,
                     'monto': round(p.monto, 2),
                     'moneda': p.moneda,
+                    'tasa_usada': round(p.tasa_usada or 0, 6),
+                    'usuario_username': p.usuario_username,
+                    'fecha': p.fecha.strftime('%d/%m/%Y %H:%M') if p.fecha else None,
                     'valor_reconocido_usd': round(p.valor_reconocido_usd, 2),
                 } for p in pagos],
             })

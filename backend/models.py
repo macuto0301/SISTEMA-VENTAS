@@ -157,9 +157,12 @@ class Venta(db.Model):
 class PagoVenta(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     venta_id = db.Column(db.Integer, db.ForeignKey('venta.id'), nullable=False)
+    fecha = db.Column(db.DateTime, default=ahora_local)
     medio = db.Column(db.String(50), nullable=False)
     monto = db.Column(db.Float, nullable=False)
     moneda = db.Column(db.String(10), nullable=False) # USD o BS
+    tasa_usada = db.Column(db.Float, default=1.0)
+    usuario_username = db.Column(db.String(50))
     valor_reconocido_usd = db.Column(db.Float, nullable=False)
     descuento_aplicado = db.Column(db.Float, default=0.0)
 

@@ -325,6 +325,30 @@ def create_app():
                 db.session.commit()
                 print("Columna lista_precio agregada a tabla detalle_venta")
 
+            result = db.session.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name='pago_venta'"))
+            columnas_pago_venta = [row[0] for row in result.fetchall()]
+            print(f"Columnas en pago_venta: {columnas_pago_venta}")
+
+            if columnas_pago_venta and 'fecha' not in columnas_pago_venta:
+                db.session.execute(text("ALTER TABLE pago_venta ADD COLUMN fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP"))
+                db.session.commit()
+                print("Columna fecha agregada a tabla pago_venta")
+
+            if columnas_pago_venta and 'tasa_usada' not in columnas_pago_venta:
+                db.session.execute(text("ALTER TABLE pago_venta ADD COLUMN tasa_usada FLOAT DEFAULT 1.0"))
+                db.session.commit()
+                print("Columna tasa_usada agregada a tabla pago_venta")
+
+            if columnas_pago_venta and 'usuario_username' not in columnas_pago_venta:
+                db.session.execute(text("ALTER TABLE pago_venta ADD COLUMN usuario_username VARCHAR(50)"))
+                db.session.commit()
+                print("Columna usuario_username agregada a tabla pago_venta")
+
+            if columnas_pago_venta:
+                db.session.execute(text("UPDATE pago_venta SET fecha = CURRENT_TIMESTAMP WHERE fecha IS NULL"))
+                db.session.execute(text("UPDATE pago_venta SET tasa_usada = 1.0 WHERE tasa_usada IS NULL OR tasa_usada = 0"))
+                db.session.commit()
+
             result = db.session.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name='detalle_devolucion_venta'"))
             columnas_detalle_devolucion = [row[0] for row in result.fetchall()]
             print(f"Columnas en detalle_devolucion_venta: {columnas_detalle_devolucion}")
