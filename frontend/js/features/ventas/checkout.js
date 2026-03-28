@@ -27,6 +27,15 @@ const VentasCheckoutFeature = {
         return window.PricingUtils?.aplicarRedondeoBs?.(monto, metodo) ?? monto;
     },
 
+    obtenerTotalVueltoEntregadoUSD() {
+        return vueltosAgregados.reduce((sum, v) => sum + v.valorEnDolares, 0);
+    },
+
+    obtenerFaltanteVueltoUSD() {
+        if (!ventaEnProgreso) return 0;
+        return Math.max(0, (ventaEnProgreso.excedenteReconocido || 0) - this.obtenerTotalVueltoEntregadoUSD());
+    },
+
     procesarVenta() {
         if (carrito.length === 0) {
             this.mostrarNotificacionSegura('❌ El carrito está vacío');
@@ -299,14 +308,11 @@ const VentasCheckoutFeature = {
             valorEnDolares = monto / tasa;
         }
 
-        const excedenteTotal = ventaEnProgreso.excedenteReconocido;
-        const yaEntregado = vueltosAgregados.reduce((sum, v) => sum + v.valorEnDolares, 0);
-        const faltante = excedenteTotal - yaEntregado;
+        const faltante = this.obtenerFaltanteVueltoUSD();
 
         if (valorEnDolares > (faltante + 0.01)) {
-            if (!confirm(`El monto ingresado ($${valorEnDolares.toFixed(2)}) es mayor al faltante ($${faltante.toFixed(2)}). ¿Desea agregarlo de todas formas?`)) {
-                return;
-            }
+            this.mostrarNotificacionSegura(`❌ El vuelto no puede superar el faltante de $${faltante.toFixed(2)}`);
+            return;
         }
 
         vueltosAgregados.push({
@@ -368,10 +374,22 @@ const VentasCheckoutFeature = {
                 </div>
             `).join('');
         }
+
+        const btnSinVuelto = document.getElementById('btnFinalizarSinVuelto');
+        if (btnSinVuelto) {
+            btnSinVuelto.style.display = ventaEnProgreso?.cliente_id ? 'inline-flex' : 'none';
+        }
+
+        const btnConfirmarVuelto = document.getElementById('btnConfirmarVuelto');
+        if (btnConfirmarVuelto) {
+            const clienteGeneralConFaltante = !ventaEnProgreso?.cliente_id && faltanteUSD > 0.01;
+            btnConfirmarVuelto.disabled = clienteGeneralConFaltante;
+            btnConfirmarVuelto.classList.toggle('btn-disabled', clienteGeneralConFaltante);
+        }
     },
 
     async finalizarVentaSinVuelto() {
-        const excedentePendiente = ventaEnProgreso?.excedenteTotalUSD || 0;
+        const excedentePendiente = this.obtenerFaltanteVueltoUSD();
         if (!ventaEnProgreso?.cliente_id && excedentePendiente > 0.01) {
             this.mostrarNotificacionSegura('❌ Cliente General / Contado requiere registrar todo el vuelto antes de finalizar');
             return;
@@ -394,11 +412,11 @@ const VentasCheckoutFeature = {
 
         if (!confirmado) return;
 
-        if (ventaEnProgreso?.cliente_id && ventaEnProgreso?.excedenteTotalUSD > 0.01) {
-            ventaEnProgreso.saldo_a_favor_generado_usd = ventaEnProgreso.excedenteTotalUSD;
-            ventaEnProgreso.excedenteTotalUSD = 0;
-            ventaEnProgreso.excedenteReconocido = 0;
-            ventaEnProgreso.excedenteUSD = 0;
+        if (ventaEnProgreso?.cliente_id && excedentePendiente > 0.01) {
+            ventaEnProgreso.saldo_a_favor_generado_usd = excedentePendiente;
+            ventaEnProgreso.excedenteTotalUSD = excedentePendiente;
+            ventaEnProgreso.excedenteReconocido = excedentePendiente;
+            ventaEnProgreso.excedenteUSD = excedentePendiente;
             ventaEnProgreso.excedenteBS = 0;
         }
 
@@ -410,8 +428,7 @@ const VentasCheckoutFeature = {
         const totalExcedente = ventaEnProgreso.excedenteReconocido;
         const confirmarModal = window.Utils?.confirmarModal?.bind(window.Utils)
             || ((mensaje) => Promise.resolve(confirm(mensaje)));
-        const totalEntregado = vueltosAgregados.reduce((sum, v) => sum + v.valorEnDolares, 0);
-        const faltanteVuelto = Math.max(0, totalExcedente - totalEntregado);
+        const faltanteVuelto = this.obtenerFaltanteVueltoUSD();
 
         if (!ventaEnProgreso?.cliente_id && faltanteVuelto > 0.01) {
             this.mostrarNotificacionSegura(`❌ Debe entregar el vuelto completo de Cliente General / Contado. Falta $${faltanteVuelto.toFixed(2)}`);
@@ -435,22 +452,11 @@ const VentasCheckoutFeature = {
             }
         }
 
-        vueltosAgregados.forEach(v => {
-            ventaEnProgreso.pagos.push({
-                medio: `Vuelto (${v.metodo})`,
-                monto: -v.monto,
-                moneda: v.moneda,
-                esDolares: v.moneda === 'USD',
-                valor_reconocido: -v.valorEnDolares,
-                descuento_aplicado: 0
-            });
-
-            if (v.moneda === 'USD') {
-                ventaEnProgreso.total_pagado_real_dolares -= v.monto;
-            } else {
-                ventaEnProgreso.total_pagado_real_bs -= v.monto;
-            }
-        });
+        ventaEnProgreso.saldo_a_favor_generado_usd = ventaEnProgreso?.cliente_id ? faltanteVuelto : 0;
+        ventaEnProgreso.excedenteTotalUSD = faltanteVuelto;
+        ventaEnProgreso.excedenteReconocido = faltanteVuelto;
+        ventaEnProgreso.excedenteUSD = faltanteVuelto;
+        ventaEnProgreso.excedenteBS = 0;
 
         let mensaje = '';
         if (vueltosAgregados.length > 0) {

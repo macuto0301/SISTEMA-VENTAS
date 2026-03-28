@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime
 
 from flask import Blueprint, jsonify, request
@@ -21,6 +22,21 @@ from models import (
 )
 
 ventas_bp = Blueprint('ventas', __name__)
+logger = logging.getLogger(__name__)
+
+MEDIOS_PAGO_PERMITIDOS = {
+    'Efectivo en Dólares',
+    'Efectivo en Bolívares',
+    'Tarjeta de Débito',
+    'Pago Móvil',
+    'Tarjeta de Crédito',
+    'Transferencia en Bs',
+    'Transferencia en Dólares',
+}
+
+MONEDAS_PAGO_PERMITIDAS = {'USD', 'BS'}
+MEDIOS_VUELTO_PERMITIDOS = {'Efectivo', 'Transferencia', 'Pago Móvil'}
+TOLERANCIA_MONTO = 0.05
 
 
 def producto_maneja_existencia(producto: Producto | None) -> bool:
@@ -130,6 +146,145 @@ def crear_movimiento_cliente(
     db.session.add(movimiento)
 
 
+def validar_monto_positivo(valor: float, campo: str) -> str | None:
+    if valor <= 0:
+        return f'{campo} debe ser mayor a cero'
+    return None
+
+
+def validar_productos_venta(items: list[dict]) -> tuple[list[dict], float, str | None]:
+    if not items:
+        return [], 0.0, 'Debe agregar al menos un producto a la venta'
+
+    items_normalizados: list[dict] = []
+    total_dolares = 0.0
+
+    for item in items:
+        producto_id = item.get('producto_id')
+        nombre_item = (item.get('nombre') or '').strip()
+        prod = Producto.query.get(producto_id) if producto_id else None
+
+        if not prod:
+            return [], 0.0, f'Producto no encontrado para la linea: {nombre_item or "Sin nombre"}'
+
+        cantidad_item = round(float(item.get('cantidad') or 0), 3)
+        precio_unitario = round(float(item.get('precio_unitario_dolares') or 0), 2)
+        subtotal_item = round(float(item.get('subtotal_dolares') or 0), 2)
+
+        error_cantidad = validar_monto_positivo(cantidad_item, f'La cantidad para {prod.nombre}')
+        if error_cantidad:
+            return [], 0.0, error_cantidad
+
+        error_precio = validar_monto_positivo(precio_unitario, f'El precio para {prod.nombre}')
+        if error_precio:
+            return [], 0.0, error_precio
+
+        subtotal_calculado = round(cantidad_item * precio_unitario, 2)
+        if abs(subtotal_item - subtotal_calculado) > TOLERANCIA_MONTO:
+            return [], 0.0, f'El subtotal del producto {prod.nombre} no coincide con cantidad por precio'
+
+        if not prod.permite_decimal and cantidad_item != int(cantidad_item):
+            return [], 0.0, f'El producto {prod.nombre} no permite cantidades decimales'
+
+        items_normalizados.append({
+            'producto': prod,
+            'producto_id': prod.id,
+            'nombre': prod.nombre,
+            'cantidad': cantidad_item,
+            'precio_unitario_dolares': precio_unitario,
+            'subtotal_dolares': subtotal_item,
+            'lista_precio': int(item.get('lista_precio') or 1),
+        })
+        total_dolares = round(total_dolares + subtotal_item, 2)
+
+    return items_normalizados, total_dolares, None
+
+
+def validar_pagos_venta(pagos: list[dict]) -> tuple[list[dict], dict, str | None]:
+    pagos_normalizados: list[dict] = []
+    resumen = {
+        'total_reconocido_usd': 0.0,
+        'total_pagado_real_dolares': 0.0,
+        'total_pagado_real_bs': 0.0,
+        'descuento_total': 0.0,
+    }
+
+    for pago in pagos:
+        medio = (pago.get('medio') or '').strip()
+        moneda = (pago.get('moneda') or '').upper().strip()
+        monto = round(float(pago.get('monto') or 0), 2)
+        valor_reconocido = round(float(pago.get('valor_reconocido') or 0), 2)
+        descuento_aplicado = round(float(pago.get('descuento_aplicado') or 0), 2)
+
+        if medio not in MEDIOS_PAGO_PERMITIDOS:
+            return [], resumen, f'Medio de pago no permitido: {medio or "Sin medio"}'
+        if moneda not in MONEDAS_PAGO_PERMITIDAS:
+            return [], resumen, f'Moneda de pago no permitida: {moneda or "Sin moneda"}'
+        if monto <= 0:
+            return [], resumen, f'El monto del pago debe ser mayor a cero para {medio}'
+        if valor_reconocido < 0:
+            return [], resumen, f'El valor reconocido no puede ser negativo para {medio}'
+        if descuento_aplicado < 0:
+            return [], resumen, f'El descuento aplicado no puede ser negativo para {medio}'
+
+        pagos_normalizados.append({
+            'medio': medio,
+            'moneda': moneda,
+            'monto': monto,
+            'valor_reconocido': valor_reconocido,
+            'descuento_aplicado': descuento_aplicado,
+        })
+        resumen['total_reconocido_usd'] = round(resumen['total_reconocido_usd'] + valor_reconocido, 2)
+        resumen['descuento_total'] = round(resumen['descuento_total'] + descuento_aplicado, 2)
+        if moneda == 'USD':
+            resumen['total_pagado_real_dolares'] = round(resumen['total_pagado_real_dolares'] + monto, 2)
+        else:
+            resumen['total_pagado_real_bs'] = round(resumen['total_pagado_real_bs'] + monto, 2)
+
+    return pagos_normalizados, resumen, None
+
+
+def validar_vueltos_entregados(vueltos_entregados: list[dict]) -> tuple[list[dict], float, str | None]:
+    vueltos_normalizados: list[dict] = []
+    total_vuelto_entregado_usd = 0.0
+
+    for vuelto in vueltos_entregados:
+        moneda = (vuelto.get('moneda') or '').upper().strip()
+        metodo = (vuelto.get('metodo') or '').strip()
+        monto = round(float(vuelto.get('monto') or 0), 2)
+        valor_en_dolares = round(float(vuelto.get('valorEnDolares') or 0), 2)
+        tasa = vuelto.get('tasa')
+        tasa = round(float(tasa), 6) if tasa not in (None, '') else None
+
+        if moneda not in MONEDAS_PAGO_PERMITIDAS:
+            return [], 0.0, f'Moneda de vuelto no permitida: {moneda or "Sin moneda"}'
+        if metodo not in MEDIOS_VUELTO_PERMITIDOS:
+            return [], 0.0, f'Metodo de vuelto no permitido: {metodo or "Sin metodo"}'
+        if monto <= 0 or valor_en_dolares <= 0:
+            return [], 0.0, 'Los montos del vuelto deben ser mayores a cero'
+        if moneda == 'USD':
+            if abs(valor_en_dolares - monto) > TOLERANCIA_MONTO:
+                return [], 0.0, 'El vuelto en USD no coincide con su equivalente'
+            tasa = None
+        else:
+            if tasa is None or tasa <= 0:
+                return [], 0.0, 'El vuelto en bolivares requiere una tasa valida'
+            if abs(valor_en_dolares - round(monto / tasa, 2)) > TOLERANCIA_MONTO:
+                return [], 0.0, 'El vuelto en bolivares no coincide con la tasa indicada'
+
+        vuelta = {
+            'moneda': moneda,
+            'metodo': metodo,
+            'monto': monto,
+            'tasa': tasa,
+            'valorEnDolares': valor_en_dolares,
+        }
+        vueltos_normalizados.append(vuelta)
+        total_vuelto_entregado_usd = round(total_vuelto_entregado_usd + valor_en_dolares, 2)
+
+    return vueltos_normalizados, total_vuelto_entregado_usd, None
+
+
 @ventas_bp.route('/', methods=['POST'])
 @require_roles('admin', 'cajero')
 def registrar_venta():
@@ -143,16 +298,42 @@ def registrar_venta():
         cliente_id = data.get('cliente_id')
         cliente_nombre = (data.get('cliente') or 'Cliente General').strip() or 'Cliente General'
         cliente = Cliente.query.get(cliente_id) if cliente_id else None
-        pagos = data.get('pagos', [])
-        vueltos_entregados = data.get('vueltos_entregados', [])
+        items_normalizados, total_dolares, error_productos = validar_productos_venta(data.get('productos', []))
+        if error_productos:
+            return jsonify({'error': error_productos}), 400
+
+        pagos_normalizados, resumen_pagos, error_pagos = validar_pagos_venta(data.get('pagos', []))
+        if error_pagos:
+            return jsonify({'error': error_pagos}), 400
+
+        vueltos_entregados, total_vuelto_entregado_usd, error_vueltos = validar_vueltos_entregados(data.get('vueltos_entregados', []))
+        if error_vueltos:
+            return jsonify({'error': error_vueltos}), 400
+
         saldo_a_favor_aplicado_usd = round(float(data.get('saldo_a_favor_aplicado_usd') or 0), 2)
-        saldo_a_favor_generado_usd = round(float(data.get('saldo_a_favor_generado_usd') or 0), 2)
-        total_reconocido_pagos = round(sum(float(p.get('valor_reconocido') or 0) for p in pagos), 2)
-        total_dolares = round(float(data['total_dolares']), 2)
-        saldo_pendiente_usd = round(float(data.get('saldo_pendiente_usd') or max(0.0, total_dolares - total_reconocido_pagos - saldo_a_favor_aplicado_usd)), 2)
+        total_reconocido_pagos = resumen_pagos['total_reconocido_usd']
+        saldo_pendiente_usd = round(max(0.0, total_dolares - total_reconocido_pagos - saldo_a_favor_aplicado_usd), 2)
         tipo_venta = 'credito' if saldo_pendiente_usd > 0.01 else 'contado'
-        total_vuelto_entregado_usd = round(sum(float(v.get('valorEnDolares') or 0) for v in vueltos_entregados), 2)
-        excedente_sin_vuelto_usd = round(max(0.0, total_reconocido_pagos - total_dolares - total_vuelto_entregado_usd), 2)
+        excedente_total_usd = round(max(0.0, total_reconocido_pagos - total_dolares), 2)
+        if total_vuelto_entregado_usd - excedente_total_usd > TOLERANCIA_MONTO:
+            return jsonify({'error': 'El vuelto registrado no puede superar el excedente de la venta'}), 400
+
+        saldo_a_favor_generado_usd = round(max(0.0, excedente_total_usd - total_vuelto_entregado_usd), 2)
+        total_bolivares = round(float(data.get('total_bolivares') or 0), 2)
+        if total_bolivares <= 0:
+            return jsonify({'error': 'El total en bolivares de la venta es invalido'}), 400
+
+        total_dolares_payload = round(float(data.get('total_dolares') or 0), 2)
+        if abs(total_dolares_payload - total_dolares) > TOLERANCIA_MONTO:
+            return jsonify({'error': 'El total en dolares no coincide con los productos enviados'}), 400
+
+        saldo_pendiente_payload = round(float(data.get('saldo_pendiente_usd') or saldo_pendiente_usd), 2)
+        if abs(saldo_pendiente_payload - saldo_pendiente_usd) > TOLERANCIA_MONTO:
+            return jsonify({'error': 'El saldo pendiente enviado no coincide con el calculado'}), 400
+
+        saldo_a_favor_payload = round(float(data.get('saldo_a_favor_generado_usd') or saldo_a_favor_generado_usd), 2)
+        if abs(saldo_a_favor_payload - saldo_a_favor_generado_usd) > TOLERANCIA_MONTO:
+            return jsonify({'error': 'El saldo a favor enviado no coincide con el excedente calculado'}), 400
 
         if (saldo_pendiente_usd > 0.01 or saldo_a_favor_generado_usd > 0.01 or saldo_a_favor_aplicado_usd > 0.01) and not cliente:
             return jsonify({'error': 'Debe seleccionar un cliente para ventas con saldo pendiente o saldo a favor'}), 400
@@ -174,11 +355,11 @@ def registrar_venta():
             usuario_rol=current_user.rol,
             tipo_venta=tipo_venta,
             total_dolares=total_dolares,
-            total_bolivares=data['total_bolivares'],
-            descuento_total=data.get('descuento_dolares', 0),
+            total_bolivares=total_bolivares,
+            descuento_total=resumen_pagos['descuento_total'],
             porcentaje_bono=data.get('porcentaje_descuento_usd', 0),
-            total_pagado_dolares=data.get('total_pagado_real_dolares', 0),
-            total_pagado_bs=data.get('total_pagado_real_bs', 0),
+            total_pagado_dolares=resumen_pagos['total_pagado_real_dolares'],
+            total_pagado_bs=resumen_pagos['total_pagado_real_bs'],
             saldo_pendiente_usd=saldo_pendiente_usd,
             saldo_a_favor_generado_usd=saldo_a_favor_generado_usd,
             vuelto_entregado=vueltos_entregados,
@@ -187,26 +368,9 @@ def registrar_venta():
         db.session.flush()
         nueva_venta.numero_venta = nueva_venta.id
 
-        for item in data['productos']:
-            prod = None
-            producto_id = item.get('producto_id')
-
-            if producto_id:
-                prod = Producto.query.get(producto_id)
-            if not prod:
-                prod = Producto.query.filter_by(nombre=item['nombre']).first()
-
-            cantidad_item = float(item['cantidad'])
-
-            # Validar decimales: solo permitir si el producto tiene permite_decimal
-            if prod and not prod.permite_decimal and cantidad_item != int(cantidad_item):
-                db.session.rollback()
-                return jsonify({'error': f'El producto {prod.nombre} no permite cantidades decimales'}), 400
-
-            if cantidad_item <= 0:
-                db.session.rollback()
-                return jsonify({'error': f'La cantidad debe ser mayor a cero para: {item["nombre"]}'}), 400
-
+        for item in items_normalizados:
+            prod = item['producto']
+            cantidad_item = item['cantidad']
             if producto_maneja_existencia(prod):
                 if prod.cantidad < cantidad_item:
                     db.session.rollback()
@@ -215,7 +379,7 @@ def registrar_venta():
 
             detalle = DetalleVenta(
                 venta_id=nueva_venta.id,
-                producto_id=prod.id if prod else producto_id,
+                producto_id=prod.id,
                 producto_nombre=item['nombre'],
                 cantidad=cantidad_item,
                 precio_unitario=item['precio_unitario_dolares'],
@@ -225,7 +389,7 @@ def registrar_venta():
             )
             db.session.add(detalle)
 
-        for p in pagos:
+        for p in pagos_normalizados:
             pago = PagoVenta(
                 venta_id=nueva_venta.id,
                 medio=p['medio'],
@@ -325,9 +489,10 @@ def registrar_venta():
             'cuenta_por_cobrar_id': cuenta_por_cobrar.id if cuenta_por_cobrar else None,
         }), 201
 
-    except Exception as e:
+    except Exception:
         db.session.rollback()
-        return jsonify({'error': str(e)}), 500
+        logger.exception('Error registrando venta')
+        return jsonify({'error': 'Ocurrio un error inesperado al registrar la venta'}), 500
 
 
 @ventas_bp.route('/<int:venta_id>/devoluciones', methods=['POST'])

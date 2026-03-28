@@ -344,6 +344,7 @@ const VentasPaymentsFeature = {
         }
 
         const btnProcesar = document.getElementById('btnProcesarVenta');
+        const btnAgregarPago = document.getElementById('btnAgregarPago');
         const clienteSeleccionado = this.obtenerClienteSeleccionadoSeguro();
         if (pendienteDolares <= 0.01 || (pendienteDolares > 0.01 && clienteSeleccionado)) {
             btnProcesar.disabled = false;
@@ -355,6 +356,13 @@ const VentasPaymentsFeature = {
             btnProcesar.classList.remove('btn-success');
             btnProcesar.classList.add('btn-disabled');
             btnProcesar.removeAttribute('data-moneda-sugerida');
+        }
+
+        if (btnAgregarPago) {
+            const bloquearMasPagos = pendienteDolares <= 0.01;
+            btnAgregarPago.disabled = bloquearMasPagos;
+            btnAgregarPago.classList.toggle('btn-disabled', bloquearMasPagos);
+            btnAgregarPago.title = bloquearMasPagos ? 'La compra ya esta cubierta' : 'F9 o Enter en pago';
         }
 
         const tipoVentaPreview = document.getElementById('tipoVentaPreview');
