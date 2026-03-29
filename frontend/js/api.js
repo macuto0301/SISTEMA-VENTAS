@@ -68,13 +68,18 @@ const API = {
             }
             if (!res.ok) {
                 let mensaje = `HTTP ${res.status}`;
+                let errorData = null;
                 try {
                     const data = await res.json();
+                    errorData = data;
                     mensaje = data?.error || data?.message || mensaje;
                 } catch (parseError) {
                     // noop
                 }
-                throw new Error(mensaje);
+                const error = new Error(mensaje);
+                error.status = res.status;
+                error.data = errorData;
+                throw error;
             }
             return await res.json();
         } catch (e) {
@@ -181,6 +186,7 @@ const ApiService = {
                     tasaVuelto: data.tasaVuelto || data.tasaDolar || 36.5,
                     porcentajeGananciaDefecto: data.porcentajeGananciaDefecto || 30,
                     porcentajeDescuentoDolares: data.porcentajeDescuentoDolares || 0,
+                    cxcInteresMoraPorcentajeDiario: data.cxc_interes_mora_porcentaje_diario || 1,
                     metodoRedondeoBs: data.metodoRedondeoBs || 'none',
                     precioVentaLibre: Boolean(data.precioVentaLibre),
                     nombreEmpresa: data.nombreEmpresa || '',
@@ -271,19 +277,7 @@ const ApiService = {
     },
 
     async guardarVenta(venta) {
-        try {
-            const res = await fetch(`${API.baseUrl}/ventas/`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', ...API.getAuthHeaders() },
-                body: JSON.stringify(venta)
-            });
-            if (!res.ok) throw new Error('Error guardando');
-            return await res.json();
-        } catch (e) {
-            console.error('Error:', e);
-            alert('Error de conexión. No se pudo guardar.');
-            throw e;
-        }
+        return API.post('/ventas/', venta);
     },
 
     async registrarDevolucionVenta(ventaId, devolucion) {
@@ -354,6 +348,14 @@ const ApiService = {
 
     async registrarAbonoCuenta(cuentaId, payload) {
         return API.post(`/cuentas-por-cobrar/${cuentaId}/abonos`, payload);
+    },
+
+    async registrarNotaDebitoCuenta(cuentaId, payload) {
+        return API.post(`/cuentas-por-cobrar/${cuentaId}/nota-debito`, payload);
+    },
+
+    async generarInteresMora(payload) {
+        return API.post('/cuentas-por-cobrar/generar-interes-mora', payload || {});
     },
 
     async devolverSaldoFavorCliente(clienteId, payload) {

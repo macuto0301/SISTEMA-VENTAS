@@ -2,6 +2,8 @@ const CxcFeature = {
     _clientPicker: null,
     _guardandoAbonoCuenta: false,
     _devolviendoSaldoFavor: false,
+    _guardandoNotaDebitoCuenta: false,
+    _generandoMoraAutomatica: false,
     _modalDevolucionSaldoFavor: null,
 
     inicializarComponentesCxc() {
@@ -21,7 +23,7 @@ const CxcFeature = {
                     ${this.renderAvatarCliente(cliente, 'cliente-seleccionado-avatar')}
                     <div class="cliente-seleccionado-info">
                         <strong>${this.escaparHtml(cliente.nombre || 'Cliente')}</strong>
-                        <small>Favor $${(cliente.saldo_a_favor_usd || 0).toFixed(2)} · CxC $${(cliente.saldo_por_cobrar_usd || 0).toFixed(2)}</small>
+                        <small>Favor $${(cliente.saldo_a_favor_usd || 0).toFixed(2)} · CxC $${(cliente.saldo_por_cobrar_usd || 0).toFixed(2)} · Disp. $${(cliente.disponible_credito_usd || 0).toFixed(2)}</small>
                     </div>
                 `
             });
@@ -182,6 +184,8 @@ const CxcFeature = {
                 <div style="display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap:10px; font-size:0.92em; color:#334155;">
                     <div>Por cobrar: <strong>$${(cliente.saldo_por_cobrar_usd || 0).toFixed(2)}</strong></div>
                     <div>Saldo a favor: <strong>$${(cliente.saldo_a_favor_usd || 0).toFixed(2)}</strong></div>
+                    <div>Limite: <strong>$${(cliente.limite_credito_usd || 0).toFixed(2)}</strong></div>
+                    <div>Mora max.: <strong>${cliente.max_dias_mora_cxc || 0} d</strong></div>
                 </div>
             </button>
         `).join('');
@@ -233,15 +237,25 @@ const CxcFeature = {
             variant: 'success'
         });
 
+        const creditoHtml = window.SVSummaryCard?.createHtml({
+            title: 'Credito disponible',
+            value: `$${(cliente.disponible_credito_usd || 0).toFixed(2)}`,
+            variant: cliente.bloqueado_credito ? 'danger' : 'info',
+            content: `<small>Limite $${(cliente.limite_credito_usd || 0).toFixed(2)} · Docs ${cliente.documentos_pendientes_cxc || 0}/${cliente.limite_documentos || 0}</small>`
+        });
+
         const accionesHtml = `
             <div class="producto-acciones" style="grid-column: 1 / -1; margin-top: 6px;">
+                <button class="btn-secondary" onclick="window.CxcFeature?.generarInteresMoraAutomatico?.()" ${(cliente.cuentas_vencidas_cxc || 0) > 0 ? '' : 'disabled'}>
+                    Generar mora automatica
+                </button>
                 <button class="btn-secondary" onclick="window.CxcFeature?.abrirModalDevolucionSaldoFavor?.()" ${(cliente.saldo_a_favor_usd || 0) > 0.001 ? '' : 'disabled'}>
                     Devolver saldo a favor
                 </button>
             </div>
         `;
 
-        return [clienteHtml, cobrarHtml, favorHtml, accionesHtml].join('');
+        return [clienteHtml, cobrarHtml, favorHtml, creditoHtml, accionesHtml].join('');
     },
 
     obtenerModalDevolucionSaldoFavor() {
@@ -367,13 +381,16 @@ const CxcFeature = {
                     <span class="cxc-document-status">${this.escaparHtml(cuenta.estado || 'pendiente')}</span>
                 </div>
                 <div class="cxc-document-date">Emitida: ${this.escaparHtml(cuenta.fecha_emision || 'Sin fecha')}</div>
+                <div class="cxc-document-date">Vence: ${this.escaparHtml(cuenta.fecha_vencimiento || 'Sin fecha')} · Mora: ${Number(cuenta.dias_mora || 0)} dias · Riesgo: ${this.escaparHtml(cuenta.estado_riesgo || 'pendiente')}</div>
                 <div class="cxc-document-totals">
                     <div><small>Original</small><strong>$${(cuenta.monto_original_usd || 0).toFixed(2)}</strong></div>
                     <div><small>Abonado</small><strong>$${(cuenta.monto_abonado_usd || 0).toFixed(2)}</strong></div>
                     <div><small>Pendiente</small><strong>$${(cuenta.saldo_pendiente_usd || 0).toFixed(2)}</strong></div>
                 </div>
+                <div class="cxc-document-date">Cargos acumulados: $${Number(cuenta.total_notas_debito_usd || 0).toFixed(2)}${cuenta.fecha_ultima_mora ? ` · Ultima mora: ${this.escaparHtml(cuenta.fecha_ultima_mora)}` : ''}</div>
                 <div class="producto-acciones">
                     <button class="btn-success" onclick="window.CxcFeature?.registrarAbonoCuentaPrompt?.(${cuenta.id})">💵 Abonar</button>
+                    <button class="btn-secondary" onclick="window.CxcFeature?.registrarNotaDebitoCuentaPrompt?.(${cuenta.id})">🧾 Cargo</button>
                 </div>
             </div>
         `;
@@ -449,6 +466,44 @@ const CxcFeature = {
         `;
     },
 
+    async generarInteresMoraAutomatico() {
+        const cliente = window.AppState.estadoCuentaClienteActual?.cliente || null;
+        if (!cliente || this._generandoMoraAutomatica) return;
+
+        const porcentajeDefault = Number(window.AppState?.cxcInteresMoraPorcentajeDiario || 1);
+        const input = window.prompt('Porcentaje diario de mora a aplicar (%):', porcentajeDefault.toFixed(2));
+        if (input === null) return;
+
+        const porcentaje = parseFloat(input);
+        if (!Number.isFinite(porcentaje) || porcentaje <= 0) {
+            window.mostrarNotificacion('❌ Debe indicar un porcentaje diario valido');
+            return;
+        }
+
+        this._generandoMoraAutomatica = true;
+        try {
+            const respuesta = await window.ApiService.generarInteresMora({
+                cliente_id: cliente.id,
+                porcentaje_diario: Number(porcentaje.toFixed(4)),
+            });
+
+            const afectadas = Number(respuesta?.total_cuentas_afectadas || 0);
+            const total = Number(respuesta?.total_mora_generada_usd || 0).toFixed(2);
+            if (afectadas <= 0) {
+                window.mostrarNotificacion('ℹ️ No hay dias nuevos de mora para generar en este cliente');
+            } else {
+                window.mostrarNotificacion(`✅ Mora generada en ${afectadas} cuenta(s) por $${total}`);
+            }
+            await this.cargarClientesSeguras();
+            await this.cargarCuentasPorCobrar({ clienteId: cliente.id });
+            await this.cargarDatosVentasSeguras();
+        } catch (e) {
+            window.mostrarNotificacion(`❌ ${e.message || 'No se pudo generar la mora automatica'}`);
+        } finally {
+            this._generandoMoraAutomatica = false;
+        }
+    },
+
     registrarAbonoCuentaPrompt(cuentaId) {
         const cuenta = window.cuentasPorCobrar.find(item => item.id === cuentaId);
         if (!cuenta) return;
@@ -482,6 +537,27 @@ const CxcFeature = {
 
     cerrarModalAbonoCuenta() {
         document.getElementById('modalAbonoCuenta').style.display = 'none';
+    },
+
+    registrarNotaDebitoCuentaPrompt(cuentaId) {
+        const cuenta = window.cuentasPorCobrar.find(item => item.id === cuentaId);
+        if (!cuenta) return;
+
+        document.getElementById('notaDebitoCuentaId').value = String(cuenta.id);
+        document.getElementById('notaDebitoResumenCliente').textContent = cuenta.cliente_nombre || 'Cliente';
+        document.getElementById('notaDebitoResumenVenta').textContent = `Venta #${cuenta.numero_venta || cuenta.venta_id} | Riesgo: ${cuenta.estado_riesgo || cuenta.estado}`;
+        document.getElementById('notaDebitoResumenPendiente').textContent = `$${(cuenta.saldo_pendiente_usd || 0).toFixed(2)}`;
+        document.getElementById('notaDebitoResumenOriginal').textContent = `$${(cuenta.monto_original_usd || 0).toFixed(2)}`;
+        document.getElementById('notaDebitoResumenMora').textContent = `${Number(cuenta.dias_mora || 0)} dias`;
+        document.getElementById('notaDebitoTipo').value = Number(cuenta.dias_mora || 0) > 0 ? 'interes_mora' : 'nota_debito';
+        document.getElementById('notaDebitoMontoUsd').value = '0';
+        document.getElementById('notaDebitoDescripcion').value = Number(cuenta.dias_mora || 0) > 0 ? `Interes de mora por ${Number(cuenta.dias_mora || 0)} dias` : '';
+        document.getElementById('notaDebitoObservacion').value = '';
+        document.getElementById('modalNotaDebitoCuenta').style.display = 'block';
+    },
+
+    cerrarModalNotaDebitoCuenta() {
+        document.getElementById('modalNotaDebitoCuenta').style.display = 'none';
     },
 
     obtenerCuentaAbonoActual() {
@@ -628,6 +704,55 @@ const CxcFeature = {
             if (btnGuardar) {
                 btnGuardar.disabled = false;
                 btnGuardar.textContent = textoOriginal;
+            }
+        }
+    },
+
+    async guardarNotaDebitoCuentaDesdeModal() {
+        const cuentaId = parseInt(document.getElementById('notaDebitoCuentaId')?.value || '0', 10);
+        if (!cuentaId || this._guardandoNotaDebitoCuenta) return;
+
+        const tipo = (document.getElementById('notaDebitoTipo')?.value || 'nota_debito').trim();
+        const montoUsd = parseFloat(document.getElementById('notaDebitoMontoUsd')?.value || '0') || 0;
+        const descripcion = (document.getElementById('notaDebitoDescripcion')?.value || '').trim();
+        const observacion = (document.getElementById('notaDebitoObservacion')?.value || '').trim();
+        const btnGuardar = document.getElementById('btnGuardarNotaDebitoCuenta');
+
+        if (montoUsd <= 0) {
+            window.mostrarNotificacion('❌ Debe indicar un monto valido');
+            return;
+        }
+        if (!descripcion) {
+            window.mostrarNotificacion('❌ Debe indicar una descripcion del cargo');
+            return;
+        }
+
+        this._guardandoNotaDebitoCuenta = true;
+        if (btnGuardar) {
+            btnGuardar.disabled = true;
+            btnGuardar.textContent = 'Guardando...';
+        }
+
+        try {
+            await window.ApiService.registrarNotaDebitoCuenta(cuentaId, {
+                tipo,
+                monto_usd: Number(montoUsd.toFixed(2)),
+                descripcion,
+                observacion,
+            });
+            window.mostrarNotificacion('✅ Nota de debito registrada');
+            this.cerrarModalNotaDebitoCuenta();
+            const cuenta = window.cuentasPorCobrar.find(item => item.id === cuentaId);
+            await this.cargarClientesSeguras();
+            await this.cargarCuentasPorCobrar({ clienteId: cuenta?.cliente_id || window.AppState.estadoCuentaClienteActual?.cliente?.id });
+            await this.cargarDatosVentasSeguras();
+        } catch (e) {
+            window.mostrarNotificacion(`❌ ${e.message || 'No se pudo registrar la nota de debito'}`);
+        } finally {
+            this._guardandoNotaDebitoCuenta = false;
+            if (btnGuardar) {
+                btnGuardar.disabled = false;
+                btnGuardar.textContent = '💾 Registrar cargo';
             }
         }
     }

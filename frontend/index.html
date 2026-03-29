@@ -1285,6 +1285,33 @@
                     <label for="clienteDireccionModal">Dirección:</label>
                     <textarea id="clienteDireccionModal" class="form-control" rows="2" placeholder="Dirección del cliente" name="clienteDireccionModal"></textarea>
                 </div>
+
+                <div class="form-group">
+                    <label for="clienteLimiteCreditoModal">Limite de credito USD:</label>
+                    <input type="number" id="clienteLimiteCreditoModal" class="form-control" placeholder="0.00" name="clienteLimiteCreditoModal" min="0" step="0.01">
+                </div>
+
+                <div class="form-group">
+                    <label for="clienteLimiteDocumentosModal">Limite de documentos:</label>
+                    <input type="number" id="clienteLimiteDocumentosModal" class="form-control" placeholder="0" name="clienteLimiteDocumentosModal" min="0" step="1">
+                </div>
+
+                <div class="form-group">
+                    <label for="clienteDiasCreditoModal">Dias de credito:</label>
+                    <input type="number" id="clienteDiasCreditoModal" class="form-control" placeholder="0" name="clienteDiasCreditoModal" min="0" step="1">
+                </div>
+
+                <div class="form-group">
+                    <label for="clienteDiasToleranciaModal">Dias de tolerancia:</label>
+                    <input type="number" id="clienteDiasToleranciaModal" class="form-control" placeholder="0" name="clienteDiasToleranciaModal" min="0" step="1">
+                </div>
+
+                <div class="form-group cliente-form-span-2">
+                    <label style="display:flex; align-items:center; gap:10px; font-weight:600; cursor:pointer;">
+                        <input type="checkbox" id="clienteBloqueadoCreditoModal" name="clienteBloqueadoCreditoModal">
+                        Bloquear credito manualmente
+                    </label>
+                </div>
             </div>
 
             <div class="cliente-fotos-grid cliente-form-span-2">
@@ -1480,6 +1507,53 @@
             <div style="text-align: right; border-top: 1px solid #eee; padding-top: 15px;">
                 <button type="button" class="btn-secondary" onclick="window.CxcFeature?.cerrarModalDevolucionSaldoFavor?.()">Cancelar</button>
                 <button id="btnGuardarDevolucionSaldoFavor" type="button" class="btn-primary" onclick="window.CxcFeature?.guardarDevolucionSaldoFavorDesdeModal?.()">Registrar devolucion</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modalNotaDebitoCuenta" class="modal">
+        <div class="modal-content" style="max-width: 560px;">
+            <span class="close" onclick="window.CxcFeature?.cerrarModalNotaDebitoCuenta?.()">&times;</span>
+            <h2 style="text-align: center; margin-bottom: 18px;">Registrar Nota de Debito</h2>
+
+            <input type="hidden" id="notaDebitoCuentaId" value="" name="notaDebitoCuentaId">
+
+            <div style="background: #f8fafc; border-radius: 10px; padding: 14px; margin-bottom: 16px;">
+                <div id="notaDebitoResumenCliente" style="font-weight: bold; margin-bottom: 6px;">Cliente</div>
+                <div id="notaDebitoResumenVenta" style="color: #5b6470; margin-bottom: 6px;">Venta</div>
+                <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px;">
+                    <div><small>Pendiente</small><br><strong id="notaDebitoResumenPendiente">$0.00</strong></div>
+                    <div><small>Original</small><br><strong id="notaDebitoResumenOriginal">$0.00</strong></div>
+                    <div><small>Mora</small><br><strong id="notaDebitoResumenMora">0 dias</strong></div>
+                </div>
+            </div>
+
+            <div style="margin-bottom: 12px;">
+                <label for="notaDebitoTipo" style="font-weight: bold; display: block; margin-bottom: 5px;">Tipo:</label>
+                <select id="notaDebitoTipo" class="form-control" name="notaDebitoTipo">
+                    <option value="nota_debito">Nota de debito</option>
+                    <option value="interes_mora">Interes de mora</option>
+                </select>
+            </div>
+
+            <div style="margin-bottom: 12px;">
+                <label for="notaDebitoMontoUsd" style="font-weight: bold; display: block; margin-bottom: 5px;">Monto USD:</label>
+                <input type="number" id="notaDebitoMontoUsd" class="form-control" min="0" step="0.01" value="0" name="notaDebitoMontoUsd">
+            </div>
+
+            <div style="margin-bottom: 12px;">
+                <label for="notaDebitoDescripcion" style="font-weight: bold; display: block; margin-bottom: 5px;">Descripcion:</label>
+                <input type="text" id="notaDebitoDescripcion" class="form-control" placeholder="Ej: Interes por mora del mes" name="notaDebitoDescripcion">
+            </div>
+
+            <div style="margin-bottom: 14px;">
+                <label for="notaDebitoObservacion" style="font-weight: bold; display: block; margin-bottom: 5px;">Observacion:</label>
+                <textarea id="notaDebitoObservacion" rows="2" placeholder="Detalle opcional" class="form-control" name="notaDebitoObservacion"></textarea>
+            </div>
+
+            <div style="text-align: right; border-top: 1px solid #eee; padding-top: 15px;">
+                <button type="button" class="btn-secondary" onclick="window.CxcFeature?.cerrarModalNotaDebitoCuenta?.()">Cancelar</button>
+                <button type="button" id="btnGuardarNotaDebitoCuenta" class="btn-primary" onclick="window.CxcFeature?.guardarNotaDebitoCuentaDesdeModal?.()">💾 Registrar cargo</button>
             </div>
         </div>
     </div>
@@ -1767,8 +1841,12 @@
                     <small>Total devolución</small><br>
                     <strong id="devolucionTotalUSD">$0.00</strong>
                 </div>
+                <div style="padding: 12px; border-radius: 8px; background: #f4fdf6;">
+                    <small>Aplicado a CxC</small><br>
+                    <strong id="devolucionAplicadoCxcUSD">$0.00</strong>
+                </div>
                 <div style="padding: 12px; border-radius: 8px; background: #eef6ff;">
-                    <small>Reintegrado</small><br>
+                    <small>Reintegro requerido</small><br>
                     <strong id="devolucionEntregadoUSD">$0.00</strong>
                 </div>
                 <div style="padding: 12px; border-radius: 8px; background: #f4fdf6;">
@@ -1776,7 +1854,7 @@
                     <strong id="devolucionEntregadoBS">Bs 0.00</strong>
                 </div>
                 <div style="padding: 12px; border-radius: 8px; background: #fff7ed;">
-                    <small>Diferencia</small><br>
+                    <small>Faltante por reintegrar</small><br>
                     <strong id="devolucionFaltanteUSD">$0.00</strong>
                 </div>
             </div>

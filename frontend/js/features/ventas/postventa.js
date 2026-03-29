@@ -355,6 +355,7 @@ const VentasPostventaFeature = {
                 <div><strong>Fecha:</strong><br>${venta.fecha || 'S/F'}</div>
                 <div><strong>Cliente:</strong><br>${venta.cliente || 'Consumidor Final'}</div>
                 <div><strong>Total venta:</strong><br>$${(venta.total_dolares || 0).toFixed(2)}</div>
+                <div><strong>Saldo CxC actual:</strong><br>$${(venta.saldo_pendiente_usd || 0).toFixed(2)}</div>
             </div>
         `;
 
@@ -426,7 +427,29 @@ const VentasPostventaFeature = {
         const monto = parseFloat(document.getElementById('devolucionMontoReintegro').value || '0') || 0;
         const tasa = parseFloat(document.getElementById('devolucionTasaReintegro').value || '0') || 0;
         const equivalenteUSD = moneda === 'BS' ? (tasa > 0 ? monto / tasa : 0) : monto;
-        document.getElementById('devolucionVistaFormulario').textContent = `${moneda} ${monto.toFixed(2)} equivalen a $${equivalenteUSD.toFixed(2)}`;
+        const resumen = this.obtenerResumenFinancieroDevolucion();
+        document.getElementById('devolucionVistaFormulario').textContent = `${moneda} ${monto.toFixed(2)} equivalen a $${equivalenteUSD.toFixed(2)}. Reintegro pendiente: $${resumen.faltanteReintegroUSD.toFixed(2)}`;
+    },
+
+    obtenerResumenFinancieroDevolucion(items = null) {
+        const listaItems = Array.isArray(items) ? items : this.obtenerItemsDevolucionSeleccionados();
+        const totalUSD = roundAmount(listaItems.reduce((sum, item) => sum + item.subtotal, 0));
+        const saldoPendiente = roundAmount(devolucionActiva?.saldo_pendiente_usd || 0);
+        const aplicadoCxcUSD = roundAmount(Math.min(totalUSD, saldoPendiente));
+        const reintegroRequeridoUSD = roundAmount(Math.max(0, totalUSD - aplicadoCxcUSD));
+        const entregadoUSD = roundAmount(reintegrosDevolucion.reduce((sum, item) => sum + (item.equivalente_usd || 0), 0));
+        const entregadoBS = roundAmount(reintegrosDevolucion.filter(item => item.moneda === 'BS').reduce((sum, item) => sum + item.monto, 0));
+        const faltanteReintegroUSD = roundAmount(reintegroRequeridoUSD - entregadoUSD);
+
+        return {
+            totalUSD,
+            saldoPendiente,
+            aplicadoCxcUSD,
+            reintegroRequeridoUSD,
+            entregadoUSD,
+            entregadoBS,
+            faltanteReintegroUSD
+        };
     },
 
     agregarReintegroDevolucion() {
@@ -445,11 +468,15 @@ const VentasPostventaFeature = {
         }
 
         const equivalenteUSD = moneda === 'BS' ? monto / tasa : monto;
-        const totalUSD = roundAmount(this.obtenerItemsDevolucionSeleccionados().reduce((sum, item) => sum + item.subtotal, 0));
-        const entregadoUSD = roundAmount(reintegrosDevolucion.reduce((sum, item) => sum + (item.equivalente_usd || 0), 0));
-        const faltanteUSD = roundAmount(totalUSD - entregadoUSD);
+        const resumen = this.obtenerResumenFinancieroDevolucion();
+        const faltanteUSD = resumen.faltanteReintegroUSD;
 
-        if (totalUSD > 0 && equivalenteUSD - faltanteUSD > 0.05) {
+        if (resumen.reintegroRequeridoUSD <= 0.01) {
+            mostrarNotificacion('❌ Esta devolucion se aplicara completa a la deuda pendiente. No requiere reintegro.');
+            return;
+        }
+
+        if (resumen.reintegroRequeridoUSD > 0 && equivalenteUSD - faltanteUSD > 0.05) {
             mostrarNotificacion(`❌ El reintegro no puede superar el faltante de $${faltanteUSD.toFixed(2)}`);
             return;
         }
@@ -514,16 +541,14 @@ const VentasPostventaFeature = {
 
     actualizarResumenDevolucion() {
         const items = this.obtenerItemsDevolucionSeleccionados();
-        const totalUSD = roundAmount(items.reduce((sum, item) => sum + item.subtotal, 0));
-        const entregadoUSD = roundAmount(reintegrosDevolucion.reduce((sum, item) => sum + (item.equivalente_usd || 0), 0));
-        const entregadoBS = roundAmount(reintegrosDevolucion.filter(item => item.moneda === 'BS').reduce((sum, item) => sum + item.monto, 0));
-        const diferenciaUSD = roundAmount(totalUSD - entregadoUSD);
+        const resumen = this.obtenerResumenFinancieroDevolucion(items);
 
-        document.getElementById('devolucionTotalUSD').textContent = `$${totalUSD.toFixed(2)}`;
-        document.getElementById('devolucionEntregadoUSD').textContent = `$${entregadoUSD.toFixed(2)}`;
-        document.getElementById('devolucionEntregadoBS').textContent = `Bs ${entregadoBS.toFixed(2)}`;
-        document.getElementById('devolucionFaltanteUSD').textContent = `${diferenciaUSD >= 0 ? '$' : '-$'}${Math.abs(diferenciaUSD).toFixed(2)}`;
-        document.getElementById('btnGuardarDevolucion').disabled = items.length === 0 || reintegrosDevolucion.length === 0 || Math.abs(diferenciaUSD) > 0.05;
+        document.getElementById('devolucionTotalUSD').textContent = `$${resumen.totalUSD.toFixed(2)}`;
+        document.getElementById('devolucionAplicadoCxcUSD').textContent = `$${resumen.aplicadoCxcUSD.toFixed(2)}`;
+        document.getElementById('devolucionEntregadoUSD').textContent = `$${resumen.reintegroRequeridoUSD.toFixed(2)}`;
+        document.getElementById('devolucionEntregadoBS').textContent = `Bs ${resumen.entregadoBS.toFixed(2)}`;
+        document.getElementById('devolucionFaltanteUSD').textContent = `${resumen.faltanteReintegroUSD >= 0 ? '$' : '-$'}${Math.abs(resumen.faltanteReintegroUSD).toFixed(2)}`;
+        document.getElementById('btnGuardarDevolucion').disabled = items.length === 0 || Math.abs(resumen.faltanteReintegroUSD) > 0.05;
     },
 
     async guardarDevolucionVenta() {
@@ -535,15 +560,15 @@ const VentasPostventaFeature = {
             return;
         }
 
-        if (reintegrosDevolucion.length === 0) {
+        const resumen = this.obtenerResumenFinancieroDevolucion(items);
+
+        if (resumen.reintegroRequeridoUSD > 0.01 && reintegrosDevolucion.length === 0) {
             mostrarNotificacion('❌ Debe agregar al menos una entrega de reintegro');
             return;
         }
 
-        const totalUSD = roundAmount(items.reduce((sum, item) => sum + item.subtotal, 0));
-        const entregadoUSD = roundAmount(reintegrosDevolucion.reduce((sum, item) => sum + (item.equivalente_usd || 0), 0));
-        if (Math.abs(totalUSD - entregadoUSD) > 0.05) {
-            mostrarNotificacion('❌ El total de reintegro no coincide con la devolución');
+        if (Math.abs(resumen.faltanteReintegroUSD) > 0.05) {
+            mostrarNotificacion('❌ El total de reintegro no coincide con el monto pendiente por devolver');
             return;
         }
 
@@ -579,7 +604,7 @@ const VentasPostventaFeature = {
             cargarTodasLasVentas();
 
             const ventaActualizada = this.obtenerVentaPorId(ventaId) || devolucionActiva;
-            mostrarNotificacion('✅ Devolución registrada con reintegro');
+            mostrarNotificacion('✅ Devolución registrada');
             this.verTicketDevolucion(respuesta.devolucion, ventaActualizada);
         } catch (e) {
             mostrarNotificacion(`❌ No se pudo registrar la devolución: ${e.message || 'Error inesperado'}`);
@@ -610,6 +635,7 @@ const VentasPostventaFeature = {
         `).join('');
 
         const motivo = devolucion.motivo ? `<div style="margin-top: 10px;"><strong>Motivo:</strong> ${devolucion.motivo}</div>` : '';
+        const ajusteCxc = Number(devolucion.monto_aplicado_cxc_usd || 0);
         const html = `
             <div style="font-family: 'Courier New', monospace; background: white; padding: 16px; max-width: 320px; margin: 0 auto;">
                 <div style="text-align: center; border-bottom: 2px dashed #333; padding-bottom: 10px; margin-bottom: 10px;">
@@ -620,6 +646,8 @@ const VentasPostventaFeature = {
                 </div>
                 <div style="margin-bottom: 10px; font-size: 0.9em;">
                     <div><strong>Cliente:</strong> ${(venta && venta.cliente) || devolucion.cliente || 'Cliente General'}</div>
+                    <div><strong>Total devolucion:</strong> $${(devolucion.total_devolucion_usd || 0).toFixed(2)}</div>
+                    <div><strong>Aplicado a deuda:</strong> $${ajusteCxc.toFixed(2)}</div>
                     <div><strong>Reintegro total:</strong> $${(devolucion.total_reintegrado_dolares || 0).toFixed(2)}</div>
                 </div>
                 <div style="border-bottom: 2px dashed #333; margin-bottom: 10px;"></div>

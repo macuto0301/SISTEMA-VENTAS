@@ -21,7 +21,11 @@ const ClientesFeature = {
                 documento: window.SVField.enhance('clienteDocumentoModal'),
                 telefono: window.SVField.enhance('clienteTelefonoModal'),
                 email: window.SVField.enhance('clienteEmailModal'),
-                direccion: window.SVField.enhance('clienteDireccionModal')
+                direccion: window.SVField.enhance('clienteDireccionModal'),
+                limiteCredito: window.SVField.enhance('clienteLimiteCreditoModal'),
+                limiteDocumentos: window.SVField.enhance('clienteLimiteDocumentosModal'),
+                diasCredito: window.SVField.enhance('clienteDiasCreditoModal'),
+                diasTolerancia: window.SVField.enhance('clienteDiasToleranciaModal')
             };
         }
 
@@ -53,7 +57,7 @@ const ClientesFeature = {
                     ${this.renderAvatarCliente(cliente, 'cliente-seleccionado-avatar')}
                     <div class="cliente-seleccionado-info">
                         <strong>${this.escaparHtml(cliente.nombre || 'Cliente')}</strong>
-                        <small>Favor $${(cliente.saldo_a_favor_usd || 0).toFixed(2)} · CxC $${(cliente.saldo_por_cobrar_usd || 0).toFixed(2)}</small>
+                        <small>Favor $${(cliente.saldo_a_favor_usd || 0).toFixed(2)} · CxC $${(cliente.saldo_por_cobrar_usd || 0).toFixed(2)} · Disp. $${(cliente.disponible_credito_usd || 0).toFixed(2)}</small>
                     </div>
                 `
             });
@@ -242,6 +246,8 @@ const ClientesFeature = {
                 <div style="display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap:10px; font-size:0.92em; color:#334155;">
                     <div>Por cobrar: <strong>$${(cliente.saldo_por_cobrar_usd || 0).toFixed(2)}</strong></div>
                     <div>Saldo a favor: <strong>$${(cliente.saldo_a_favor_usd || 0).toFixed(2)}</strong></div>
+                    <div>Limite: <strong>$${(cliente.limite_credito_usd || 0).toFixed(2)}</strong></div>
+                    <div>Disponible: <strong>$${(cliente.disponible_credito_usd || 0).toFixed(2)}</strong></div>
                 </div>
             </button>
         `).join('');
@@ -315,7 +321,11 @@ const ClientesFeature = {
         }
 
         if (info) {
-            info.textContent = `Saldo a favor: $${(cliente.saldo_a_favor_usd || 0).toFixed(2)} | Por cobrar: $${(cliente.saldo_por_cobrar_usd || 0).toFixed(2)}`;
+            const limite = Number(cliente.limite_credito_usd || 0).toFixed(2);
+            const disponible = Number(cliente.disponible_credito_usd || 0).toFixed(2);
+            const mora = Number(cliente.max_dias_mora_cxc || 0);
+            const bloqueo = cliente.bloqueado_credito ? ' | Credito bloqueado' : '';
+            info.textContent = `Saldo a favor: $${(cliente.saldo_a_favor_usd || 0).toFixed(2)} | Por cobrar: $${(cliente.saldo_por_cobrar_usd || 0).toFixed(2)} | Limite: $${limite} | Disponible: $${disponible} | Mora max.: ${mora} d${bloqueo}`;
         }
 
         this._clientVentaPicker?.setEntity(cliente);
@@ -420,6 +430,23 @@ const ClientesFeature = {
                     filterable: true
                 },
                 {
+                    id: 'limite',
+                    label: 'Limite',
+                    key: 'limite_credito_usd',
+                    type: 'money',
+                    currency: '$',
+                    align: 'right',
+                    filterable: true
+                },
+                {
+                    id: 'mora',
+                    label: 'Mora max.',
+                    key: 'max_dias_mora_cxc',
+                    align: 'right',
+                    filterable: true,
+                    render: row => `${row.max_dias_mora_cxc || 0} d`
+                },
+                {
                     id: 'acciones',
                     label: 'Acciones',
                     type: 'actions',
@@ -463,6 +490,11 @@ const ClientesFeature = {
         this.obtenerCampoCliente('telefono')?.setValue(cliente ? cliente.telefono || '' : '');
         this.obtenerCampoCliente('email')?.setValue(cliente ? cliente.email || '' : '');
         this.obtenerCampoCliente('direccion')?.setValue(cliente ? cliente.direccion || '' : '');
+        this.obtenerCampoCliente('limiteCredito')?.setValue(cliente ? Number(cliente.limite_credito_usd || 0).toFixed(2) : '0.00');
+        this.obtenerCampoCliente('limiteDocumentos')?.setValue(cliente ? String(cliente.limite_documentos || 0) : '0');
+        this.obtenerCampoCliente('diasCredito')?.setValue(cliente ? String(cliente.dias_credito || 0) : '0');
+        this.obtenerCampoCliente('diasTolerancia')?.setValue(cliente ? String(cliente.dias_tolerancia || 0) : '0');
+        document.getElementById('clienteBloqueadoCreditoModal').checked = Boolean(cliente?.bloqueado_credito);
         this.limpiarErroresModalCliente();
         this.resetearFotosCliente(cliente);
         this._clientModal?.open()?.focusFirstField();
@@ -489,12 +521,21 @@ const ClientesFeature = {
         const telefono = this.obtenerCampoCliente('telefono')?.getValue?.().trim() || '';
         const email = this.obtenerCampoCliente('email')?.getValue?.().trim() || '';
         const direccion = this.obtenerCampoCliente('direccion')?.getValue?.().trim() || '';
+        const limiteCredito = this.obtenerCampoCliente('limiteCredito')?.getValue?.().trim() || '0';
+        const limiteDocumentos = this.obtenerCampoCliente('limiteDocumentos')?.getValue?.().trim() || '0';
+        const diasCredito = this.obtenerCampoCliente('diasCredito')?.getValue?.().trim() || '0';
+        const diasTolerancia = this.obtenerCampoCliente('diasTolerancia')?.getValue?.().trim() || '0';
         const payload = new FormData();
         payload.append('nombre', nombre);
         payload.append('documento', documento);
         payload.append('telefono', telefono);
         payload.append('email', email);
         payload.append('direccion', direccion);
+        payload.append('limite_credito_usd', limiteCredito);
+        payload.append('limite_documentos', limiteDocumentos);
+        payload.append('dias_credito', diasCredito);
+        payload.append('dias_tolerancia', diasTolerancia);
+        payload.append('bloqueado_credito', document.getElementById('clienteBloqueadoCreditoModal').checked ? 'true' : 'false');
         payload.append('remove_foto_perfil', document.getElementById('clienteFotoPerfilEliminar').value);
         payload.append('remove_foto_cedula', document.getElementById('clienteFotoCedulaEliminar').value);
 
@@ -599,6 +640,11 @@ const ClientesFeature = {
                             <div><small>Original</small><br><strong>$${(cuenta.monto_original_usd || 0).toFixed(2)}</strong></div>
                             <div><small>Abonado</small><br><strong>$${(cuenta.monto_abonado_usd || 0).toFixed(2)}</strong></div>
                             <div><small>Pendiente</small><br><strong>$${(cuenta.saldo_pendiente_usd || 0).toFixed(2)}</strong></div>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-top:10px; font-size:0.9em; color:#475569;">
+                            <span>Vence: ${cuenta.fecha_vencimiento || 'N/A'}</span>
+                            <span>Mora: ${cuenta.dias_mora || 0} dias</span>
+                            <span>Riesgo: ${this.escaparHtml(cuenta.estado_riesgo || 'pendiente')}</span>
                         </div>
                     </div>
                 `).join('');

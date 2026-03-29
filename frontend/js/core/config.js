@@ -23,6 +23,7 @@ const ConfigCore = {
             window.AppState.tasaVuelto = config.tasaVuelto;
             window.AppState.porcentajeGananciaDefecto = config.porcentajeGananciaDefecto;
             window.AppState.porcentajeDescuentoDolares = config.porcentajeDescuentoDolares;
+            window.AppState.cxcInteresMoraPorcentajeDiario = config.cxcInteresMoraPorcentajeDiario;
             window.AppState.metodoRedondeoBs = config.metodoRedondeoBs;
             window.AppState.precioVentaLibre = Boolean(config.precioVentaLibre);
             window.AppState.nombreEmpresa = config.nombreEmpresa || '';

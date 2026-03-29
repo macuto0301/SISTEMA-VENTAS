@@ -36,6 +36,23 @@ const VentasCheckoutFeature = {
         return Math.max(0, (ventaEnProgreso.excedenteReconocido || 0) - this.obtenerTotalVueltoEntregadoUSD());
     },
 
+    async solicitarAutorizacionSupervisor(detalle = {}) {
+        const razones = Array.isArray(detalle.razones) && detalle.razones.length
+            ? `\n- ${detalle.razones.join('\n- ')}`
+            : '';
+        const mensajeBase = `Se requiere autorizacion de supervisor para esta venta a credito.${razones}`;
+        const username = window.prompt(`${mensajeBase}\n\nUsuario supervisor:`, '');
+        if (!username) return null;
+        const password = window.prompt('Clave del supervisor:', '');
+        if (!password) return null;
+        const motivo = window.prompt('Motivo de autorizacion (opcional):', 'Excepcion de credito') || '';
+        return {
+            supervisor_username: username.trim(),
+            supervisor_password: password,
+            motivo_autorizacion_credito: motivo.trim()
+        };
+    },
+
     procesarVenta() {
         if (carrito.length === 0) {
             this.mostrarNotificacionSegura('❌ El carrito está vacío');
@@ -469,45 +486,49 @@ const VentasCheckoutFeature = {
 
     async terminarProcesoVenta(venta, mensajeVuelto) {
         try {
-            const payload = {
+            let payload = {
                 ...venta,
                 vueltos_entregados: vueltosAgregados
             };
-            const apiBase = (typeof API !== 'undefined' && API?.baseUrl) ? API.baseUrl : 'http://localhost:5000/api';
-            const authHeaders = (typeof API !== 'undefined' && typeof API.getAuthHeaders === 'function') ? API.getAuthHeaders() : {};
-            const res = await fetch(`${apiBase}/ventas/`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', ...authHeaders },
-                body: JSON.stringify(payload)
-            });
 
-            if (res.ok) {
-                const ventaGuardada = await res.json();
-                cerrarModalExcedenteTotalizacion();
-                cerrarModalTotalizacion();
-                document.getElementById('modalGestionVuelto').style.display = 'none';
-                this.mostrarNotificacionSegura('✅ Venta guardada en servidor');
-                await window.cargarProductos?.();
-                await window.cargarDatosVentas?.();
-                await window.cargarClientes?.();
-                await window.cargarCuentasPorCobrar?.();
-                ultimaVentaProcesada = {
-                    ...venta,
-                    productos: (venta.productos || []).map(item => ({ ...item, lista_precio: item.lista_precio || 1 })),
-                    id: ventaGuardada.id,
-                    numero_venta: ventaGuardada.numero_venta,
-                    tipo_venta: ventaGuardada.tipo_venta || venta.tipo_venta,
-                    saldo_pendiente_usd: ventaGuardada.saldo_pendiente_usd ?? venta.saldo_pendiente_usd,
-                    saldo_a_favor_generado_usd: ventaGuardada.saldo_a_favor_generado_usd ?? venta.saldo_a_favor_generado_usd,
-                    vueltos_entregados: vueltosAgregados
-                };
-                ultimoNumeroVenta = ventaGuardada.numero_venta || ventas[0]?.numero_venta || ventaGuardada.id;
-            } else {
-                this.mostrarNotificacionSegura('⚠️ No se pudo guardar la venta en el servidor');
-                return;
+            let ventaGuardada;
+            try {
+                ventaGuardada = await window.ApiService.guardarVenta(payload);
+            } catch (error) {
+                if (error?.data?.requires_supervisor_authorization) {
+                    const autorizacion = await this.solicitarAutorizacionSupervisor(error.data.detalle || {});
+                    if (!autorizacion) {
+                        this.mostrarNotificacionSegura('⚠️ Venta cancelada: no se ingreso autorizacion de supervisor');
+                        return;
+                    }
+                    payload = { ...payload, ...autorizacion };
+                    ventaGuardada = await window.ApiService.guardarVenta(payload);
+                } else {
+                    throw error;
+                }
             }
+
+            cerrarModalExcedenteTotalizacion();
+            cerrarModalTotalizacion();
+            document.getElementById('modalGestionVuelto').style.display = 'none';
+            this.mostrarNotificacionSegura('✅ Venta guardada en servidor');
+            await window.cargarProductos?.();
+            await window.cargarDatosVentas?.();
+            await window.cargarClientes?.();
+            await window.cargarCuentasPorCobrar?.();
+            ultimaVentaProcesada = {
+                ...venta,
+                productos: (venta.productos || []).map(item => ({ ...item, lista_precio: item.lista_precio || 1 })),
+                id: ventaGuardada.id,
+                numero_venta: ventaGuardada.numero_venta,
+                tipo_venta: ventaGuardada.tipo_venta || venta.tipo_venta,
+                saldo_pendiente_usd: ventaGuardada.saldo_pendiente_usd ?? venta.saldo_pendiente_usd,
+                saldo_a_favor_generado_usd: ventaGuardada.saldo_a_favor_generado_usd ?? venta.saldo_a_favor_generado_usd,
+                vueltos_entregados: vueltosAgregados
+            };
+            ultimoNumeroVenta = ventaGuardada.numero_venta || ventas[0]?.numero_venta || ventaGuardada.id;
         } catch (e) {
-            this.mostrarNotificacionSegura('⚠️ No se pudo guardar la venta en el servidor');
+            this.mostrarNotificacionSegura(`⚠️ ${e.message || 'No se pudo guardar la venta en el servidor'}`);
             return;
         }
 

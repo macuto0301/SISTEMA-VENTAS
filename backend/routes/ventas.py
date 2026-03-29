@@ -4,6 +4,14 @@ from datetime import datetime
 from flask import Blueprint, jsonify, request
 from sqlalchemy import func, or_
 from auth_utils import get_current_user, require_roles
+from credito_utils import (
+    actualizar_estado_credito_cuenta,
+    calcular_dias_mora,
+    calcular_estado_riesgo_cuenta,
+    construir_fecha_vencimiento,
+    resolver_supervisor_autorizado,
+    validar_credito_cliente,
+)
 from cuenta_corriente_utils import obtener_saldos_a_favor_disponibles
 
 from database import db
@@ -65,6 +73,8 @@ def serializar_devolucion(devolucion: DevolucionVenta) -> dict:
     detalles = DetalleDevolucionVenta.query.filter_by(devolucion_id=devolucion.id).all()
     reintegros = devolucion.reintegros_entregados or []
     venta = Venta.query.get(devolucion.venta_id)
+    total_devolucion_usd = round(sum((d.subtotal or 0.0) for d in detalles), 2)
+    monto_aplicado_cxc_usd = round(max(0.0, total_devolucion_usd - float(devolucion.total_reintegrado_dolares or 0.0)), 2)
     if not reintegros and devolucion.monto_reintegrado:
         reintegros = [{
             'metodo': devolucion.metodo_reintegro,
@@ -86,6 +96,8 @@ def serializar_devolucion(devolucion: DevolucionVenta) -> dict:
         'monto_reintegrado': devolucion.monto_reintegrado,
         'total_reintegrado_dolares': devolucion.total_reintegrado_dolares,
         'total_reintegrado_bolivares': devolucion.total_reintegrado_bolivares,
+        'total_devolucion_usd': total_devolucion_usd,
+        'monto_aplicado_cxc_usd': monto_aplicado_cxc_usd,
         'reintegros_entregados': reintegros,
         'detalles': [{
             'id': d.id,
@@ -164,6 +176,30 @@ def validar_monto_positivo(valor: float, campo: str) -> str | None:
     if valor <= 0:
         return f'{campo} debe ser mayor a cero'
     return None
+
+
+def construir_respuesta_bloqueo_credito(cliente: Cliente, validacion: dict) -> tuple:
+    resumen = validacion.get('resumen') or {}
+    disponible = max(0.0, round((validacion.get('limite_credito_usd') or 0.0) - (resumen.get('saldo_por_cobrar_usd') or 0.0), 2))
+    return jsonify({
+        'error': 'Autorizacion de supervisor requerida para vender a credito',
+        'codigo': 'credito_bloqueado',
+        'requires_supervisor_authorization': True,
+        'cliente_id': cliente.id,
+        'cliente_nombre': cliente.nombre,
+        'detalle': {
+            'razones': validacion.get('razones') or [],
+            'saldo_por_cobrar_usd': round(resumen.get('saldo_por_cobrar_usd') or 0.0, 2),
+            'documentos_pendientes': int(resumen.get('documentos_pendientes') or 0),
+            'cuentas_vencidas': int(resumen.get('cuentas_vencidas') or 0),
+            'max_dias_mora': int(resumen.get('max_dias_mora') or 0),
+            'limite_credito_usd': round(validacion.get('limite_credito_usd') or 0.0, 2),
+            'disponible_credito_usd': disponible,
+            'limite_documentos': int(validacion.get('limite_documentos') or 0),
+            'dias_credito': int(validacion.get('dias_credito') or 0),
+            'dias_tolerancia': int(validacion.get('dias_tolerancia') or 0),
+        }
+    }), 403
 
 
 def validar_productos_venta(items: list[dict]) -> tuple[list[dict], float, str | None]:
@@ -388,6 +424,17 @@ def validar_reintegros_devolucion(reintegros: list[dict]) -> tuple[list[dict], f
     return reintegros_normalizados, total_reintegrado_bs, total_entregado_usd, None
 
 
+def obtener_cuenta_por_cobrar_venta(venta_id: int) -> CuentaPorCobrar | None:
+    return CuentaPorCobrar.query.filter_by(venta_id=venta_id).order_by(CuentaPorCobrar.id.desc()).first()
+
+
+def obtener_saldo_pendiente_actual_venta(venta: Venta) -> float:
+    cuenta = obtener_cuenta_por_cobrar_venta(venta.id)
+    if not cuenta:
+        return 0.0
+    return round(cuenta.saldo_pendiente_usd or 0.0, 2)
+
+
 @ventas_bp.route('/', methods=['POST'])
 @require_roles('admin', 'cajero')
 def registrar_venta():
@@ -449,6 +496,24 @@ def registrar_venta():
                 return jsonify({'error': 'No se encontro el cliente para aplicar saldo a favor'}), 400
             if saldo_a_favor_aplicado_usd > round(cliente.saldo_a_favor_usd or 0.0, 2) + 0.001:
                 return jsonify({'error': 'El cliente no tiene suficiente saldo a favor'}), 400
+
+        supervisor_autorizado = None
+        autorizacion_credito_texto = ''
+        if saldo_pendiente_usd > 0.01 and cliente:
+            validacion_credito = validar_credito_cliente(cliente, saldo_pendiente_usd)
+            if not validacion_credito['aprobado']:
+                supervisor_autorizado = resolver_supervisor_autorizado(
+                    current_user,
+                    data.get('supervisor_username'),
+                    data.get('supervisor_password'),
+                )
+                if not supervisor_autorizado:
+                    return construir_respuesta_bloqueo_credito(cliente, validacion_credito)
+
+                motivo_autorizacion = (data.get('motivo_autorizacion_credito') or '').strip()
+                autorizacion_credito_texto = f'Autorizado por {supervisor_autorizado.username}'
+                if motivo_autorizacion:
+                    autorizacion_credito_texto += f' - {motivo_autorizacion}'
 
         nueva_venta = Venta(
             fecha=ahora_local(),
@@ -542,16 +607,25 @@ def registrar_venta():
                 return jsonify({'error': 'No se pudo rastrear completamente el saldo a favor disponible del cliente'}), 400
 
         if saldo_pendiente_usd > 0.01 and cliente:
+            fecha_emision_credito = ahora_local()
             cuenta_por_cobrar = CuentaPorCobrar(
                 cliente_id=cliente.id,
                 venta_id=nueva_venta.id,
                 numero_venta=nueva_venta.numero_venta,
+                fecha_emision=fecha_emision_credito,
+                fecha_vencimiento=construir_fecha_vencimiento(fecha_emision_credito, cliente.dias_credito),
                 monto_original_usd=saldo_pendiente_usd,
                 monto_abonado_usd=0.0,
                 saldo_pendiente_usd=saldo_pendiente_usd,
                 estado='pendiente',
-                observacion=(data.get('observacion_credito') or '').strip() or None,
+                dias_credito_snapshot=int(cliente.dias_credito or 0),
+                dias_tolerancia_snapshot=int(cliente.dias_tolerancia or 0),
+                observacion=' | '.join(filter(None, [
+                    (data.get('observacion_credito') or '').strip(),
+                    autorizacion_credito_texto,
+                ])) or None,
             )
+            actualizar_estado_credito_cuenta(cuenta_por_cobrar, fecha_emision_credito)
             db.session.add(cuenta_por_cobrar)
             db.session.flush()
             crear_movimiento_cliente(
@@ -593,6 +667,7 @@ def registrar_venta():
             'saldo_pendiente_usd': nueva_venta.saldo_pendiente_usd,
             'saldo_a_favor_generado_usd': nueva_venta.saldo_a_favor_generado_usd,
             'cuenta_por_cobrar_id': cuenta_por_cobrar.id if cuenta_por_cobrar else None,
+            'credito_autorizado_por': supervisor_autorizado.username if supervisor_autorizado else None,
         }), 201
 
     except Exception:
@@ -606,6 +681,7 @@ def registrar_venta():
 def registrar_devolucion(venta_id: int):
     data = request.get_json() or {}
     venta = Venta.query.get_or_404(venta_id)
+    current_user = get_current_user()
 
     try:
         reintegros = data.get('reintegros', [])
@@ -627,24 +703,39 @@ def registrar_devolucion(venta_id: int):
         if error_items:
             return jsonify({'error': error_items}), 400
 
-        reintegros_normalizados, total_reintegrado_bs, total_entregado_usd, error_reintegros = validar_reintegros_devolucion(reintegros)
-        if error_reintegros:
-            return jsonify({'error': error_reintegros}), 400
+        cuenta_por_cobrar = obtener_cuenta_por_cobrar_venta(venta.id)
+        saldo_cxc_antes_usd = round(cuenta_por_cobrar.saldo_pendiente_usd or 0.0, 2) if cuenta_por_cobrar else 0.0
+        monto_aplicado_cxc_usd = round(min(total_reintegrado_dolares, saldo_cxc_antes_usd), 2)
+        reintegro_requerido_usd = round(max(0.0, total_reintegrado_dolares - monto_aplicado_cxc_usd), 2)
 
-        if abs(total_entregado_usd - total_reintegrado_dolares) > 0.05:
-            return jsonify({'error': 'El reintegro total no coincide con el monto de la devolución'}), 400
+        if reintegro_requerido_usd <= 0.01:
+            reintegros_normalizados = []
+            total_reintegrado_bs = 0.0
+            total_entregado_usd = 0.0
+        else:
+            reintegros_normalizados, total_reintegrado_bs, total_entregado_usd, error_reintegros = validar_reintegros_devolucion(reintegros)
+            if error_reintegros:
+                return jsonify({'error': error_reintegros}), 400
+
+        if abs(total_entregado_usd - reintegro_requerido_usd) > 0.05:
+            return jsonify({'error': 'El reintegro total no coincide con el monto realmente a devolver al cliente'}), 400
 
         if len(reintegros_normalizados) == 1:
             metodo_reintegro = reintegros_normalizados[0]['metodo']
             moneda_reintegro = reintegros_normalizados[0]['moneda']
             tasa_reintegro = reintegros_normalizados[0]['tasa']
             monto_reintegrado = reintegros_normalizados[0]['monto']
+        elif not reintegros_normalizados:
+            metodo_reintegro = 'AJUSTE_CXC'
+            moneda_reintegro = 'USD'
+            tasa_reintegro = 0.0
+            monto_reintegrado = 0.0
         else:
             metodo_reintegro = 'MULTIPLE'
             monedas = {item['moneda'] for item in reintegros_normalizados}
             moneda_reintegro = 'MIXTO' if len(monedas) > 1 else next(iter(monedas))
             tasa_reintegro = 0.0
-            monto_reintegrado = total_reintegrado_dolares
+            monto_reintegrado = reintegro_requerido_usd
 
         devolucion = DevolucionVenta(
             venta_id=venta.id,
@@ -655,7 +746,7 @@ def registrar_devolucion(venta_id: int):
             moneda_reintegro=moneda_reintegro,
             tasa_reintegro=tasa_reintegro,
             monto_reintegrado=monto_reintegrado,
-            total_reintegrado_dolares=total_reintegrado_dolares,
+            total_reintegrado_dolares=reintegro_requerido_usd,
             total_reintegrado_bolivares=total_reintegrado_bs,
         )
         db.session.add(devolucion)
@@ -679,10 +770,36 @@ def registrar_devolucion(venta_id: int):
                 if producto_maneja_existencia(producto):
                     producto.cantidad += cantidad
 
+        if cuenta_por_cobrar and monto_aplicado_cxc_usd > 0.01:
+            cuenta_por_cobrar.monto_original_usd = round(max(0.0, (cuenta_por_cobrar.monto_original_usd or 0.0) - monto_aplicado_cxc_usd), 2)
+            cuenta_por_cobrar.saldo_pendiente_usd = round(max(0.0, (cuenta_por_cobrar.saldo_pendiente_usd or 0.0) - monto_aplicado_cxc_usd), 2)
+            cuenta_por_cobrar.estado = 'pagada' if cuenta_por_cobrar.saldo_pendiente_usd <= 0.01 else 'abonada'
+            actualizar_estado_credito_cuenta(cuenta_por_cobrar)
+            venta.saldo_pendiente_usd = cuenta_por_cobrar.saldo_pendiente_usd
+            crear_movimiento_cliente(
+                cliente_id=cuenta_por_cobrar.cliente_id,
+                venta_id=venta.id,
+                cuenta_por_cobrar_id=cuenta_por_cobrar.id,
+                tipo_movimiento='nota_credito_devolucion',
+                monto_usd=monto_aplicado_cxc_usd,
+                moneda_origen='USD',
+                monto_origen=monto_aplicado_cxc_usd,
+                tasa_usada=1.0,
+                medio='Devolucion',
+                descripcion=f'Nota de credito por devolucion aplicada a la venta #{venta.numero_venta or venta.id}',
+                usuario_username=current_user.username if current_user else None,
+            )
+
         db.session.commit()
         return jsonify({
             'mensaje': 'Devolución registrada con éxito',
             'devolucion': serializar_devolucion(devolucion),
+            'resumen_cxc': {
+                'saldo_cxc_antes_usd': saldo_cxc_antes_usd,
+                'monto_aplicado_cxc_usd': monto_aplicado_cxc_usd,
+                'reintegro_requerido_usd': reintegro_requerido_usd,
+                'saldo_cxc_despues_usd': round(cuenta_por_cobrar.saldo_pendiente_usd or 0.0, 2) if cuenta_por_cobrar else 0.0,
+            }
         }), 201
 
     except Exception:
@@ -775,6 +892,7 @@ def get_ventas():
 
     res = []
     for v in lista_ventas:
+        saldo_pendiente_actual = obtener_saldo_pendiente_actual_venta(v)
         cantidades_devueltas = obtener_cantidades_devueltas(v.id)
 
         detalles = DetalleVenta.query.filter_by(venta_id=v.id).all()
@@ -801,8 +919,11 @@ def get_ventas():
             'total_dolares': v.total_dolares,
             'total_bolivares': v.total_bolivares,
             'descuento_dolares': v.descuento_total,
-            'saldo_pendiente_usd': round(v.saldo_pendiente_usd or 0.0, 2),
+            'saldo_pendiente_usd': saldo_pendiente_actual,
             'saldo_a_favor_generado_usd': round(v.saldo_a_favor_generado_usd or 0.0, 2),
+            'fecha_vencimiento': v.cuentas_por_cobrar[0].fecha_vencimiento.strftime('%d/%m/%Y') if v.cuentas_por_cobrar and v.cuentas_por_cobrar[0].fecha_vencimiento else '',
+            'dias_mora': int(calcular_dias_mora(v.cuentas_por_cobrar[0])) if v.cuentas_por_cobrar else 0,
+            'estado_riesgo_cxc': calcular_estado_riesgo_cuenta(v.cuentas_por_cobrar[0]) if v.cuentas_por_cobrar else '',
             'productos': productos_list,
             'pagos': pagos_list,
             'vueltos_entregados': v.vuelto_entregado or [],
@@ -825,6 +946,7 @@ def get_ventas():
 @require_roles('admin', 'cajero')
 def get_venta_por_id(id):
     v = Venta.query.get_or_404(id)
+    saldo_pendiente_actual = obtener_saldo_pendiente_actual_venta(v)
     cantidades_devueltas = obtener_cantidades_devueltas(v.id)
     detalles = DetalleVenta.query.filter_by(venta_id=v.id).all()
     productos_list = [
@@ -847,8 +969,11 @@ def get_venta_por_id(id):
         'total_dolares': v.total_dolares,
         'total_bolivares': v.total_bolivares,
         'descuento_dolares': v.descuento_total,
-        'saldo_pendiente_usd': round(v.saldo_pendiente_usd or 0.0, 2),
+        'saldo_pendiente_usd': saldo_pendiente_actual,
         'saldo_a_favor_generado_usd': round(v.saldo_a_favor_generado_usd or 0.0, 2),
+        'fecha_vencimiento': v.cuentas_por_cobrar[0].fecha_vencimiento.strftime('%d/%m/%Y') if v.cuentas_por_cobrar and v.cuentas_por_cobrar[0].fecha_vencimiento else '',
+        'dias_mora': int(calcular_dias_mora(v.cuentas_por_cobrar[0])) if v.cuentas_por_cobrar else 0,
+        'estado_riesgo_cxc': calcular_estado_riesgo_cuenta(v.cuentas_por_cobrar[0]) if v.cuentas_por_cobrar else '',
         'productos': productos_list,
         'pagos': pagos_list,
         'vueltos_entregados': v.vuelto_entregado or [],

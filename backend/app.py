@@ -377,6 +377,31 @@ def create_app():
                 db.session.commit()
                 print("Columna saldo_a_favor_usd agregada a tabla cliente")
 
+            if columnas_cliente and 'limite_credito_usd' not in columnas_cliente:
+                db.session.execute(text("ALTER TABLE cliente ADD COLUMN limite_credito_usd FLOAT DEFAULT 0.0"))
+                db.session.commit()
+                print("Columna limite_credito_usd agregada a tabla cliente")
+
+            if columnas_cliente and 'limite_documentos' not in columnas_cliente:
+                db.session.execute(text("ALTER TABLE cliente ADD COLUMN limite_documentos INTEGER DEFAULT 0"))
+                db.session.commit()
+                print("Columna limite_documentos agregada a tabla cliente")
+
+            if columnas_cliente and 'dias_credito' not in columnas_cliente:
+                db.session.execute(text("ALTER TABLE cliente ADD COLUMN dias_credito INTEGER DEFAULT 0"))
+                db.session.commit()
+                print("Columna dias_credito agregada a tabla cliente")
+
+            if columnas_cliente and 'dias_tolerancia' not in columnas_cliente:
+                db.session.execute(text("ALTER TABLE cliente ADD COLUMN dias_tolerancia INTEGER DEFAULT 0"))
+                db.session.commit()
+                print("Columna dias_tolerancia agregada a tabla cliente")
+
+            if columnas_cliente and 'bloqueado_credito' not in columnas_cliente:
+                db.session.execute(text("ALTER TABLE cliente ADD COLUMN bloqueado_credito BOOLEAN DEFAULT FALSE"))
+                db.session.commit()
+                print("Columna bloqueado_credito agregada a tabla cliente")
+
             if columnas_cliente and 'activo' not in columnas_cliente:
                 db.session.execute(text("ALTER TABLE cliente ADD COLUMN activo BOOLEAN DEFAULT TRUE"))
                 db.session.commit()
@@ -410,6 +435,36 @@ def create_app():
                 db.session.execute(text("ALTER TABLE cuenta_por_cobrar ADD COLUMN monto_abonado_usd FLOAT DEFAULT 0.0"))
                 db.session.commit()
                 print("Columna monto_abonado_usd agregada a tabla cuenta_por_cobrar")
+
+            if columnas_cxc and 'dias_credito_snapshot' not in columnas_cxc:
+                db.session.execute(text("ALTER TABLE cuenta_por_cobrar ADD COLUMN dias_credito_snapshot INTEGER DEFAULT 0"))
+                db.session.commit()
+                print("Columna dias_credito_snapshot agregada a tabla cuenta_por_cobrar")
+
+            if columnas_cxc and 'dias_tolerancia_snapshot' not in columnas_cxc:
+                db.session.execute(text("ALTER TABLE cuenta_por_cobrar ADD COLUMN dias_tolerancia_snapshot INTEGER DEFAULT 0"))
+                db.session.commit()
+                print("Columna dias_tolerancia_snapshot agregada a tabla cuenta_por_cobrar")
+
+            if columnas_cxc and 'fecha_ultimo_abono' not in columnas_cxc:
+                db.session.execute(text("ALTER TABLE cuenta_por_cobrar ADD COLUMN fecha_ultimo_abono TIMESTAMP"))
+                db.session.commit()
+                print("Columna fecha_ultimo_abono agregada a tabla cuenta_por_cobrar")
+
+            if columnas_cxc and 'fecha_ultima_mora' not in columnas_cxc:
+                db.session.execute(text("ALTER TABLE cuenta_por_cobrar ADD COLUMN fecha_ultima_mora TIMESTAMP"))
+                db.session.commit()
+                print("Columna fecha_ultima_mora agregada a tabla cuenta_por_cobrar")
+
+            if columnas_cxc and 'dias_mora' not in columnas_cxc:
+                db.session.execute(text("ALTER TABLE cuenta_por_cobrar ADD COLUMN dias_mora INTEGER DEFAULT 0"))
+                db.session.commit()
+                print("Columna dias_mora agregada a tabla cuenta_por_cobrar")
+
+            if columnas_cxc and 'estado_riesgo' not in columnas_cxc:
+                db.session.execute(text("ALTER TABLE cuenta_por_cobrar ADD COLUMN estado_riesgo VARCHAR(20) DEFAULT 'pendiente'"))
+                db.session.commit()
+                print("Columna estado_riesgo agregada a tabla cuenta_por_cobrar")
 
             result = db.session.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name='abono_cuenta_por_cobrar'"))
             columnas_abono = [row[0] for row in result.fetchall()]

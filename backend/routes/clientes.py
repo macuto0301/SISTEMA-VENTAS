@@ -11,6 +11,7 @@ from werkzeug.datastructures import FileStorage
 from werkzeug.utils import secure_filename
 
 from auth_utils import get_current_user, require_roles
+from credito_utils import calcular_dias_mora, calcular_estado_riesgo_cuenta, obtener_resumen_credito_cliente
 from cuenta_corriente_utils import obtener_saldos_a_favor_disponibles, reconciliar_saldos_a_favor_cliente
 from database import db
 from models import Cliente, CuentaPorCobrar, MovimientoCuentaCliente
@@ -33,6 +34,20 @@ def build_cliente_foto_url(foto_path: str | None) -> str | None:
 
 def parse_bool(value) -> bool:
     return str(value or '').strip().lower() in {'1', 'true', 'si', 'sí', 'yes', 'on'}
+
+
+def parse_float(value, default: float = 0.0) -> float:
+    try:
+        return round(float(value or default), 2)
+    except (TypeError, ValueError):
+        return default
+
+
+def parse_int(value, default: int = 0) -> int:
+    try:
+        return max(0, int(value or default))
+    except (TypeError, ValueError):
+        return default
 
 
 def get_payload_and_images() -> tuple[dict, FileStorage | None, FileStorage | None]:
@@ -98,12 +113,10 @@ def save_cliente_image(image_file: FileStorage, prefix: str) -> str:
 
 
 def serializar_cliente(cliente: Cliente) -> dict:
-    saldo_por_cobrar = db.session.query(
-        db.func.coalesce(db.func.sum(CuentaPorCobrar.saldo_pendiente_usd), 0.0)
-    ).filter(
-        CuentaPorCobrar.cliente_id == cliente.id,
-        CuentaPorCobrar.estado.in_(['pendiente', 'abonada'])
-    ).scalar() or 0.0
+    resumen_credito = obtener_resumen_credito_cliente(cliente.id)
+    saldo_por_cobrar = resumen_credito['saldo_por_cobrar_usd']
+    limite_credito_usd = round(cliente.limite_credito_usd or 0.0, 2)
+    disponible_credito_usd = max(0.0, round(limite_credito_usd - saldo_por_cobrar, 2)) if limite_credito_usd > 0 else 0.0
 
     return {
         'id': cliente.id,
@@ -119,6 +132,15 @@ def serializar_cliente(cliente: Cliente) -> dict:
         'activo': bool(cliente.activo),
         'saldo_a_favor_usd': round(cliente.saldo_a_favor_usd or 0.0, 2),
         'saldo_por_cobrar_usd': round(saldo_por_cobrar, 2),
+        'limite_credito_usd': limite_credito_usd,
+        'limite_documentos': int(cliente.limite_documentos or 0),
+        'dias_credito': int(cliente.dias_credito or 0),
+        'dias_tolerancia': int(cliente.dias_tolerancia or 0),
+        'bloqueado_credito': bool(cliente.bloqueado_credito),
+        'documentos_pendientes_cxc': int(resumen_credito['documentos_pendientes']),
+        'cuentas_vencidas_cxc': int(resumen_credito['cuentas_vencidas']),
+        'max_dias_mora_cxc': int(resumen_credito['max_dias_mora']),
+        'disponible_credito_usd': round(disponible_credito_usd, 2),
         'fecha_creado': cliente.fecha_creado.strftime('%d/%m/%Y %H:%M') if cliente.fecha_creado else '',
     }
 
@@ -202,6 +224,11 @@ def crear_cliente():
         nuevo.telefono = (data.get('telefono') or '').strip() or None
         nuevo.email = (data.get('email') or '').strip() or None
         nuevo.direccion = (data.get('direccion') or '').strip() or None
+        nuevo.limite_credito_usd = parse_float(data.get('limite_credito_usd'))
+        nuevo.limite_documentos = parse_int(data.get('limite_documentos'))
+        nuevo.dias_credito = parse_int(data.get('dias_credito'))
+        nuevo.dias_tolerancia = parse_int(data.get('dias_tolerancia'))
+        nuevo.bloqueado_credito = parse_bool(data.get('bloqueado_credito'))
         nuevo.foto_perfil_path = foto_perfil_path
         nuevo.foto_cedula_path = foto_cedula_path
         db.session.add(nuevo)
@@ -254,6 +281,11 @@ def actualizar_cliente(cliente_id: int):
         cliente.telefono = (data.get('telefono') or '').strip() or None
         cliente.email = (data.get('email') or '').strip() or None
         cliente.direccion = (data.get('direccion') or '').strip() or None
+        cliente.limite_credito_usd = parse_float(data.get('limite_credito_usd'))
+        cliente.limite_documentos = parse_int(data.get('limite_documentos'))
+        cliente.dias_credito = parse_int(data.get('dias_credito'))
+        cliente.dias_tolerancia = parse_int(data.get('dias_tolerancia'))
+        cliente.bloqueado_credito = parse_bool(data.get('bloqueado_credito'))
         if foto_perfil and foto_perfil.filename:
             uploaded_perfil_path = save_cliente_image(foto_perfil, 'perfil')
             cliente.foto_perfil_path = uploaded_perfil_path
@@ -299,6 +331,8 @@ def get_estado_cuenta(cliente_id: int):
     transacciones = []
 
     for cuenta in cuentas:
+        dias_mora = calcular_dias_mora(cuenta)
+        estado_riesgo = calcular_estado_riesgo_cuenta(cuenta)
         abonos_payload = [{
             'id': abono.id,
             'fecha': abono.fecha.strftime('%d/%m/%Y %H:%M') if abono.fecha else '',
@@ -323,6 +357,9 @@ def get_estado_cuenta(cliente_id: int):
             'monto_abonado_usd': round(cuenta.monto_abonado_usd or 0.0, 2),
             'saldo_pendiente_usd': round(cuenta.saldo_pendiente_usd or 0.0, 2),
             'estado': cuenta.estado,
+            'fecha_vencimiento': cuenta.fecha_vencimiento.strftime('%d/%m/%Y') if cuenta.fecha_vencimiento else '',
+            'dias_mora': dias_mora,
+            'estado_riesgo': estado_riesgo,
             'abonos': abonos_payload,
         })
 
@@ -336,6 +373,8 @@ def get_estado_cuenta(cliente_id: int):
             'cargo_usd': round(cuenta.monto_original_usd or 0.0, 2),
             'abono_usd': 0.0,
             'saldo_documento_usd': round(cuenta.saldo_pendiente_usd or 0.0, 2),
+            'fecha_vencimiento': cuenta.fecha_vencimiento.strftime('%d/%m/%Y') if cuenta.fecha_vencimiento else '',
+            'dias_mora': dias_mora,
             'estado': cuenta.estado,
         })
 
@@ -350,11 +389,13 @@ def get_estado_cuenta(cliente_id: int):
                 'cargo_usd': 0.0,
                 'abono_usd': round(abono['equivalente_usd'] or 0.0, 2),
                 'saldo_documento_usd': round(cuenta.saldo_pendiente_usd or 0.0, 2),
+                'fecha_vencimiento': cuenta.fecha_vencimiento.strftime('%d/%m/%Y') if cuenta.fecha_vencimiento else '',
+                'dias_mora': dias_mora,
                 'estado': cuenta.estado,
             })
 
     for movimiento in movimientos:
-        if movimiento.tipo_movimiento not in ('aplicacion_saldo_favor', 'aplicacion_saldo_favor_venta', 'saldo_a_favor', 'devolucion_saldo_favor'):
+        if movimiento.tipo_movimiento not in ('aplicacion_saldo_favor', 'aplicacion_saldo_favor_venta', 'saldo_a_favor', 'devolucion_saldo_favor', 'nota_credito_devolucion', 'nota_debito', 'interes_mora'):
             continue
         referencia = movimiento.movimiento_referencia
         numero_venta_origen = None
@@ -375,16 +416,22 @@ def get_estado_cuenta(cliente_id: int):
             descripcion = f'Saldo a favor aplicado desde venta #{numero_venta_origen}' + (f' a factura #{numero_destino}' if numero_destino else '')
         elif movimiento.tipo_movimiento == 'devolucion_saldo_favor':
             descripcion = movimiento.descripcion or 'Devolucion de saldo a favor al cliente'
+        elif movimiento.tipo_movimiento == 'nota_credito_devolucion':
+            descripcion = movimiento.descripcion or 'Nota de credito por devolucion aplicada a la deuda'
+        elif movimiento.tipo_movimiento == 'interes_mora':
+            descripcion = movimiento.descripcion or 'Interes de mora aplicado a la cuenta'
+        elif movimiento.tipo_movimiento == 'nota_debito':
+            descripcion = movimiento.descripcion or 'Nota de debito aplicada a la cuenta'
 
         transacciones.append({
-            'tipo': 'SALDO' if movimiento.tipo_movimiento == 'saldo_a_favor' else ('DEVOLUCION' if movimiento.tipo_movimiento == 'devolucion_saldo_favor' else 'APLICACION'),
+            'tipo': 'SALDO' if movimiento.tipo_movimiento == 'saldo_a_favor' else ('DEVOLUCION' if movimiento.tipo_movimiento == 'devolucion_saldo_favor' else ('NC' if movimiento.tipo_movimiento == 'nota_credito_devolucion' else ('ND' if movimiento.tipo_movimiento == 'nota_debito' else ('MORA' if movimiento.tipo_movimiento == 'interes_mora' else 'APLICACION')))),
             'fecha': movimiento.fecha.strftime('%d/%m/%Y %H:%M') if movimiento.fecha else '',
             'cuenta_id': movimiento.cuenta_por_cobrar_id,
             'venta_id': movimiento.venta_id,
             'numero_venta': None,
             'descripcion': descripcion,
-            'cargo_usd': round(movimiento.monto_usd or 0.0, 2) if movimiento.tipo_movimiento == 'saldo_a_favor' else 0.0,
-            'abono_usd': 0.0 if movimiento.tipo_movimiento == 'saldo_a_favor' else round(movimiento.monto_usd or 0.0, 2),
+            'cargo_usd': round(movimiento.monto_usd or 0.0, 2) if movimiento.tipo_movimiento in ('saldo_a_favor', 'nota_debito', 'interes_mora') else 0.0,
+            'abono_usd': 0.0 if movimiento.tipo_movimiento in ('saldo_a_favor', 'nota_debito', 'interes_mora') else round(movimiento.monto_usd or 0.0, 2),
             'saldo_documento_usd': None,
             'estado': '',
             'movimiento_referencia_id': movimiento.movimiento_referencia_id,

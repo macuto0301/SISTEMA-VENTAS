@@ -80,6 +80,10 @@ def ensure_demo_dataset() -> None:
             email='cliente-demo@local.test',
             direccion='Av. Principal Demo',
             activo=True,
+            limite_credito_usd=120.0,
+            limite_documentos=3,
+            dias_credito=15,
+            dias_tolerancia=3,
         )
         db.session.add(cliente_credito)
         db.session.flush()
@@ -324,6 +328,11 @@ def ensure_demo_dataset() -> None:
             monto_abonado_usd=15.0,
             saldo_pendiente_usd=25.0,
             estado='abonada',
+            dias_credito_snapshot=15,
+            dias_tolerancia_snapshot=3,
+            fecha_ultimo_abono=ahora_local() - timedelta(days=1),
+            dias_mora=0,
+            estado_riesgo='al_dia',
             observacion='Cuenta por cobrar de practica creada automaticamente',
         )
         db.session.add(cuenta)
